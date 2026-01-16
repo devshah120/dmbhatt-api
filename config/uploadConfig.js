@@ -92,8 +92,42 @@ const uploadAssistantFiles = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 }).single('aadharFile');
 
+// Universal upload handler that accepts fields for any role
+// This solves the issue where req.body is empty before multer runs
+const uploadUniversal = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+            if (file.fieldname === 'aadharFile') {
+                cb(null, 'uploads/aadhar/');
+            } else {
+                cb(null, 'uploads/photos/');
+            }
+        },
+        filename: (req, file, cb) => {
+            const uniqueName = `${crypto.randomUUID()}${path.extname(file.originalname)}`;
+            cb(null, uniqueName);
+        }
+    }),
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /pdf|jpeg|jpg|png/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (extname && mimetype) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF and image files are allowed'));
+        }
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+}).fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'aadharFile', maxCount: 2 }
+]);
+
 module.exports = {
     uploadPhoto,
     uploadAadhar,
-    uploadAssistantFiles
+    uploadAssistantFiles,
+    uploadUniversal
 };

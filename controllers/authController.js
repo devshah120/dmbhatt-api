@@ -98,8 +98,23 @@ const registerAssistant = async (req, session) => {
     const { name, email, phoneNum, aadharNum, address, loginCode } = req.body;
 
     // Check if aadhar file was uploaded
-    if (!req.file) {
+    const aadharFiles = req.files?.aadharFile;
+    if (!aadharFiles || aadharFiles.length === 0) {
         throw new Error('Aadhar card file is required');
+    }
+
+    // Validate file count and types
+    if (aadharFiles.length === 1) {
+        // Allow PDF or Image
+        // Multer filter already checks for allowed types, so we just proceed
+    } else if (aadharFiles.length === 2) {
+        // Allow only Images if 2 files are uploaded
+        const isAllImages = aadharFiles.every(file => ['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype));
+        if (!isAllImages) {
+            throw new Error('If uploading 2 files, both must be images (Front and Back)');
+        }
+    } else {
+        throw new Error('Maximum 2 files allowed for Aadhar card');
     }
 
     // Check if user exists
@@ -133,7 +148,7 @@ const registerAssistant = async (req, session) => {
     const assistantProfile = new AssistantProfile({
         userId: savedUser._id,
         aadharNum,
-        aadharFilePath: req.file.path
+        aadharFilePath: aadharFiles.map(file => file.path)
     });
 
     await assistantProfile.save({ session });
@@ -147,7 +162,8 @@ const registerStudent = async (req, session) => {
     const { firstName, middleName, lastName, phoneNum, std, medium, school, loginCode } = req.body;
 
     // Check if photo was uploaded
-    if (!req.file) {
+    const photoFile = req.files?.photo?.[0];
+    if (!photoFile) {
         throw new Error('Photo is required for student registration');
     }
 
@@ -169,7 +185,8 @@ const registerStudent = async (req, session) => {
         lastName,
         phoneNum,
         loginCodeHash,
-        photoPath: req.file.path
+        loginCodeHash,
+        photoPath: req.files.photo[0].path
     });
 
     const savedUser = await user.save({ session });
@@ -193,7 +210,8 @@ const registerGuest = async (req, session) => {
     const { firstName, middleName, lastName, phoneNum, loginCode, schoolName } = req.body;
 
     // Check if photo was uploaded
-    if (!req.file) {
+    const photoFile = req.files?.photo?.[0];
+    if (!photoFile) {
         throw new Error('Photo is required for guest registration');
     }
 
@@ -215,7 +233,8 @@ const registerGuest = async (req, session) => {
         lastName,
         phoneNum,
         loginCodeHash,
-        photoPath: req.file.path
+        loginCodeHash,
+        photoPath: req.files.photo[0].path
     });
 
     const savedUser = await user.save({ session });
@@ -248,10 +267,10 @@ const login = async (req, res) => {
                 user = await loginAssistant(loginCode);
                 break;
             case 'student':
-                user = await loginStudent(loginCode, schoolName, req.file);
+                user = await loginStudent(loginCode, schoolName, req.files?.photo?.[0]);
                 break;
             case 'guest':
-                user = await loginGuest(loginCode, schoolName, req.file);
+                user = await loginGuest(loginCode, schoolName, req.files?.photo?.[0]);
                 break;
             default:
                 return res.status(400).json({ message: 'Invalid role specified' });

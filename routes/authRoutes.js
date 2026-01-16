@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { registrationValidation, loginValidation } = require('../middleware/validator');
-const { uploadPhoto, uploadAssistantFiles } = require('../config/uploadConfig');
+const { uploadPhoto, uploadAssistantFiles, uploadUniversal } = require('../config/uploadConfig');
 
 /**
  * Middleware to handle file uploads based on role
@@ -51,9 +51,9 @@ const handleLoginFileUpload = (req, res, next) => {
 };
 
 // Registration route - single endpoint with role in body
-router.post('/register', handleFileUpload, registrationValidation, authController.register);
+router.post('/register', uploadUniversal, registrationValidation, authController.register);
 
 // Login route - single endpoint with role in body
-router.post('/login', handleLoginFileUpload, loginValidation, authController.login);
+router.post('/login', uploadUniversal, loginValidation, authController.login);
 
 module.exports = router;

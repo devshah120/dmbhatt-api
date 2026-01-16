@@ -13,12 +13,16 @@ const assistantProfileSchema = new mongoose.Schema({
         trim: true
     },
     aadharFilePath: {
-        type: String,
+        type: [String],
         required: true,
-        trim: true
+        validate: [arrayLimit, '{PATH} exceeds the limit of 2']
     }
 }, {
     timestamps: true
 });
+
+function arrayLimit(val) {
+    return val.length <= 2;
+}
 
 module.exports = mongoose.model('AssistantProfile', assistantProfileSchema);
