@@ -12,6 +12,24 @@ const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require
  */
 const register = async (req, res) => {
     const { role } = req.body;
+
+    if (!role) {
+        return res.status(400).json({ message: 'Role is required' });
+    }
+
+    // Validate role-based file requirements
+    if (role === 'assistant') {
+        if (!req.files?.aadharFile?.length) {
+            return res.status(400).json({ message: 'Aadhar file required for assistant registration' });
+        }
+    }
+
+    if (role === 'student' || role === 'guest') {
+        if (!req.files?.photo?.length) {
+            return res.status(400).json({ message: 'Photo required for student/guest registration' });
+        }
+    }
+
     const session = await mongoose.startSession();
 
     try {
