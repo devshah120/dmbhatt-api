@@ -26,6 +26,10 @@ const studentProfileSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true
+    },
+    parentPhone: {
+        type: String,
+        trim: true
     }
 }, {
     timestamps: true

@@ -39,7 +39,8 @@ const getProfile = async (req, res) => {
                 email: user.email,
                 phoneNum: user.phoneNum,
                 photoPath: user.photoPath,
-                role: user.role
+                role: user.role,
+                address: user.address, // Include address for city
             },
             profile: profile || {}
         });
@@ -58,11 +59,17 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const user = req.user;
-        const { firstName, phoneNum, school, city, std, medium, schoolName } = req.body; // Add other fields as needed
+        const { firstName, phoneNum, school, city, std, medium, schoolName, parentPhone } = req.body; // Add other fields as needed
 
         // Update User basic fields
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
+
+        // Update Address (City)
+        if (city) {
+            user.address = user.address || {};
+            user.address.city = city;
+        }
 
         await user.save();
 
@@ -74,6 +81,7 @@ const updateProfile = async (req, res) => {
                 if (std) profile.std = std;
                 if (medium) profile.medium = medium;
                 if (school) profile.school = school;
+                if (parentPhone) profile.parentPhone = parentPhone;
                 await profile.save();
             }
         } else if (user.role === 'guest') {
