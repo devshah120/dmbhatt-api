@@ -199,7 +199,6 @@ const registerStudent = async (req, session) => {
     const user = new User({
         role: 'student',
         firstName,
-        middleName,
         lastName,
         phoneNum,
         loginCodeHash,
@@ -225,7 +224,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, lastName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
-    const { firstName, middleName, lastName, phoneNum, loginCode, schoolName } = req.body;
+    const { firstName, phoneNum, loginCode, schoolName } = req.body;
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
@@ -247,8 +246,6 @@ const registerGuest = async (req, session) => {
     const user = new User({
         role: 'guest',
         firstName,
-        middleName,
-        lastName,
         phoneNum,
         loginCodeHash,
         loginCodeHash,
