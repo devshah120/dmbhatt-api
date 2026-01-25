@@ -19,6 +19,8 @@ const profileRoutes = require('./routes/profileRoutes');
 app.use('/api/profile', profileRoutes);
 const dashboardRoutes = require('./routes/dashboardRoutes');
 app.use('/api/dashboard', dashboardRoutes);
+const examRoutes = require('./routes/examRoutes');
+app.use('/api/exam', examRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
