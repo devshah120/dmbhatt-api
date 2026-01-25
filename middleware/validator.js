@@ -87,9 +87,7 @@ const loginValidation = [
     body('loginCode')
         .notEmpty().withMessage('Login code is required'),
 
-    // School name required for student and guest
-    body('schoolName').if(body('role').isIn(['student', 'guest']))
-        .notEmpty().withMessage('School name is required for student/guest login'),
+
 
     // Validation result handler
     (req, res, next) => {
