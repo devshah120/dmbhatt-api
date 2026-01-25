@@ -21,6 +21,11 @@ const studentProfileSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true
+    },
+    rollNo: {
+        type: String,
+        required: true,
+        trim: true
     }
 }, {
     timestamps: true

@@ -24,11 +24,11 @@ const register = async (req, res) => {
         }
     }
 
-    if (role === 'student' || role === 'guest') {
-        if (!req.files?.photo?.length) {
-            return res.status(400).json({ message: 'Photo required for student/guest registration' });
-        }
-    }
+    // if (role === 'student' || role === 'guest') {
+    //     if (!req.files?.photo?.length) {
+    //         return res.status(400).json({ message: 'Photo required for student/guest registration' });
+    //     }
+    // }
 
     const session = await mongoose.startSession();
 
@@ -177,13 +177,13 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, lastName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, middleName, lastName, phoneNum, std, medium, school, loginCode } = req.body;
+    const { firstName, middleName, lastName, phoneNum, std, medium, school, loginCode, rollNo } = req.body;
 
-    // Check if photo was uploaded
-    const photoFile = req.files?.photo?.[0];
-    if (!photoFile) {
-        throw new Error('Photo is required for student registration');
-    }
+    // Check if photo was uploaded (Optional now)
+    // const photoFile = req.files?.photo?.[0];
+    // if (!photoFile) {
+    //     throw new Error('Photo is required for student registration');
+    // }
 
     // Check if user exists
     const existingUser = await User.findOne({ phoneNum }).session(session);
@@ -203,8 +203,7 @@ const registerStudent = async (req, session) => {
         lastName,
         phoneNum,
         loginCodeHash,
-        loginCodeHash,
-        photoPath: req.files.photo[0].path
+        photoPath: req.files?.photo?.[0]?.path || ''
     });
 
     const savedUser = await user.save({ session });
@@ -214,7 +213,8 @@ const registerStudent = async (req, session) => {
         userId: savedUser._id,
         std,
         medium,
-        school
+        school,
+        rollNo
     });
 
     await studentProfile.save({ session });
@@ -252,7 +252,7 @@ const registerGuest = async (req, session) => {
         phoneNum,
         loginCodeHash,
         loginCodeHash,
-        photoPath: req.files.photo[0].path
+        photoPath: req.files?.photo?.[0]?.path || ''
     });
 
     const savedUser = await user.save({ session });
@@ -271,27 +271,20 @@ const registerGuest = async (req, session) => {
  * Handles login for all roles: admin, assistant, student, guest
  */
 const login = async (req, res) => {
-    const { role, loginCode, schoolName } = req.body;
+    const { role, loginCode, phoneNum } = req.body;
 
     try {
         let user;
 
-        // Role-specific login logic
-        switch (role) {
-            case 'admin':
-                user = await loginAdmin(loginCode);
-                break;
-            case 'assistant':
-                user = await loginAssistant(loginCode);
-                break;
-            case 'student':
-                user = await loginStudent(loginCode, schoolName, req.files?.photo?.[0]);
-                break;
-            case 'guest':
-                user = await loginGuest(loginCode, schoolName, req.files?.photo?.[0]);
-                break;
-            default:
-                return res.status(400).json({ message: 'Invalid role specified' });
+        // Common login logic: Find user by role and identifier (phoneNum or loginCode for admin)
+        if (role === 'admin') {
+            user = await loginAdmin(loginCode);
+        } else {
+            // For assistant, student, guest - use phoneNum
+            if (!phoneNum) {
+                return res.status(400).json({ message: 'Phone number is required' });
+            }
+            user = await loginUserByPhone(role, phoneNum, loginCode);
         }
 
         // Generate JWT token
@@ -340,36 +333,10 @@ const loginAdmin = async (loginCode) => {
 };
 
 /**
- * Assistant Login
- * Required: loginCode
+ * Generic Login by Phone (Student, Guest, Assistant)
  */
-const loginAssistant = async (loginCode) => {
-    // For assistant, we need to find by login code since there can be multiple assistants
-    // We'll need phone number or email for proper identification
-    throw new Error('Assistant login requires phone number or email for identification');
-};
-
-/**
- * Student Login
- * Required: schoolName, loginCode, photo
- */
-const loginStudent = async (loginCode, schoolName, photoFile) => {
-    if (!schoolName) {
-        throw new Error('School name is required for student login');
-    }
-
-    if (!photoFile) {
-        throw new Error('Photo is required for student login verification');
-    }
-
-    // Find student by school name
-    const studentProfile = await StudentProfile.findOne({ school: schoolName });
-
-    if (!studentProfile) {
-        throw new Error('Student not found for this school');
-    }
-
-    const user = await User.findById(studentProfile.userId);
+const loginUserByPhone = async (role, phoneNum, loginCode) => {
+    const user = await User.findOne({ role, phoneNum });
 
     if (!user) {
         throw new Error('User not found');
@@ -378,49 +345,8 @@ const loginStudent = async (loginCode, schoolName, photoFile) => {
     const isMatch = await compareLoginCode(loginCode, user.loginCodeHash);
 
     if (!isMatch) {
-        throw new Error('Invalid login code');
+        throw new Error('Invalid password/PIN');
     }
-
-    // TODO: Implement photo verification logic here
-    // For now, just accepting the photo upload
-
-    return user;
-};
-
-/**
- * Guest Login
- * Required: schoolName, loginCode, photo
- */
-const loginGuest = async (loginCode, schoolName, photoFile) => {
-    if (!schoolName) {
-        throw new Error('School name is required for guest login');
-    }
-
-    if (!photoFile) {
-        throw new Error('Photo is required for guest login verification');
-    }
-
-    // Find guest by school name
-    const guestProfile = await GuestProfile.findOne({ schoolName });
-
-    if (!guestProfile) {
-        throw new Error('Guest not found for this school');
-    }
-
-    const user = await User.findById(guestProfile.userId);
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    const isMatch = await compareLoginCode(loginCode, user.loginCodeHash);
-
-    if (!isMatch) {
-        throw new Error('Invalid login code');
-    }
-
-    // TODO: Implement photo verification logic here
-    // For now, just accepting the photo upload
 
     return user;
 };
