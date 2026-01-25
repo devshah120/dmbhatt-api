@@ -10,7 +10,7 @@ const registrationValidation = [
 
     body('loginCode')
         .notEmpty().withMessage('Login code is required')
-        .isLength({ min: 4, max: 6 }).withMessage('Login code must be between 4 and 6 characters'),
+        .isLength({ min: 4 }).withMessage('Login code must be at least 4 characters'),
 
     body('phoneNum')
         .notEmpty().withMessage('Phone number is required')
@@ -62,11 +62,11 @@ const registrationValidation = [
     body('firstName').if(body('role').equals('guest'))
         .notEmpty().withMessage('First name is required for guest'),
 
-    body('middleName').if(body('role').equals('guest'))
-        .notEmpty().withMessage('Middle name is required for guest'),
+    // body('middleName').if(body('role').equals('guest'))
+    //     .notEmpty().withMessage('Middle name is required for guest'),
 
-    body('lastName').if(body('role').equals('guest'))
-        .notEmpty().withMessage('Last name is required for guest'),
+    // body('lastName').if(body('role').equals('guest'))
+    //     .notEmpty().withMessage('Last name is required for guest'),
 
     // Validation result handler
     (req, res, next) => {
