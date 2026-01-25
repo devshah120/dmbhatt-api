@@ -26,8 +26,8 @@ const submitExamResult = async (req, res) => {
         });
 
         // 2. Calculate Reward Points
-        // Logic: 1 Point for every 10 marks (e.g., 50 -> 5, 45 -> 4)
-        const earnedPoints = Math.floor(obtainedMarks / 10);
+        // Logic: 1 Point for every 1 marks (e.g., 7 -> 7)
+        const earnedPoints = obtainedMarks;
 
         if (earnedPoints > 0) {
             // 3. Update Student Profile
