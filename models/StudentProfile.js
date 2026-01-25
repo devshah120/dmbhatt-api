@@ -30,6 +30,10 @@ const studentProfileSchema = new mongoose.Schema({
     parentPhone: {
         type: String,
         trim: true
+    },
+    totalRewardPoints: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
