@@ -46,8 +46,7 @@ const registrationValidation = [
     // body('middleName').if(body('role').equals('student'))
     //     .notEmpty().withMessage('Middle name is required for student'),
 
-    // body('lastName').if(body('role').equals('student'))
-    //     .notEmpty().withMessage('Last name is required for student'),
+
 
     body('std').if(body('role').equals('student'))
         .notEmpty().withMessage('STD is required for student'),
@@ -65,8 +64,7 @@ const registrationValidation = [
     // body('middleName').if(body('role').equals('guest'))
     //     .notEmpty().withMessage('Middle name is required for guest'),
 
-    // body('lastName').if(body('role').equals('guest'))
-    //     .notEmpty().withMessage('Last name is required for guest'),
+
 
     // Validation result handler
     (req, res, next) => {

@@ -174,7 +174,7 @@ const registerAssistant = async (req, session) => {
 
 /**
  * Student Registration
- * Required: firstName, middleName, lastName, phoneNum, std, medium, school, photo, loginCode
+ * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
     const { firstName, phoneNum, std, medium, school, loginCode, rollNo } = req.body;
@@ -199,7 +199,6 @@ const registerStudent = async (req, session) => {
     const user = new User({
         role: 'student',
         firstName,
-        lastName,
         phoneNum,
         loginCodeHash,
         photoPath: req.files?.photo?.[0]?.path || ''
@@ -221,7 +220,7 @@ const registerStudent = async (req, session) => {
 
 /**
  * Guest Registration
- * Required: firstName, middleName, lastName, phoneNum, photo, loginCode
+ * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
     const { firstName, phoneNum, loginCode, schoolName } = req.body;
@@ -294,7 +293,7 @@ const login = async (req, res) => {
                 id: user._id,
                 role: user.role,
                 firstName: user.firstName,
-                lastName: user.lastName,
+                // lastName: user.lastName, // Removed as per request
                 email: user.email,
                 phoneNum: user.phoneNum
             }
