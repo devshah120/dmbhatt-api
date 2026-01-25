@@ -332,7 +332,9 @@ const loginAdmin = async (loginCode) => {
  * Generic Login by Phone (Student, Guest, Assistant)
  */
 const loginUserByPhone = async (role, phoneNum, loginCode) => {
-    const user = await User.findOne({ role, phoneNum });
+    // Find by phoneNum only (unique), so we can handle any role (student/guest/assistant) 
+    // even if frontend sends a default role like 'student'.
+    const user = await User.findOne({ phoneNum });
 
     if (!user) {
         throw new Error('User not found');
