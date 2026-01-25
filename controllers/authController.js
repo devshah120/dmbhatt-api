@@ -177,9 +177,9 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, lastName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, middleName, lastName, phoneNum, std, medium, school, loginCode, rollNo } = req.body;
+    const { firstName, phoneNum, std, medium, school, loginCode, rollNo } = req.body;
 
-    // Check if photo was uploaded (Optional now)
+    // Check if photo was uploaded (Optional now)i 
     // const photoFile = req.files?.photo?.[0];
     // if (!photoFile) {
     //     throw new Error('Photo is required for student registration');

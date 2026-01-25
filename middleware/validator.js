@@ -43,11 +43,11 @@ const registrationValidation = [
     body('firstName').if(body('role').equals('student'))
         .notEmpty().withMessage('First name is required for student'),
 
-    body('middleName').if(body('role').equals('student'))
-        .notEmpty().withMessage('Middle name is required for student'),
+    // body('middleName').if(body('role').equals('student'))
+    //     .notEmpty().withMessage('Middle name is required for student'),
 
-    body('lastName').if(body('role').equals('student'))
-        .notEmpty().withMessage('Last name is required for student'),
+    // body('lastName').if(body('role').equals('student'))
+    //     .notEmpty().withMessage('Last name is required for student'),
 
     body('std').if(body('role').equals('student'))
         .notEmpty().withMessage('STD is required for student'),
