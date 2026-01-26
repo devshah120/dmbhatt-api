@@ -8,11 +8,11 @@ const { hashLoginCode, parseAddress } = require('../utils/helpers');
  * Add Student (Admin)
  */
 const addStudent = async (req, res) => {
-    const { name, phone, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
+    const { name, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
 
     // Check required fields
-    if (!name || !phone) {
-        return res.status(400).json({ message: 'Name and Phone Number are required' });
+    if (!name || !phone || !password) {
+        return res.status(400).json({ message: 'Name, Phone Number, and Password are required' });
     }
 
     const session = await mongoose.startSession();
@@ -25,8 +25,8 @@ const addStudent = async (req, res) => {
             throw new Error('User with this Phone Number already exists');
         }
 
-        // Generate default login code (same as phone number)
-        const loginCodeHash = await hashLoginCode(phone);
+        // Hash provided password
+        const loginCodeHash = await hashLoginCode(password);
 
         // Create User
         const user = new User({
