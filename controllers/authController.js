@@ -272,16 +272,13 @@ const login = async (req, res) => {
     try {
         let user;
 
-        // Common login logic: Find user by role and identifier (phoneNum or loginCode for admin)
-        if (role === 'admin') {
-            user = await loginAdmin(loginCode);
-        } else {
-            // For assistant, student, guest - use phoneNum
-            if (!phoneNum) {
-                return res.status(400).json({ message: 'Phone number is required' });
-            }
-            user = await loginUserByPhone(role, phoneNum, loginCode);
+        // Unified login logic: Require phoneNum for all roles
+        if (!phoneNum) {
+            return res.status(400).json({ message: 'Phone number is required' });
         }
+
+        // Find user by phone number ONLY (ignores role sent by client for lookup)
+        user = await loginUserByPhone(role, phoneNum, loginCode);
 
         // Generate JWT token
         const token = generateToken(user._id, user.role);
@@ -308,30 +305,13 @@ const login = async (req, res) => {
     }
 };
 
-/**
- * Admin Login
- * Required: loginCode
- */
-const loginAdmin = async (loginCode) => {
-    const user = await User.findOne({ role: 'admin' });
 
-    if (!user) {
-        throw new Error('Admin user not found');
-    }
-
-    const isMatch = await compareLoginCode(loginCode, user.loginCodeHash);
-
-    if (!isMatch) {
-        throw new Error('Invalid login code');
-    }
-
-    return user;
-};
 
 /**
  * Generic Login by Phone (Student, Guest, Assistant)
  */
 const loginUserByPhone = async (role, phoneNum, loginCode) => {
+    // Normal DB Lookup
     // Find by phoneNum only (unique), so we can handle any role (student/guest/assistant) 
     // even if frontend sends a default role like 'student'.
     const user = await User.findOne({ phoneNum });
