@@ -14,7 +14,6 @@ const assistantProfileSchema = new mongoose.Schema({
     },
     aadharFilePath: {
         type: [String],
-        required: true,
         validate: [arrayLimit, '{PATH} exceeds the limit of 2']
     }
 }, {

@@ -24,7 +24,6 @@ const studentProfileSchema = new mongoose.Schema({
     },
     rollNo: {
         type: String,
-        required: true,
         trim: true
     },
     parentPhone: {
