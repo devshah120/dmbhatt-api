@@ -75,10 +75,10 @@ const addStudent = async (req, res) => {
  * Add Assistant (Admin)
  */
 const addAssistant = async (req, res) => {
-    const { name, phone, aadharName, address } = req.body;
+    const { name, phone, password, aadharNumber, address } = req.body;
 
-    if (!name || !phone) {
-        return res.status(400).json({ message: 'Name and Phone Number are required' });
+    if (!name || !phone || !password || !aadharNumber) {
+        return res.status(400).json({ message: 'Name, Phone, Password, and Aadhar Number are required' });
     }
 
     const session = await mongoose.startSession();
@@ -91,11 +91,10 @@ const addAssistant = async (req, res) => {
             throw new Error('User with this Phone Number already exists');
         }
 
-        // Generate default login code (same as phone number)
-        const loginCodeHash = await hashLoginCode(phone);
+        // Hash the provided password
+        const loginCodeHash = await hashLoginCode(password);
 
         // Create User
-        // Assistant address comes as a string usually, we can store in street or parse
         const user = new User({
             role: 'assistant',
             firstName: name,
@@ -108,8 +107,8 @@ const addAssistant = async (req, res) => {
         // Create Profile
         const assistantProfile = new AssistantProfile({
             userId: savedUser._id,
-            aadharNum: aadharName || 'N/A', // Using aadharName as ID/Num
-            // aadharFilePath: [] // Optional now
+            aadharNum: aadharNumber, // Store actual Aadhar Number
+            // aadharFilePath: [] 
         });
         await assistantProfile.save({ session });
 
