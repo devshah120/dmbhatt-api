@@ -23,6 +23,8 @@ const examRoutes = require('./routes/examRoutes');
 app.use('/api/exam', examRoutes);
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
+const exploreRoutes = require('./routes/exploreRoutes');
+app.use('/api/explore', exploreRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
