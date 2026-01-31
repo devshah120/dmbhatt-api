@@ -15,4 +15,8 @@ router.post('/forget-password', authController.forgetPassword);
 router.post('/verify-otp', authController.verifyOtp);
 router.post('/reset-password', authController.resetPassword);
 
+// Protected routes
+const { protect } = require('../middleware/authMiddleware');
+router.post('/update-password', protect, authController.updatePassword);
+
 module.exports = router;

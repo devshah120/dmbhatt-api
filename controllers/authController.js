@@ -399,11 +399,45 @@ const loginUserByPhone = async (role, phoneNum, loginCode) => {
     return user;
 };
 
+/**
+ * Update Password
+ */
+const updatePassword = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const user = req.user; // Set by protect middleware
+
+    try {
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ message: 'Old and new passwords are required' });
+        }
+
+        // Verify old password
+        const isMatch = await compareLoginCode(oldPassword, user.loginCodeHash);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Incorrect old password' });
+        }
+
+        // Hash new password
+        const loginCodeHash = await hashLoginCode(newPassword);
+
+        // Update user
+        user.loginCodeHash = loginCodeHash;
+        await user.save();
+
+        res.status(200).json({ message: 'Password updated successfully' });
+
+    } catch (err) {
+        console.error('Update Password Error:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
 module.exports = {
     register,
     login,
     forgetPassword,
     verifyOtp,
-    resetPassword
+    resetPassword,
+    updatePassword
 };
 
