@@ -10,4 +10,9 @@ router.post('/register', uploadUniversal, registrationValidation, authController
 // Login route - single endpoint with role in body
 router.post('/login', uploadUniversal, loginValidation, authController.login);
 
+// Forgot Password Flow
+router.post('/forget-password', authController.forgetPassword);
+router.post('/verify-otp', authController.verifyOtp);
+router.post('/reset-password', authController.resetPassword);
+
 module.exports = router;

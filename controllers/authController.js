@@ -308,6 +308,73 @@ const login = async (req, res) => {
 
 
 /**
+ * Forgot Password - Send OTP
+ */
+const forgetPassword = async (req, res) => {
+    const { phoneNum } = req.body;
+
+    try {
+        const user = await User.findOne({ phoneNum });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found with this phone number' });
+        }
+
+        // In a real app, generate and send OTP here.
+        // For now, we imply static OTP '1111' will be used.
+        res.status(200).json({ message: 'OTP sent successfully to your phone number' });
+
+    } catch (err) {
+        console.error('Forget Password Error:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * Verify OTP
+ */
+const verifyOtp = async (req, res) => {
+    const { phoneNum, otp } = req.body;
+
+    try {
+        // Validate static OTP
+        if (otp === '1111') {
+            return res.status(200).json({ message: 'OTP verified successfully' });
+        } else {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+    } catch (err) {
+        console.error('Verify OTP Error:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+/**
+ * Reset Password
+ */
+const resetPassword = async (req, res) => {
+    const { phoneNum, newPassword } = req.body;
+
+    try {
+        const user = await User.findOne({ phoneNum });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Hash new password (loginCode)
+        const loginCodeHash = await hashLoginCode(newPassword);
+
+        user.loginCodeHash = loginCodeHash;
+        await user.save();
+
+        res.status(200).json({ message: 'Password reset successfully' });
+
+    } catch (err) {
+        console.error('Reset Password Error:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+/**
  * Generic Login by Phone (Student, Guest, Assistant)
  */
 const loginUserByPhone = async (role, phoneNum, loginCode) => {
@@ -334,5 +401,9 @@ const loginUserByPhone = async (role, phoneNum, loginCode) => {
 
 module.exports = {
     register,
-    login
+    login,
+    forgetPassword,
+    verifyOtp,
+    resetPassword
 };
+
