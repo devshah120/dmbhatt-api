@@ -25,6 +25,8 @@ const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
 const exploreRoutes = require('./routes/exploreRoutes');
 app.use('/api/explore', exploreRoutes);
+const paperSetRoutes = require('./routes/paperSetRoutes');
+app.use('/api/paperset', paperSetRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
