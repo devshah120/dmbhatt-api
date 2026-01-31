@@ -404,9 +404,12 @@ const loginUserByPhone = async (role, phoneNum, loginCode) => {
  */
 const updatePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
-    const user = req.user; // Set by protect middleware
+    // const user = req.user; // Set by protect middleware but lacks password hash
 
     try {
+        // Re-fetch user to get the password hash
+        const user = await User.findById(req.user._id);
+
         if (!oldPassword || !newPassword) {
             return res.status(400).json({ message: 'Old and new passwords are required' });
         }
