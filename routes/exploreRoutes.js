@@ -20,5 +20,7 @@ const uploadExplore = multer({ storage: storage }).fields([{ name: 'image', maxC
 
 router.post('/add', uploadExplore, exploreController.createProduct);
 router.get('/all', exploreController.getAllProducts);
+router.put('/edit/:id', uploadExplore, exploreController.updateProduct);
+router.delete('/delete/:id', exploreController.deleteProduct);
 
 module.exports = router;
