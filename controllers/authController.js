@@ -312,12 +312,15 @@ const login = async (req, res) => {
  */
 const loginUserByPhone = async (role, phoneNum, loginCode) => {
     // Normal DB Lookup
-    // Find by phoneNum only (unique), so we can handle any role (student/guest/assistant) 
-    // even if frontend sends a default role like 'student'.
     const user = await User.findOne({ phoneNum });
 
     if (!user) {
         throw new Error('User not found');
+    }
+
+    // Enforce role check if role is provided
+    if (role && user.role !== role) {
+        throw new Error('wrong mobile number or password');
     }
 
     const isMatch = await compareLoginCode(loginCode, user.loginCodeHash);
