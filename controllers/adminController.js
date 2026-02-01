@@ -279,3 +279,11 @@ const deleteStudent = async (req, res) => {
         session.endSession();
     }
 };
+
+module.exports = {
+    addStudent,
+    addAssistant,
+    getAllStudents,
+    editStudent,
+    deleteStudent
+};
