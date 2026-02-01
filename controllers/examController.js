@@ -14,36 +14,59 @@ const uploadExamPdf = async (req, res) => {
 
     try {
         console.log('Starting PDF conversion...');
-        // 1. Convert PDF to Images (Array of Uint8Array)
-        const pdfBuffer = req.file.buffer;
-        const outputImages = await pdfImgConvert.convert(pdfBuffer);
+        if (!req.file || !req.file.buffer) {
+            console.error("Buffer is empty!");
+            return res.status(400).json({ message: "File upload failed: No buffer" });
+        }
 
-        console.log(`Converted PDF to ${outputImages.length} images. Starting OCR...`);
+        // 1. Convert PDF to Images
+        const pdfBuffer = req.file.buffer;
+        console.log(`Buffer Size: ${pdfBuffer.length} bytes`);
+
+        const outputImages = await pdfImgConvert.convert(pdfBuffer);
+        console.log(`Converted PDF to ${outputImages.length} images.`);
+
+        if (outputImages.length === 0) {
+            return res.status(400).json({ message: "PDF Conversion Failed: No images generated" });
+        }
 
         let fullText = "";
 
         // 2. Perform OCR on each page
-        // Use mapped promise to run concurrently-ish (limit concurrency in prod, but ok for now)
         for (let i = 0; i < outputImages.length; i++) {
             const imageBuffer = outputImages[i];
+            console.log(`Processing Page ${i + 1}, Image Size: ${imageBuffer.length}`);
 
-            const { data: { text } } = await Tesseract.recognize(
-                imageBuffer,
-                'eng+guj',
-                { logger: m => console.log(`Page ${i + 1}: ${m.status} ${Math.floor(m.progress * 100)}%`) }
-            );
+            try {
+                const { data: { text } } = await Tesseract.recognize(
+                    imageBuffer,
+                    'eng+guj',
+                    {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                console.log(`Page ${i + 1}: ${Math.floor(m.progress * 100)}%`);
+                            }
+                        },
+                        errorHandler: err => console.error("Tesseract Page Error:", err)
+                    }
+                );
+                console.log(`Page ${i + 1} Text Length: ${text.length}`);
+                console.log(`Page ${i + 1} Sample: ${text.substring(0, 50)}...`);
 
-            fullText += text + "\n";
+                fullText += text + "\n";
+            } catch (ocrErr) {
+                console.error(`OCR Error on Page ${i + 1}:`, ocrErr);
+            }
         }
 
-        console.log('OCR Complete. Cleaning and Parsing...');
+        console.log('OCR Complete. Total Text Length:', fullText.length);
 
         // 3. Clean and Parse Text
         const parsedQuestions = parseQuestionsErrors(fullText);
 
         res.status(200).json({
             message: 'OCR Processing Complete',
-            rawText: fullText, // Debugging
+            rawText: fullText || "No text extracted by OCR engine.",
             questions: parsedQuestions
         });
 
