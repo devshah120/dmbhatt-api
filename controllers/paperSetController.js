@@ -78,3 +78,43 @@ exports.getPaperSetLogs = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+exports.editPaperSet = async (req, res) => {
+    const { id } = req.params;
+    const { examName, date, std, totalMarks, endTime, startTime, stream } = req.body;
+
+    // Build update object
+    const updateData = {};
+    if (examName) updateData.examName = examName;
+    if (date) updateData.date = date;
+    if (std) updateData.standard = std;
+    if (totalMarks) updateData.totalMarks = totalMarks;
+    if (endTime) updateData.endTime = endTime;
+    if (startTime) updateData.startTime = startTime;
+    if (stream) updateData.stream = stream;
+
+    try {
+        const paperSet = await PaperSet.findByIdAndUpdate(id, updateData, { new: true });
+        if (!paperSet) {
+            return res.status(404).json({ message: 'Paper Set not found' });
+        }
+        res.status(200).json({ message: 'Paper Set updated successfully', paperSet });
+    } catch (err) {
+        console.error('Edit Paper Set Error:', err);
+        res.status(500).json({ message: 'Failed to update paper set' });
+    }
+};
+
+exports.deletePaperSet = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const paperSet = await PaperSet.findByIdAndDelete(id);
+        if (!paperSet) {
+            return res.status(404).json({ message: 'Paper Set not found' });
+        }
+        res.status(200).json({ message: 'Paper Set deleted successfully' });
+    } catch (err) {
+        console.error('Delete Paper Set Error:', err);
+        res.status(500).json({ message: 'Failed to delete paper set' });
+    }
+};
