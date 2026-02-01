@@ -408,18 +408,18 @@ const importStudents = async (req, res) => {
         };
 
         for (const row of data) {
-            // Expected columns: Name, Phone, Password, ParentPhone, Standard, Medium, Stream, State, City, Address, SchoolName
+            // Flexible Header Matching
             const name = row['Name'] || row['name'];
-            const phone = row['Phone'] || row['phone']; // Ensure string
-            const password = row['Password'] || row['password']; // In Excel might be number, cast to string
-            const parentPhone = row['ParentPhone'] || row['parentPhone'];
+            const phone = row['Phone Number'] || row['Phone'] || row['phone'];
+            const password = row['Password'] || row['password'];
+            const parentPhone = row["Parent's Mobile Number"] || row['ParentPhone'] || row['parentPhone'];
             const standard = row['Standard'] || row['standard'];
             const medium = row['Medium'] || row['medium'];
-            const stream = row['Stream'] || row['stream']; // Optional
+            const stream = row['Stream'] || row['stream'];
             const state = row['State'] || row['state'];
             const city = row['City'] || row['city'];
             const address = row['Address'] || row['address'];
-            const schoolName = row['SchoolName'] || row['schoolName'];
+            const schoolName = row['School Name'] || row['SchoolName'] || row['schoolName'];
 
             if (!name || !phone || !password) {
                 results.failed++;
