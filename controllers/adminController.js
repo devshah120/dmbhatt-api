@@ -124,13 +124,7 @@ const addAssistant = async (req, res) => {
     }
 };
 
-module.exports = {
-    addStudent,
-    addAssistant,
-    getAllStudents,
-    editStudent,
-    deleteStudent
-};
+// Exports moved to bottom
 
 /**
  * Get All Students
