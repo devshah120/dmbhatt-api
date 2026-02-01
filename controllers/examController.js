@@ -27,30 +27,29 @@ const uploadExamPdf = async (req, res) => {
         for (let i = 0; i < outputImages.length; i++) {
             const imageBuffer = outputImages[i];
 
-            const { data: { text } } = await Tesseract.recognize(
-                imageBuffer,
-                'eng',
+            imageBuffer,
+                'eng+guj',
                 { logger: m => console.log(`Page ${i + 1}: ${m.status} ${Math.floor(m.progress * 100)}%`) }
             );
 
-            fullText += text + "\n";
+fullText += text + "\n";
         }
 
-        console.log('OCR Complete. Cleaning and Parsing...');
+console.log('OCR Complete. Cleaning and Parsing...');
 
-        // 3. Clean and Parse Text
-        const parsedQuestions = parseQuestionsErrors(fullText);
+// 3. Clean and Parse Text
+const parsedQuestions = parseQuestionsErrors(fullText);
 
-        res.status(200).json({
-            message: 'OCR Processing Complete',
-            rawText: fullText, // Debugging
-            questions: parsedQuestions
-        });
+res.status(200).json({
+    message: 'OCR Processing Complete',
+    rawText: fullText, // Debugging
+    questions: parsedQuestions
+});
 
     } catch (err) {
-        console.error('PDF Upload Error:', err);
-        res.status(500).json({ message: 'Failed to process PDF', error: err.message });
-    }
+    console.error('PDF Upload Error:', err);
+    res.status(500).json({ message: 'Failed to process PDF', error: err.message });
+}
 };
 
 /**
