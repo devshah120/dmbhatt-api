@@ -3,6 +3,7 @@ const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
 const AssistantProfile = require('../models/AssistantProfile');
 const { hashLoginCode, parseAddress } = require('../utils/helpers');
+const xlsx = require('xlsx');
 
 /**
  * Add Student (Admin)
@@ -382,6 +383,102 @@ const deleteAssistant = async (req, res) => {
     }
 };
 
+/**
+ * Import Students from Excel
+ */
+const importStudents = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
+        // Read Excel File
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+
+        for (const row of data) {
+            // Expected columns: Name, Phone, Password, ParentPhone, Standard, Medium, Stream, State, City, Address, SchoolName
+            const name = row['Name'] || row['name'];
+            const phone = row['Phone'] || row['phone']; // Ensure string
+            const password = row['Password'] || row['password']; // In Excel might be number, cast to string
+            const parentPhone = row['ParentPhone'] || row['parentPhone'];
+            const standard = row['Standard'] || row['standard'];
+            const medium = row['Medium'] || row['medium'];
+            const stream = row['Stream'] || row['stream']; // Optional
+            const state = row['State'] || row['state'];
+            const city = row['City'] || row['city'];
+            const address = row['Address'] || row['address'];
+            const schoolName = row['SchoolName'] || row['schoolName'];
+
+            if (!name || !phone || !password) {
+                results.failed++;
+                results.errors.push(`Row missing required fields. Row: ${JSON.stringify(row)}`);
+                continue;
+            }
+
+            // Check duplicate in this batch or DB
+            const existingUser = await User.findOne({ phoneNum: phone }).session(session);
+            if (existingUser) {
+                results.failed++;
+                results.errors.push(`User already exists: ${phone}`);
+                continue;
+            }
+
+            // Create User
+            const loginCodeHash = await hashLoginCode(String(password));
+            const user = new User({
+                role: 'student',
+                firstName: name,
+                phoneNum: String(phone),
+                loginCodeHash,
+                address: {
+                    street: address,
+                    city: city,
+                    state: state
+                }
+            });
+            const savedUser = await user.save({ session });
+
+            // Generate Roll No
+            const rollNo = String(phone).substring(6) + Math.floor(Math.random() * 1000);
+
+            // Create Profile
+            const studentProfile = new StudentProfile({
+                userId: savedUser._id,
+                std: standard,
+                medium,
+                school: schoolName,
+                rollNo,
+                parentPhone: String(parentPhone),
+            });
+            await studentProfile.save({ session });
+
+            results.success++;
+        }
+
+        await session.commitTransaction();
+        res.status(200).json({ message: 'Import processed', results });
+
+    } catch (err) {
+        await session.abortTransaction();
+        console.error('Import Students Error:', err);
+        res.status(500).json({ message: 'Failed to import students', error: err.message });
+    } finally {
+        session.endSession();
+    }
+};
+
 module.exports = {
     addStudent,
     addAssistant,
@@ -390,5 +487,6 @@ module.exports = {
     deleteStudent,
     getAllAssistants,
     editAssistant,
-    deleteAssistant
+    deleteAssistant,
+    importStudents
 };

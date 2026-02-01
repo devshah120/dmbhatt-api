@@ -27,7 +27,11 @@ const storage = new CloudinaryStorage({
 });
 const uploadStudent = multer({ storage: storage }).fields([{ name: 'image', maxCount: 1 }]);
 
+// Excel Upload (Memory Storage)
+const uploadExcel = multer({ storage: multer.memoryStorage() });
+
 router.post('/add-student', uploadStudent, adminController.addStudent);
+router.post('/import-students', uploadExcel.single('file'), adminController.importStudents);
 router.get('/all-students', adminController.getAllStudents);
 router.put('/edit-student/:id', uploadStudent, adminController.editStudent);
 router.delete('/delete-student/:id', adminController.deleteStudent);
