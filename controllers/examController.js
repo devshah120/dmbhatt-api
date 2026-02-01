@@ -64,66 +64,90 @@ const uploadExamPdf = async (req, res) => {
  */
 const parseQuestionsErrors = (text) => {
     const questions = [];
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const cleanText = text.replace(/\r\n/g, '\n');
+    const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l);
 
     // Regex patterns
-    const questionStart = /^(\d+)[\.\)]\s*(.*)/; // 1. or 1) 
-    const optionStart = /^([A-D])[\)\.]\s*(.*)/i; // A) or A.
-    const answerStart = /^(Answer|Ans)[\s:-]*([A-D])/i; // Answer: A
+    const questionStart = /^(\d{1,3})[\.\)]\s*(.*)/; // Matches "01. Text", "1) Text"
+
+    // Answer Regex: Matches "Ans. (C)", "Answer: C", "Ans: C", "Ans (A)"
+    const answerPattern = /(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*([A-D])/i;
 
     let currentQuestion = null;
 
     for (const line of lines) {
-        // Check for Answer Line
-        const ansMatch = line.match(answerStart);
+        // 1. Check for Answer (Highest Priority if it ends a block)
+        const ansMatch = line.match(answerPattern);
         if (ansMatch) {
             if (currentQuestion) {
-                currentQuestion.correctAnswer = ansMatch[2].toUpperCase();
+                currentQuestion.correctAnswer = ansMatch[1].toUpperCase();
                 questions.push(currentQuestion);
                 currentQuestion = null;
             }
             continue;
         }
 
-        // Check for Option Line
-        const optMatch = line.match(optionStart);
-        if (optMatch) {
-            if (currentQuestion) {
-                currentQuestion.options.push({
-                    key: optMatch[1].toUpperCase(),
-                    text: optMatch[2]
-                });
-            }
-            continue;
-        }
-
-        // Check for New Question
+        // 2. Check for New Question Start
         const qMatch = line.match(questionStart);
         if (qMatch) {
-            // If previous question was pending (no answer found), push it anyway? 
-            // Or maybe it spans multiple lines.
-            // For now, if we hit a new number, we assume previous is done (even if answer missing - user can fix in UI)
+            // Push pending question if exists
             if (currentQuestion) {
                 questions.push(currentQuestion);
             }
-
             currentQuestion = {
-                id: Date.now() + Math.random(), // Temp frontend ID
+                id: Date.now() + Math.random(),
                 questionText: qMatch[2],
                 options: [],
-                correctAnswer: '' // Default empty
+                correctAnswer: ''
             };
             continue;
         }
 
-        // Continuation of previous line (Multi-line question or option)
+        // 3. Check for Options (Handle multiple per line)
         if (currentQuestion) {
-            if (currentQuestion.options.length > 0) {
-                // Append to last option
-                currentQuestion.options[currentQuestion.options.length - 1].text += " " + line;
+            // Regex to find options: "A. Text", " A) Text", " (A) Text"
+            // Look for [A-D] followed by dot/paren/space
+            // Safe pattern: Start of line or whitespace -> Letter -> dot/paren -> whitespace
+
+            const optionRegex = /(?:^|\s{2,})([A-D])[\.\)]\s+(.*?)(?=\s{2,}[A-D][\.\)]|$)/gi;
+
+            // If the line *starts* with an option characteristic
+            const startsWithOption = /^([A-D])[\.\)]\s/.test(line);
+
+            if (startsWithOption || optionRegex.test(line)) {
+                // Reset regex lastIndex
+                optionRegex.lastIndex = 0;
+                let foundOption = false;
+                let match;
+
+                // Try parsing multiple options on one line
+                while ((match = optionRegex.exec(line)) !== null) {
+                    foundOption = true;
+                    currentQuestion.options.push({
+                        key: match[1].toUpperCase(),
+                        text: match[2].trim()
+                    });
+                }
+
+                // Fallback: If regex failed but line starts with Option (simple case)
+                if (!foundOption && startsWithOption) {
+                    const parts = line.match(/^([A-D])[\.\)]\s+(.*)/);
+                    if (parts) {
+                        currentQuestion.options.push({
+                            key: parts[1].toUpperCase(),
+                            text: parts[2].trim()
+                        });
+                    }
+                }
             } else {
-                // Append to question text
-                currentQuestion.questionText += " " + line;
+                // Continuation of Question Text OR Previous Option
+                if (currentQuestion.options.length === 0) {
+                    // Still part of question text
+                    currentQuestion.questionText += " " + line;
+                } else {
+                    // Append to last option
+                    currentQuestion.options[currentQuestion.options.length - 1].text += " " + line;
+                }
             }
         }
     }
