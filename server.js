@@ -29,6 +29,8 @@ const paperSetRoutes = require('./routes/paperSetRoutes');
 app.use('/api/paperset', paperSetRoutes);
 const fiveMinTestRoutes = require('./routes/fiveMinTestRoutes');
 app.use('/api/fiveMinTest', fiveMinTestRoutes);
+const topRankerRoutes = require('./routes/topRankerRoutes');
+app.use('/api/topRanker', topRankerRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
