@@ -135,7 +135,15 @@ const uploadExamPdf = async (req, res) => {
  */
 const parseQuestionsErrors = (text) => {
     const questions = [];
-    const cleanText = text.replace(/\r\n/g, '\n');
+    // Normalize newlines
+    let cleanText = text.replace(/\r\n/g, '\n');
+
+    // IMPROVEMENT: Insert newlines before options that are on the same line
+    // Look for space followed by A-D, dot/paren, and space.
+    // e.g. "Option A text   B. Option B text" -> "Option A text\nB. Option B text"
+    // Using simple regex to catch implicit splits.
+    cleanText = cleanText.replace(/(\s{1,})([A-D][\.\)]\s+)/g, '\n$2');
+
     // Pre-processing: Split by newline
     const rawLines = cleanText.split('\n');
 
