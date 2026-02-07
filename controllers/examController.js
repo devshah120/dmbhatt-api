@@ -1,5 +1,6 @@
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
+const ExamResult = require('../models/ExamResult');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const fs = require('fs');
@@ -250,7 +251,10 @@ const parseQuestionsErrors = (text) => {
  * Save Exam
  */
 const saveExam = async (req, res) => {
-    const { name, subject, totalMarks, duration, questions } = req.body;
+    const { subject, std, medium, unit, totalMarks, questions } = req.body;
+
+    console.log('[DEBUG] Schema Paths:', Object.keys(Exam.schema.paths));
+    console.log('[DEBUG] Name Required:', Exam.schema.path('name')?.options?.required);
 
     try {
         // 1. Create Question Docs
@@ -259,10 +263,11 @@ const saveExam = async (req, res) => {
         // Create Exam first to get ID? Or Questions first?
         // Questions need examId.
         const exam = new Exam({
-            name,
             subject,
+            std,
+            medium,
+            unit,
             totalMarks,
-            durationMinutes: duration,
             // createdBy: req.user.id // If auth middleware used
         });
 
@@ -351,17 +356,18 @@ const getExamById = async (req, res) => {
  */
 const updateExam = async (req, res) => {
     const { id } = req.params;
-    const { name, subject, totalMarks, duration, questions } = req.body;
+    const { subject, std, medium, unit, totalMarks, questions } = req.body;
 
     try {
         // 1. Update Exam Metadata
         const exam = await Exam.findByIdAndUpdate(
             id,
             {
-                name,
                 subject,
+                std,
+                medium,
+                unit,
                 totalMarks,
-                durationMinutes: duration
             },
             { new: true }
         );
@@ -397,11 +403,63 @@ const updateExam = async (req, res) => {
     }
 };
 
+/**
+ * Submit Exam Result
+ */
+const submitExam = async (req, res) => {
+    const { examId, title, obtainedMarks, totalMarks, isOnline } = req.body;
+    const studentId = req.user._id;
+
+    console.log(`[DEBUG] Received sumbitExam: studentId=${studentId}, examId=${examId}, score=${obtainedMarks}/${totalMarks}`);
+
+    try {
+        // 1. Check if student already gave this exam
+        const existingResult = await ExamResult.findOne({ studentId, examId });
+        if (existingResult) {
+            return res.status(400).json({ message: 'You have already submitted this exam once.' });
+        }
+
+        // 2. Calculate Reward Points (1 point per 10 marks)
+        const earnedPoints = Math.floor(obtainedMarks / 10);
+
+        // 3. Update Student Profile
+        const StudentProfile = require('../models/StudentProfile');
+        const profile = await StudentProfile.findOne({ userId: studentId });
+        if (profile) {
+            profile.totalRewardPoints = (profile.totalRewardPoints || 0) + earnedPoints;
+            await profile.save();
+        }
+
+        // 4. Save Result
+        const result = new ExamResult({
+            studentId,
+            examId,
+            title,
+            obtainedMarks,
+            totalMarks,
+            isOnline: isOnline !== undefined ? isOnline : true,
+            earnedPoints: earnedPoints
+        });
+
+        await result.save();
+        res.status(201).json({
+            message: 'Exam result submitted successfully',
+            result,
+            earnedPoints
+        });
+
+    } catch (err) {
+        console.error('Submit Exam Error:', err);
+        res.status(500).json({ message: 'Failed to submit exam result', error: err.message });
+    }
+};
+
 module.exports = {
     uploadExamPdf,
     saveExam,
     getAllExams,
     deleteExam,
     getExamById,
-    updateExam
+    updateExam,
+    submitExam
 };

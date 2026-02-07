@@ -35,6 +35,7 @@ const getDashboardData = async (req, res) => {
                 title: exam.title,
                 obtainedMarks: exam.obtainedMarks,
                 totalMarks: exam.totalMarks,
+                earnedPoints: exam.earnedPoints || 0,
                 isOnline: exam.isOnline,
                 date: exam.date
             }))

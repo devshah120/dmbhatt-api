@@ -6,6 +6,11 @@ const examResultSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    examId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Exam',
+        required: true
+    },
     title: {
         type: String,
         required: true
@@ -25,6 +30,10 @@ const examResultSchema = new mongoose.Schema({
     isOnline: {
         type: Boolean,
         default: false
+    },
+    earnedPoints: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true

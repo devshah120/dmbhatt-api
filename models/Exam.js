@@ -1,10 +1,6 @@
 const mongoose = require('mongoose');
 
 const examSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true
-    },
     subject: {
         type: String,
         required: true
@@ -13,8 +9,16 @@ const examSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    durationMinutes: {
-        type: Number,
+    std: {
+        type: String,
+        required: true
+    },
+    medium: {
+        type: String,
+        required: true
+    },
+    unit: {
+        type: String,
         required: true
     },
     questions: [{

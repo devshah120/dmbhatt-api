@@ -12,6 +12,10 @@ router.post('/upload-pdf', upload.single('file'), examController.uploadExamPdf);
 // Save verified exam
 router.post('/create', examController.saveExam);
 
+// Submit exam result (Student)
+const { protect } = require('../middleware/authMiddleware');
+router.post('/submit', protect, examController.submitExam);
+
 // Get All Exams
 router.get('/all', examController.getAllExams);
 
