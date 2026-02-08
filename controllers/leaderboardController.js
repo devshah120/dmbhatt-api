@@ -17,28 +17,49 @@ exports.getLeaderboardByStandard = async (req, res) => {
             });
         }
 
-        // Find all students in the specified standard
-        const students = await StudentProfile.find({ std })
-            .populate('userId', 'firstName lastName')
-            .sort({ totalRewardPoints: -1 }) // Sort by points descending
-            .lean();
+        // Find all students in the specified standard and combine points using aggregation
+        const leaderboard = await StudentProfile.aggregate([
+            { $match: { std } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'userData'
+                }
+            },
+            { $unwind: '$userData' },
+            {
+                $project: {
+                    _id: '$userData._id',
+                    firstName: '$userData.firstName',
+                    lastName: '$userData.lastName',
+                    examPoints: { $ifNull: ['$totalRewardPoints', 0] },
+                    referralPoints: { $ifNull: ['$userData.bonusPoints', 0] },
+                    totalRewardPoints: {
+                        $add: [
+                            { $ifNull: ['$totalRewardPoints', 0] },
+                            { $ifNull: ['$userData.bonusPoints', 0] }
+                        ]
+                    },
+                    std: 1,
+                    medium: 1,
+                    school: 1
+                }
+            },
+            { $sort: { totalRewardPoints: -1 } }
+        ]);
 
         // Add rank to each student
-        const leaderboard = students.map((student, index) => ({
-            _id: student.userId?._id,
-            firstName: student.userId?.firstName || 'Unknown',
-            lastName: student.userId?.lastName || '',
-            totalRewardPoints: student.totalRewardPoints || 0,
-            rank: index + 1,
-            std: student.std,
-            medium: student.medium,
-            school: student.school
+        const rankedLeaderboard = leaderboard.map((student, index) => ({
+            ...student,
+            rank: index + 1
         }));
 
         res.status(200).json({
             success: true,
-            count: leaderboard.length,
-            data: leaderboard
+            count: rankedLeaderboard.length,
+            data: rankedLeaderboard
         });
 
     } catch (error) {

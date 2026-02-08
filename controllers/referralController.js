@@ -10,6 +10,44 @@ const generateReferralCode = () => {
     return code;
 };
 
+// POST /api/referral/validate - Validate a referral code (public endpoint)
+exports.validateReferralCode = async (req, res) => {
+    try {
+        const { referralCode } = req.body;
+
+        if (!referralCode) {
+            return res.status(400).json({ message: 'Referral code is required' });
+        }
+
+        // Find the referrer by code
+        const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).select('firstName referralCode invitedFriends');
+
+        if (!referrer) {
+            return res.status(404).json({ message: 'Invalid referral code' });
+        }
+
+        // Check if referrer has reached max referrals (5)
+        if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
+            return res.status(400).json({ message: 'Referrer has reached maximum referral limit' });
+        }
+
+        // Calculate milestone and discount
+        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
+        const discountAmount = milestoneNumber * 10; // ₹10, ₹20, ₹30, ₹40, ₹50
+
+        res.status(200).json({
+            valid: true,
+            referrerName: referrer.firstName,
+            discountAmount: discountAmount,
+            milestone: milestoneNumber,
+            message: `Valid referral code from ${referrer.firstName}. You'll get ₹${discountAmount} discount!`
+        });
+    } catch (error) {
+        console.error('Error validating referral code:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 // GET /api/referral/data - Get user's referral data
 exports.getReferralData = async (req, res) => {
     try {
@@ -89,13 +127,12 @@ exports.applyReferralCode = async (req, res) => {
             return res.status(400).json({ message: 'You cannot use your own referral code' });
         }
 
-        // Update referrer's invited friends and bonus points
+        // Update referrer's invited friends (no bonus points)
         referrer.invitedFriends.push({
             userId: currentUser._id,
             name: currentUser.firstName,
             joinedAt: new Date()
         });
-        referrer.bonusPoints = (referrer.bonusPoints || 0) + 10; // 10 points per referral
         await referrer.save();
 
         // Update current user's referredBy field
@@ -103,8 +140,7 @@ exports.applyReferralCode = async (req, res) => {
         await currentUser.save();
 
         res.status(200).json({
-            message: 'Referral code applied successfully',
-            bonusEarned: 10
+            message: 'Referral code applied successfully'
         });
     } catch (error) {
         console.error('Error applying referral code:', error);

@@ -177,7 +177,7 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, phoneNum, std, medium, school, loginCode, rollNo } = req.body;
+    const { firstName, phoneNum, std, medium, school, loginCode, rollNo, referralCode } = req.body;
 
     // Check if photo was uploaded (Optional now)i 
     // const photoFile = req.files?.photo?.[0];
@@ -195,16 +195,53 @@ const registerStudent = async (req, session) => {
     // Hash login code
     const loginCodeHash = await hashLoginCode(loginCode);
 
+    // Handle referral code if provided
+    let referrerId = null;
+    if (referralCode) {
+        const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
+        if (referrer) {
+            // Check if referrer has reached max referrals (5)
+            if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
+                throw new Error('Referrer has reached maximum referral limit');
+            }
+            referrerId = referrer._id;
+        }
+    }
+
     // Create user
     const user = new User({
         role: 'student',
         firstName,
         phoneNum,
         loginCodeHash,
-        photoPath: req.files?.photo?.[0]?.path || ''
+        photoPath: req.files?.photo?.[0]?.path || '',
+        referredBy: referrerId
     });
 
     const savedUser = await user.save({ session });
+
+    // Update referrer's invited friends and award bonus points if referral code was used
+    if (referrerId) {
+        // Calculate milestone and bonus points
+        const referrer = await User.findById(referrerId).session(session);
+        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
+        const bonusPoints = milestoneNumber * 500; // 500, 1000, 1500, 2000, 2500 points
+
+        await User.findByIdAndUpdate(
+            referrerId,
+            {
+                $push: {
+                    invitedFriends: {
+                        userId: savedUser._id,
+                        name: firstName,
+                        joinedAt: new Date()
+                    }
+                },
+                $inc: { bonusPoints: bonusPoints }
+            },
+            { session }
+        );
+    }
 
     // Create student profile
     const studentProfile = new StudentProfile({
@@ -223,7 +260,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
-    const { firstName, phoneNum, loginCode, schoolName } = req.body;
+    const { firstName, phoneNum, loginCode, schoolName, referralCode } = req.body;
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
@@ -241,17 +278,53 @@ const registerGuest = async (req, session) => {
     // Hash login code
     const loginCodeHash = await hashLoginCode(loginCode);
 
+    // Handle referral code if provided
+    let referrerId = null;
+    if (referralCode) {
+        const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
+        if (referrer) {
+            // Check if referrer has reached max referrals (5)
+            if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
+                throw new Error('Referrer has reached maximum referral limit');
+            }
+            referrerId = referrer._id;
+        }
+    }
+
     // Create user
     const user = new User({
         role: 'guest',
         firstName,
         phoneNum,
         loginCodeHash,
-        loginCodeHash,
-        photoPath: req.files?.photo?.[0]?.path || ''
+        photoPath: req.files?.photo?.[0]?.path || '',
+        referredBy: referrerId
     });
 
     const savedUser = await user.save({ session });
+
+    // Update referrer's invited friends and award bonus points if referral code was used
+    if (referrerId) {
+        // Calculate milestone and bonus points
+        const referrer = await User.findById(referrerId).session(session);
+        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
+        const bonusPoints = milestoneNumber * 500; // 500, 1000, 1500, 2000, 2500 points
+
+        await User.findByIdAndUpdate(
+            referrerId,
+            {
+                $push: {
+                    invitedFriends: {
+                        userId: savedUser._id,
+                        name: firstName,
+                        joinedAt: new Date()
+                    }
+                },
+                $inc: { bonusPoints: bonusPoints }
+            },
+            { session }
+        );
+    }
 
     // Create guest profile
     const guestProfile = new GuestProfile({

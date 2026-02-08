@@ -28,8 +28,11 @@ const getDashboardData = async (req, res) => {
         // Sort by date descending
         const examResults = await ExamResult.find({ studentId: user._id }).sort({ date: -1 });
 
+        // Consolidate points: Exam Points + Referral Points
+        const totalPoints = (studentProfile.totalRewardPoints || 0) + (user.bonusPoints || 0);
+
         res.status(200).json({
-            totalRewardPoints: studentProfile.totalRewardPoints || 0,
+            totalRewardPoints: totalPoints,
             examResults: examResults.map(exam => ({
                 id: exam._id,
                 title: exam.title,
