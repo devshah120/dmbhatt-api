@@ -31,6 +31,8 @@ const fiveMinTestRoutes = require('./routes/fiveMinTestRoutes');
 app.use('/api/fiveMinTest', fiveMinTestRoutes);
 const topRankerRoutes = require('./routes/topRankerRoutes');
 app.use('/api/topRanker', topRankerRoutes);
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+app.use('/api/leaderboard', leaderboardRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
