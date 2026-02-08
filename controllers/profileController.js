@@ -59,11 +59,17 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const user = req.user;
-        const { firstName, phoneNum, school, city, std, medium, schoolName, parentPhone } = req.body; // Add other fields as needed
+        const { firstName, phoneNum, email, school, city, std, medium, schoolName, parentPhone } = req.body;
 
         // Update User basic fields
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
+        if (email) user.email = email;
+
+        // Handle Photo Upload
+        if (req.files && req.files['photo'] && req.files['photo'][0]) {
+            user.photoPath = req.files['photo'][0].path;
+        }
 
         // Update Address (City)
         if (city) {
@@ -85,14 +91,12 @@ const updateProfile = async (req, res) => {
                 await profile.save();
             }
         } else if (user.role === 'guest') {
-            // Guest usually just updates schoolName if tracked
             profile = await GuestProfile.findOne({ userId: user._id });
             if (profile) {
                 if (schoolName) profile.schoolName = schoolName;
                 await profile.save();
             }
         }
-        // Add other roles if needed
 
         res.status(200).json({ message: 'Profile updated successfully', user, profile });
 
