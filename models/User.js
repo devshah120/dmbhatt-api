@@ -41,6 +41,31 @@ const userSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    // Referral fields
+    referralCode: {
+        type: String,
+        unique: true,
+        sparse: true // Allows null values
+    },
+    bonusPoints: {
+        type: Number,
+        default: 0
+    },
+    invitedFriends: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        name: String,
+        joinedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    referredBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     timestamps: true
