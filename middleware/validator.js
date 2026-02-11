@@ -81,7 +81,7 @@ const registrationValidation = [
  */
 const loginValidation = [
     body('role')
-        .notEmpty().withMessage('Role is required')
+        .optional()
         .isIn(['admin', 'assistant', 'student', 'guest']).withMessage('Invalid role'),
 
     body('loginCode')
