@@ -264,9 +264,8 @@ const registerGuest = async (req, session) => {
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
-    if (!photoFile) {
-        throw new Error('Photo is required for guest registration');
-    }
+    // Photo is NOT required for guest registration
+
 
     // Check if user exists
     const existingUser = await User.findOne({ phoneNum }).session(session);

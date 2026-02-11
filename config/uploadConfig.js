@@ -25,7 +25,7 @@ const storage = new CloudinaryStorage({
 
         return {
             folder: folder,
-            allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+            allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'webp', 'gif'],
             public_id: Date.now() + '-' + path.parse(file.originalname).name
         };
     }
@@ -33,11 +33,11 @@ const storage = new CloudinaryStorage({
 
 // File filter (optional redundant check as CloudinaryStorage has allowed_formats)
 const fileFilter = (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/webp', 'image/gif'];
     if (allowed.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type'), false);
+        cb(new Error('Invalid file type: ' + file.mimetype), false);
     }
 };
 
