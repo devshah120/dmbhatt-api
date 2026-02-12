@@ -11,6 +11,7 @@ connectDB();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -35,6 +36,8 @@ const leaderboardRoutes = require('./routes/leaderboardRoutes');
 app.use('/api/leaderboard', leaderboardRoutes);
 const referralRoutes = require('./routes/referralRoutes');
 app.use('/api/referral', referralRoutes);
+const eventRoutes = require('./routes/eventRoutes');
+app.use('/api/event', eventRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {

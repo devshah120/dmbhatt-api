@@ -52,5 +52,6 @@ const uploadUniversal = multer({
 
 module.exports = {
     uploadUniversal,
-    cloudinary // Export specific instance if needed elsewhere
+    storage, // Exported storage for use in other routes (e.g., eventRoutes)
+    cloudinary
 };
