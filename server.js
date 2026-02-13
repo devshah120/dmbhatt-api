@@ -38,6 +38,8 @@ const referralRoutes = require('./routes/referralRoutes');
 app.use('/api/referral', referralRoutes);
 const eventRoutes = require('./routes/eventRoutes');
 app.use('/api/event', eventRoutes);
+const gameRoutes = require('./routes/gameRoutes');
+app.use('/api/games', gameRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
