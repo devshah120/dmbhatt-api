@@ -177,7 +177,7 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, phoneNum, std, medium, school, loginCode, rollNo, referralCode } = req.body;
+    const { firstName, phoneNum, email, std, medium, school, loginCode, rollNo, referralCode, parentPhone } = req.body;
 
     // Check if photo was uploaded (Optional now)i 
     // const photoFile = req.files?.photo?.[0];
@@ -212,6 +212,7 @@ const registerStudent = async (req, session) => {
     const user = new User({
         role: 'student',
         firstName,
+        email,
         phoneNum,
         loginCodeHash,
         photoPath: req.files?.photo?.[0]?.path || '',
@@ -249,7 +250,8 @@ const registerStudent = async (req, session) => {
         std,
         medium,
         school,
-        rollNo
+        rollNo,
+        parentPhone
     });
 
     await studentProfile.save({ session });
@@ -260,7 +262,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
-    const { firstName, phoneNum, loginCode, schoolName, referralCode } = req.body;
+    const { firstName, phoneNum, email, loginCode, schoolName, referralCode } = req.body;
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
@@ -294,6 +296,7 @@ const registerGuest = async (req, session) => {
     const user = new User({
         role: 'guest',
         firstName,
+        email,
         phoneNum,
         loginCodeHash,
         photoPath: req.files?.photo?.[0]?.path || '',
