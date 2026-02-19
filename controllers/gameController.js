@@ -50,3 +50,37 @@ exports.getAllGameQuestions = async (req, res) => {
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
+
+// Edit a game question
+exports.editGameQuestion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const updatedQuestion = await GameQuestion.findByIdAndUpdate(id, updates, { new: true });
+
+        if (!updatedQuestion) {
+            return res.status(404).json({ message: "Question not found" });
+        }
+
+        res.status(200).json({ message: "Game question updated successfully", question: updatedQuestion });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// Delete a game question
+exports.deleteGameQuestion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedQuestion = await GameQuestion.findByIdAndDelete(id);
+
+        if (!deletedQuestion) {
+            return res.status(404).json({ message: "Question not found" });
+        }
+
+        res.status(200).json({ message: "Game question deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
