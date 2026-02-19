@@ -5,13 +5,16 @@ const AssistantProfile = require('../models/AssistantProfile');
 const StudentProfile = require('../models/StudentProfile');
 const GuestProfile = require('../models/GuestProfile');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
+const crypto = require('crypto');
+const Payment = require('../models/Payment');
 
 /**
  * Universal Registration Handler
  * Handles registration for all roles: admin, assistant, student, guest
  */
 const register = async (req, res) => {
-    const { role } = req.body;
+    const { role, phoneNum, firstName } = req.body;
+    console.log(`[DEBUG] Incoming Registration Request. Role: '${role}', Phone: '${phoneNum}', Name: '${firstName}'`);
 
     if (!role) {
         return res.status(400).json({ message: 'Role is required' });
@@ -177,18 +180,35 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, phoneNum, email, std, medium, school, loginCode, rollNo, referralCode, parentPhone } = req.body;
+    const { firstName, phoneNum, email, std, medium, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
 
-    // Check if photo was uploaded (Optional now)i 
-    // const photoFile = req.files?.photo?.[0];
-    // if (!photoFile) {
-    //     throw new Error('Photo is required for student registration');
-    // }
+    // Verify Payment unless skipped (for testing or specific cases)
+    if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
+        const secret = 'IHUC5CwHWJwCgVIuvG7ZAti6';
+        const generated_signature = crypto.createHmac('sha256', secret)
+            .update(razorpay_order_id + "|" + razorpay_payment_id)
+            .digest('hex');
+
+        if (generated_signature !== razorpay_signature) {
+            throw new Error('Payment verification failed: Invalid signature');
+        }
+    } else {
+        // If payment is mandatory, throw error here. For flexibility (e.g. free trials or manual entry by admin), we might skip.
+        // Assuming mandatory for online registration:
+        throw new Error('Payment details are missing');
+    }
 
     // Check if user exists
+    console.log(`[DEBUG] Registering student. Phone: '${phoneNum}', Type: ${typeof phoneNum}`);
+
+    if (!phoneNum) {
+        throw new Error('Phone number is missing or undefined');
+    }
+
     const existingUser = await User.findOne({ phoneNum }).session(session);
 
     if (existingUser) {
+        console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
         throw new Error('User with this phone number already exists');
     }
 
@@ -220,6 +240,19 @@ const registerStudent = async (req, session) => {
     });
 
     const savedUser = await user.save({ session });
+
+    // Save Payment Record
+    if (razorpay_payment_id) {
+        const payment = new Payment({
+            userId: savedUser._id,
+            razorpayOrderId: razorpay_order_id,
+            razorpayPaymentId: razorpay_payment_id,
+            razorpaySignature: razorpay_signature,
+            amount: amount,
+            status: 'captured'
+        });
+        await payment.save({ session });
+    }
 
     // Update referrer's invited friends and award bonus points if referral code was used
     if (referrerId) {
@@ -273,6 +306,7 @@ const registerGuest = async (req, session) => {
     const existingUser = await User.findOne({ phoneNum }).session(session);
 
     if (existingUser) {
+        console.log(`[DEBUG] Guest User found: ${existingUser.phoneNum}, ID: ${existingUser._id}`);
         throw new Error('User with this phone number already exists');
     }
 

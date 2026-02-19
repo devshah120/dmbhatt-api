@@ -40,6 +40,8 @@ const eventRoutes = require('./routes/eventRoutes');
 app.use('/api/event', eventRoutes);
 const gameRoutes = require('./routes/gameRoutes');
 app.use('/api/games', gameRoutes);
+const paymentRoutes = require('./routes/paymentRoutes');
+app.use('/api/payment', paymentRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
