@@ -10,7 +10,7 @@ const gameQuestionSchema = new mongoose.Schema({
             'Odd One Out',
             'Fact or Fiction',
             'Sentence Builder',
-            'Grammar Guradian', // Note: User typo "Guradian", keeping as requested or correcting? I'll correct to Guardian but support the string if needed. Let's use the user's string for safety or confirm. I'll use "Grammar Guardian" as the likely intended string but mapped from the frontend.
+            'Grammar Guardian', // Note: User typo "Guradian", keeping as requested or correcting? I'll correct to Guardian but support the string if needed. Let's use the user's string for safety or confirm. I'll use "Grammar Guardian" as the likely intended string but mapped from the frontend.
             'Word Bridge',
             'Emoji Decoder'
         ]
