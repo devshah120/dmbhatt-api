@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getProfile, updateProfile, getPurchasedProducts } = require('../controllers/profileController');
+const { getProfile, updateProfile, getPurchasedProducts, getUpgradeHistory } = require('../controllers/profileController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadUniversal } = require('../config/uploadConfig');
 
