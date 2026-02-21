@@ -513,29 +513,103 @@ const getDashboardStats = async (req, res) => {
             }
         ]);
 
-        // 2. Calculate Total Product Sales
-        const productTotal = subjectStats.reduce((sum, item) => sum + item.sales, 0);
+        // 2. Aggregate Sales by Standard (Registration Fees ONLY, excluding Products)
+        const paymentStandardStats = await Payment.aggregate([
+            {
+                // Join with ProductPurchase to identify product payments
+                $lookup: {
+                    from: 'productpurchases',
+                    localField: 'razorpayPaymentId',
+                    foreignField: 'razorpayPaymentId',
+                    as: 'purchase'
+                }
+            },
+            {
+                // Filter out payments that have a corresponding ProductPurchase entry
+                $match: {
+                    purchase: { $size: 0 }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: '$profile' },
+            {
+                $group: {
+                    _id: '$profile.std',
+                    sales: { $sum: '$amount' }
+                }
+            }
+        ]);
 
-        // 3. Calculate Total Plan Upgrade Sales
-        const planUpgradeTotal = await PlanUpgrade.aggregate([
+        // 3. Aggregate Plan Upgrades by New Standard
+        const upgradeStandardStats = await PlanUpgrade.aggregate([
+            {
+                $group: {
+                    _id: '$newStandard',
+                    sales: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        // Merge Standard Stats (Payments + Upgrades)
+        const standardMap = {};
+        paymentStandardStats.forEach(item => {
+            const std = item._id || 'Unknown';
+            standardMap[std] = (standardMap[std] || 0) + item.sales;
+        });
+        upgradeStandardStats.forEach(item => {
+            const std = item._id || 'Unknown';
+            standardMap[std] = (standardMap[std] || 0) + item.sales;
+        });
+
+        const standardStats = Object.keys(standardMap).map(std => ({
+            standard: std,
+            sales: standardMap[std]
+        }));
+
+        // 4. Calculate Unified Totals
+        // 4a. Total from all payments (Registration + Products)
+        const totalPaymentAmount = await Payment.aggregate([
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
-        const planTotal = planUpgradeTotal.length > 0 ? planUpgradeTotal[0].total : 0;
+        const paymentTotal = totalPaymentAmount.length > 0 ? totalPaymentAmount[0].total : 0;
 
-        const totalSales = productTotal + planTotal;
+        // 4b. Total from upgrades
+        const totalUpgradeAmount = upgradeStandardStats.reduce((sum, item) => sum + item.sales, 0);
 
-        // 4. Calculate Percentages for Subjects
+        const totalSales = paymentTotal + totalUpgradeAmount;
+
+        // 5. Calculate Percentages
         const formattedSubjectStats = subjectStats.map(item => ({
             ...item,
             percentage: totalSales > 0 ? item.sales / totalSales : 0
         }));
 
-        // Sort by sales descending
+        const formattedStandardStats = standardStats.map(item => ({
+            ...item,
+            percentage: totalSales > 0 ? item.sales / totalSales : 0
+        }));
+
+        // Sort both
         formattedSubjectStats.sort((a, b) => b.sales - a.sales);
+        formattedStandardStats.sort((a, b) => {
+            // Sort by numerical standard if possible
+            const aNum = parseInt(a.standard);
+            const bNum = parseInt(b.standard);
+            if (!isNaN(aNum) && !isNaN(bNum)) return bNum - aNum; // High to low or Low to high? Sales descending is better for dash
+            return b.sales - a.sales;
+        });
 
         res.status(200).json({
             totalSales,
-            subjectSales: formattedSubjectStats
+            subjectSales: formattedSubjectStats,
+            standardSales: formattedStandardStats
         });
     } catch (err) {
         console.error('Get Dashboard Stats Error:', err);
