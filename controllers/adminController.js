@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
 const AssistantProfile = require('../models/AssistantProfile');
+const ProductPurchase = require('../models/ProductPurchase');
+const PlanUpgrade = require('../models/PlanUpgrade');
+const ExploreProduct = require('../models/ExploreProduct');
 const { hashLoginCode, parseAddress } = require('../utils/helpers');
 const xlsx = require('xlsx');
 
@@ -479,6 +482,67 @@ const importStudents = async (req, res) => {
     }
 };
 
+/**
+ * Get Dashboard Stats (Admin)
+ */
+const getDashboardStats = async (req, res) => {
+    try {
+        // 1. Aggregate Sales by Subject from ProductPurchase
+        const subjectStats = await ProductPurchase.aggregate([
+            {
+                $lookup: {
+                    from: 'exploreproducts',
+                    localField: 'productId',
+                    foreignField: '_id',
+                    as: 'product'
+                }
+            },
+            { $unwind: '$product' },
+            {
+                $group: {
+                    _id: '$product.subject',
+                    sales: { $sum: '$amount' }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    subject: '$_id',
+                    sales: 1
+                }
+            }
+        ]);
+
+        // 2. Calculate Total Product Sales
+        const productTotal = subjectStats.reduce((sum, item) => sum + item.sales, 0);
+
+        // 3. Calculate Total Plan Upgrade Sales
+        const planUpgradeTotal = await PlanUpgrade.aggregate([
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const planTotal = planUpgradeTotal.length > 0 ? planUpgradeTotal[0].total : 0;
+
+        const totalSales = productTotal + planTotal;
+
+        // 4. Calculate Percentages for Subjects
+        const formattedSubjectStats = subjectStats.map(item => ({
+            ...item,
+            percentage: totalSales > 0 ? item.sales / totalSales : 0
+        }));
+
+        // Sort by sales descending
+        formattedSubjectStats.sort((a, b) => b.sales - a.sales);
+
+        res.status(200).json({
+            totalSales,
+            subjectSales: formattedSubjectStats
+        });
+    } catch (err) {
+        console.error('Get Dashboard Stats Error:', err);
+        res.status(500).json({ message: 'Failed to fetch dashboard statistics' });
+    }
+};
+
 module.exports = {
     addStudent,
     addAssistant,
@@ -488,5 +552,6 @@ module.exports = {
     getAllAssistants,
     editAssistant,
     deleteAssistant,
-    importStudents
+    importStudents,
+    getDashboardStats
 };

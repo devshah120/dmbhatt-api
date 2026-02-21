@@ -42,7 +42,7 @@ const emojiDecoderQuestions = [
     { q: "🥊🐯", a: "Rocky", diff: "Medium" },
     { q: "🧙‍♂️💍", a: "Lord of the Rings", diff: "Medium" },
     { q: "🐒🚢🗽", a: "King Kong", diff: "Medium" },
-    { q: "🦖🏝️", a: "Jurassic Park", diff: "Medium" },
+    { q: "REX🏝️", a: "Jurassic Park", diff: "Medium" },
     { q: "🏠🎈🎈", a: "Up", diff: "Easy" },
     { q: "👻🚫", a: "Ghostbusters", diff: "Easy" },
     { q: "🏹🍎", a: "Robin Hood", diff: "Medium" },
@@ -90,78 +90,79 @@ const oddOneOutQuestions = [
     { q: "Find the odd mammal:", a: "Shark", opts: ["Whale", "Dolphin", "Seal", "Shark"], reason: "Shark is a fish, others are mammals.", diff: "Medium" }
 ];
 
+const factOrFictionQuestions = [
+    { q: "The Great Wall of China is visible from space with the naked eye.", a: "Fiction", reason: "It's a common myth but not true without aid.", diff: "Easy" },
+    { q: "Octopuses have three hearts.", a: "Fact", reason: "They have two peripheral hearts and one central heart.", diff: "Medium" },
+    { q: "A strawberry is a berry.", a: "Fiction", reason: "Botanically, strawberries are not berries, but bananas are!", diff: "Medium" },
+    { q: "The shortest war in history lasted 38 minutes.", a: "Fact", reason: "The Anglo-Zanzibar War of 1896.", diff: "Hard" },
+    { q: "Sound travels faster in water than in air.", a: "Fact", reason: "Sound travels about 4.3 times faster in water.", diff: "Medium" },
+    { q: "Goldfish only have a three-second memory.", a: "Fiction", reason: "Goldfish can remember things for months.", diff: "Easy" },
+    { q: "There are more stars in the universe than grains of sand on Earth.", a: "Fact", reason: "Estimated 10^24 stars vs 7.5*10^18 sand grains.", diff: "Medium" },
+    { q: "Humans use only 10% of their brains.", a: "Fiction", reason: "We use virtually every part of the brain.", diff: "Easy" },
+    { q: "The Nile is the longest river in the world.", a: "Fact", reason: "Stretches 6,650 km.", diff: "Easy" },
+    { q: "Monaco is the smallest country in the world.", a: "Fiction", reason: "Vatican City is the smallest.", diff: "Medium" }
+];
+
+const speedMathQuestions = [
+    { q: "12 * 8 = ?", a: "96", opts: ["84", "96", "108", "116"], diff: "Easy" },
+    { q: "25% of 200 is ?", a: "50", opts: ["25", "50", "75", "100"], diff: "Easy" },
+    { q: "Square root of 225 is ?", a: "15", opts: ["12", "15", "18", "25"], diff: "Medium" },
+    { q: "15 * 15 = ?", a: "225", opts: ["125", "225", "325", "425"], diff: "Easy" },
+    { q: "3^3 + 4^2 = ?", a: "43", opts: ["31", "43", "52", "61"], diff: "Medium" },
+    { q: "1/2 + 1/4 = ?", a: "3/4", opts: ["2/4", "3/4", "1/4", "5/4"], diff: "Easy" },
+    { q: "1000 - 357 = ?", a: "643", opts: ["643", "743", "653", "753"], diff: "Medium" },
+    { q: "12 * 12 * 0 = ?", a: "0", opts: ["144", "0", "12", "1"], diff: "Easy" },
+    { q: "99 / 9 + 11 = ?", a: "22", opts: ["11", "22", "33", "44"], diff: "Medium" },
+    { q: "15% of 60 = ?", a: "9", opts: ["6", "9", "12", "15"], diff: "Medium" }
+];
+
+const wordScrambleWords = [
+    "SCIENCE", "VALENCY", "GRAVITY", "ALGEBRA", "GRAMMAR", "GEOLOGY", "HISTORY", "FOSSILS", "ELEMENT", "NUCLEUS",
+    "GLUCOSE", "VITAMIN", "PLASTIC", "MERCURY", "PLANETS", "DIAMOND", "ENGLISH", "PYRAMID", "GEOMETRY", "SPECIES",
+    "PROTEIN", "OXYGEN", "SULPHUR", "MAMMALS", "VOLTAGE", "DENSITY", "BIOLOGY", "PHYSICS", "THERMAL", "CAVITY"
+];
+
 const seedGames = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
         console.log('MongoDB Connected');
 
-        // Clear and Seed Word Bridge
-        await GameQuestion.deleteMany({ gameType: 'Word Bridge' });
-        console.log(`Adding Word Bridge questions...`);
-        for (const item of wordBridgeQuestions) {
-            await new GameQuestion({
-                gameType: 'Word Bridge',
-                questionText: item.q,
-                options: item.opts,
-                correctAnswer: item.a,
-                difficulty: item.diff,
-                meta: { hint: "Complete the analogy!" }
-            }).save();
+        const games = [
+            { type: 'Word Bridge', data: wordBridgeQuestions },
+            { type: 'Emoji Decoder', data: emojiDecoderQuestions },
+            { type: 'Grammar Guardian', data: grammarQuestions },
+            { type: 'Sentence Builder', data: sentenceBuilderQuestions },
+            { type: 'Odd One Out', data: oddOneOutQuestions },
+            { type: 'Fact or Fiction', data: factOrFictionQuestions },
+            { type: 'Speed Math', data: speedMathQuestions },
+        ];
+
+        for (const game of games) {
+            await GameQuestion.deleteMany({ gameType: game.type });
+            console.log(`Adding ${game.type} questions...`);
+            for (const item of game.data) {
+                await new GameQuestion({
+                    gameType: game.type,
+                    questionText: item.q,
+                    options: item.opts || [],
+                    correctAnswer: item.a,
+                    difficulty: item.diff || "Medium",
+                    meta: item.reason ? { reason: item.reason } : (game.type === 'Word Bridge' ? { hint: "Complete the analogy!" } : {})
+                }).save();
+            }
         }
 
-        // Clear and Seed Emoji Decoder
-        await GameQuestion.deleteMany({ gameType: 'Emoji Decoder' });
-        console.log(`Adding Emoji Decoder questions...`);
-        for (const item of emojiDecoderQuestions) {
+        // Word Scramble Seeding
+        await GameQuestion.deleteMany({ gameType: 'Word Scramble' });
+        console.log(`Adding Word Scramble words...`);
+        for (const word of wordScrambleWords) {
             await new GameQuestion({
-                gameType: 'Emoji Decoder',
-                questionText: item.q,
+                gameType: 'Word Scramble',
+                questionText: word,
+                correctAnswer: word,
+                difficulty: "Medium",
                 options: [],
-                correctAnswer: item.a,
-                difficulty: item.diff,
-                meta: { hint: "What does this emoji set represent?" }
-            }).save();
-        }
-
-        // Clear and Seed Grammar Guardian
-        await GameQuestion.deleteMany({ gameType: 'Grammar Guardian' });
-        console.log(`Adding Grammar Guardian questions...`);
-        for (const item of grammarQuestions) {
-            await new GameQuestion({
-                gameType: 'Grammar Guardian',
-                questionText: item.q,
-                options: item.opts,
-                correctAnswer: item.a,
-                difficulty: item.diff,
-                meta: { category: "English Grammar" }
-            }).save();
-        }
-
-        // Clear and Seed Sentence Builder
-        await GameQuestion.deleteMany({ gameType: 'Sentence Builder' });
-        console.log(`Adding Sentence Builder questions...`);
-        for (const item of sentenceBuilderQuestions) {
-            await new GameQuestion({
-                gameType: 'Sentence Builder',
-                questionText: item.q,
-                options: [],
-                correctAnswer: item.a,
-                difficulty: item.diff,
-                meta: { hint: "Arrange the words correctly!" }
-            }).save();
-        }
-
-        // Clear and Seed Odd One Out
-        await GameQuestion.deleteMany({ gameType: 'Odd One Out' });
-        console.log(`Adding Odd One Out questions...`);
-        for (const item of oddOneOutQuestions) {
-            await new GameQuestion({
-                gameType: 'Odd One Out',
-                questionText: item.q,
-                options: item.opts,
-                correctAnswer: item.a,
-                difficulty: item.diff,
-                meta: { reason: item.reason }
+                meta: { category: "General Education" }
             }).save();
         }
 
