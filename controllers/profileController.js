@@ -3,12 +3,15 @@ const StudentProfile = require('../models/StudentProfile');
 const GuestProfile = require('../models/GuestProfile');
 const AssistantProfile = require('../models/AssistantProfile');
 const AdminProfile = require('../models/AdminProfile');
+const ProductPurchase = require('../models/ProductPurchase');
+const PlanUpgrade = require('../models/PlanUpgrade');
 
 /**
  * Get User Profile
  * @route GET /api/profile
  * @access Private
  */
+// ... (rest of the functions remain same)
 const getProfile = async (req, res) => {
     try {
         const user = req.user;
@@ -25,12 +28,6 @@ const getProfile = async (req, res) => {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
 
-        if (!profile) {
-            // It's possible to have a user without a profile if registration failed halfway or manual DB entry
-            // But ideally shouldn't happen. Return basic user info + empty profile or null
-            // return res.status(404).json({ message: 'Profile not found' });
-        }
-
         res.status(200).json({
             user: {
                 firstName: user.firstName,
@@ -40,7 +37,7 @@ const getProfile = async (req, res) => {
                 phoneNum: user.phoneNum,
                 photoPath: user.photoPath,
                 role: user.role,
-                address: user.address, // Include address for city
+                address: user.address,
             },
             profile: profile || {}
         });
@@ -61,17 +58,14 @@ const updateProfile = async (req, res) => {
         const user = req.user;
         const { firstName, phoneNum, email, school, city, std, medium, schoolName, parentPhone } = req.body;
 
-        // Update User basic fields
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
         if (email) user.email = email;
 
-        // Handle Photo Upload
         if (req.files && req.files['photo'] && req.files['photo'][0]) {
             user.photoPath = req.files['photo'][0].path;
         }
 
-        // Update Address (City)
         if (city) {
             user.address = user.address || {};
             user.address.city = city;
@@ -80,7 +74,6 @@ const updateProfile = async (req, res) => {
         await user.save();
 
         let profile = null;
-
         if (user.role === 'student') {
             profile = await StudentProfile.findOne({ userId: user._id });
             if (profile) {
@@ -106,7 +99,44 @@ const updateProfile = async (req, res) => {
     }
 }
 
+/**
+ * Get Purchased Products
+ * @route GET /api/profile/purchased-products
+ * @access Private
+ */
+const getPurchasedProducts = async (req, res) => {
+    try {
+        const purchases = await ProductPurchase.find({ userId: req.user.id })
+            .populate('productId')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(purchases);
+    } catch (error) {
+        console.error('Get Purchased Products Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+/**
+ * Get Upgrade History
+ * @route GET /api/profile/upgrade-history
+ * @access Private
+ */
+const getUpgradeHistory = async (req, res) => {
+    try {
+        const upgrades = await PlanUpgrade.find({ userId: req.user.id })
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(upgrades);
+    } catch (error) {
+        console.error('Get Upgrade History Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getProfile,
-    updateProfile
+    updateProfile,
+    getPurchasedProducts,
+    getUpgradeHistory
 };
