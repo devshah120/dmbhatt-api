@@ -5,6 +5,7 @@ const AssistantProfile = require('../models/AssistantProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const ExploreProduct = require('../models/ExploreProduct');
+const Payment = require('../models/Payment');
 const { hashLoginCode, parseAddress } = require('../utils/helpers');
 const xlsx = require('xlsx');
 
