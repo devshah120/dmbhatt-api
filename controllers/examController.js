@@ -251,7 +251,7 @@ const parseQuestionsErrors = (text) => {
  * Save Exam
  */
 const saveExam = async (req, res) => {
-    const { subject, std, medium, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, unit, totalMarks, questions } = req.body;
 
     console.log('[DEBUG] Schema Paths:', Object.keys(Exam.schema.paths));
     console.log('[DEBUG] Name Required:', Exam.schema.path('name')?.options?.required);
@@ -263,6 +263,8 @@ const saveExam = async (req, res) => {
         // Create Exam first to get ID? Or Questions first?
         // Questions need examId.
         const exam = new Exam({
+            title,
+            name: title, // Map title to name for backward compatibility/history list
             subject,
             std,
             medium,
@@ -302,8 +304,14 @@ const saveExam = async (req, res) => {
  * Get All Exams
  */
 const getAllExams = async (req, res) => {
+    const { std, medium, subject } = req.query;
     try {
-        const exams = await Exam.find().sort({ createdAt: -1 });
+        const query = {};
+        if (std) query.std = std;
+        if (medium) query.medium = medium;
+        if (subject) query.subject = subject;
+
+        const exams = await Exam.find(query).sort({ createdAt: -1 });
         res.status(200).json(exams);
     } catch (err) {
         console.error('Get All Exams Error:', err);
@@ -357,13 +365,15 @@ const getExamById = async (req, res) => {
  */
 const updateExam = async (req, res) => {
     const { id } = req.params;
-    const { subject, std, medium, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, unit, totalMarks, questions } = req.body;
 
     try {
         // 1. Update Exam Metadata
         const exam = await Exam.findByIdAndUpdate(
             id,
             {
+                title,
+                name: title,
                 subject,
                 std,
                 medium,

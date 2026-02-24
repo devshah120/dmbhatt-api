@@ -5,6 +5,14 @@ const examSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    name: { // Keeping 'name' for backward compatibility or as the title field
+        type: String,
+        required: false
+    },
+    title: {
+        type: String,
+        required: true
+    },
     totalMarks: {
         type: Number,
         required: true

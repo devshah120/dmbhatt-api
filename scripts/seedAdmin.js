@@ -10,7 +10,7 @@ const seedAdmin = async () => {
         console.log('MongoDB Connected');
 
         const phoneNum = '9876543210';
-        const loginCode = 'Admin%147';
+        const loginCode = 'Admin%121';
         const name = 'Admin';
         const email = 'admin@dmbhatt.com'; // Dummy email
 
