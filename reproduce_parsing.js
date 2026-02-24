@@ -8,7 +8,7 @@ const parseQuestionsErrors = (text) => {
     // Regex patterns
     // Relaxed Question Start: Allows optional non-word chars at start, e.g. "| 1. Text" or "• 1. Text"
     // CURRENT REGEX:
-    const questionStart = /^[\W]*(\d{1,3})[\.\)]\s*(.*)/;
+    const questionStart = /^[\W]*(\d{1,3})[\.\)\s]+\s*(.*)/;
 
     // Answer Regex: Matches "Ans. (C)", "Answer: C", "Ans: C", "Ans (A)"
     const answerPattern = /(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*([A-D])/i;

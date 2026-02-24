@@ -206,10 +206,14 @@ const registerStudent = async (req, session) => {
     }
 
     const existingUser = await User.findOne({ phoneNum }).session(session);
+    let savedUser;
 
     if (existingUser) {
-        console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
-        throw new Error('User with this phone number already exists');
+        if (existingUser.role !== 'guest') {
+            console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
+            throw new Error('User with this phone number already exists');
+        }
+        console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
     }
 
     // Hash login code
@@ -228,18 +232,27 @@ const registerStudent = async (req, session) => {
         }
     }
 
-    // Create user
-    const user = new User({
-        role: 'student',
-        firstName,
-        email,
-        phoneNum,
-        loginCodeHash,
-        photoPath: req.files?.photo?.[0]?.path || '',
-        referredBy: referrerId
-    });
-
-    const savedUser = await user.save({ session });
+    // Create or update user
+    if (existingUser && existingUser.role === 'guest') {
+        existingUser.role = 'student';
+        existingUser.firstName = firstName;
+        existingUser.email = email;
+        existingUser.loginCodeHash = loginCodeHash;
+        existingUser.photoPath = req.files?.photo?.[0]?.path || existingUser.photoPath;
+        existingUser.referredBy = referrerId;
+        savedUser = await existingUser.save({ session });
+    } else {
+        const user = new User({
+            role: 'student',
+            firstName,
+            email,
+            phoneNum,
+            loginCodeHash,
+            photoPath: req.files?.photo?.[0]?.path || '',
+            referredBy: referrerId
+        });
+        savedUser = await user.save({ session });
+    }
 
     // Save Payment Record
     if (razorpay_payment_id) {

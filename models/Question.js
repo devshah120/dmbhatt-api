@@ -8,11 +8,15 @@ const questionSchema = new mongoose.Schema({
     },
     questionText: {
         type: String,
-        required: true
+        required: false
+    },
+    questionImage: {
+        type: String // Cloudinary URL
     },
     options: [{
         key: String, // A, B, C, D
-        text: String
+        text: String,
+        image: String // Cloudinary URL for option image
     }],
     correctAnswer: {
         type: String, // A, B, C, D

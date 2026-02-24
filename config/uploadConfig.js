@@ -11,23 +11,36 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+console.log('[DEBUG] Cloudinary Configured with Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
+
 // Storage configuration
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
-        // Determine folder based on field name
-        let folder = 'others';
-        if (file.fieldname === 'photo') {
-            folder = 'photos';
-        } else if (file.fieldname === 'aadharFile') {
-            folder = 'aadhar';
-        }
+        try {
+            // Determine folder based on field name
+            let folder = 'others';
+            if (file.fieldname === 'photo') {
+                folder = 'photos';
+            } else if (file.fieldname === 'aadharFile') {
+                folder = 'aadhar';
+            } else if (file.fieldname === 'image') {
+                folder = 'exam_images';
+            }
 
-        return {
-            folder: folder,
-            allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'webp', 'gif'],
-            public_id: Date.now() + '-' + path.parse(file.originalname).name
-        };
+            // Clean filename to avoid issues with special characters
+            const cleanName = path.parse(file.originalname).name.replace(/[^a-zA-Z0-9]/g, '_');
+            const publicId = `${Date.now()}-${cleanName}`;
+
+            return {
+                folder: folder,
+                allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'webp', 'gif'],
+                public_id: publicId
+            };
+        } catch (error) {
+            console.error('Cloudinary Storage Param Error:', error);
+            throw error;
+        }
     }
 });
 

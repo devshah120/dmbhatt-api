@@ -42,10 +42,23 @@ const gameRoutes = require('./routes/gameRoutes');
 app.use('/api/games', gameRoutes);
 const paymentRoutes = require('./routes/paymentRoutes');
 app.use('/api/payment', paymentRoutes);
+const mediaRoutes = require('./routes/mediaRoutes');
+app.use('/api/media', mediaRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK' });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('SERVER ERROR:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal Server Error',
+        error: err.toString(),
+        stack: err.stack
+    });
 });
 
 const PORT = process.env.PORT || 5000;

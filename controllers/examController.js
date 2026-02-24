@@ -166,7 +166,7 @@ const parseQuestionsErrors = (text) => {
 
     // Regex patterns
     // Relaxed Question Start: Matches "1. Text", "1) Text", "1 Text"
-    const questionStart = /^[\W]*(\d{1,3})[\.\)\s]\s+(.*)/;
+    const questionStart = /^[\W]*(\d{1,3})[\.\)\s]+\s*(.*)/;
 
     // Answer Regex: Matches "Ans. (C)", "Answer: C", "Ans: C", "Ans (A)"
     const answerPattern = /(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*([A-D])/i;
@@ -277,6 +277,7 @@ const saveExam = async (req, res) => {
             const newQ = new Question({
                 examId: savedExam._id,
                 questionText: q.questionText,
+                questionImage: q.questionImage,
                 options: q.options,
                 correctAnswer: q.correctAnswer,
                 marks: 1 // Default per q
@@ -377,23 +378,35 @@ const updateExam = async (req, res) => {
         }
 
         // 2. Update Questions
-        // We assume 'questions' is a list of objects.
-        // If question object has _id, update it.
-        // Note: This simple loop updates one by one. For bulk, bulkWrite is better but this is fine for now.
         if (questions && Array.isArray(questions)) {
+            const questionIds = [];
             for (const q of questions) {
                 if (q._id) {
                     await Question.findByIdAndUpdate(q._id, {
                         questionText: q.questionText,
+                        questionImage: q.questionImage,
                         options: q.options,
                         correctAnswer: q.correctAnswer,
-                        marks: q.marks
+                        marks: q.marks || 1
                     });
+                    questionIds.push(q._id);
                 } else {
-                    // Handle new questions if necessary, or ignore
-                    // For now, focusing on updating existing ones as per request
+                    // Create new question if it doesn't have an _id
+                    const newQ = new Question({
+                        examId: id,
+                        questionText: q.questionText,
+                        questionImage: q.questionImage,
+                        options: q.options,
+                        correctAnswer: q.correctAnswer,
+                        marks: q.marks || 1
+                    });
+                    const savedQ = await newQ.save();
+                    questionIds.push(savedQ._id);
                 }
             }
+            // Update exam's question list to reflect the current state (handles additions)
+            exam.questions = questionIds;
+            await exam.save();
         }
 
         res.status(200).json({ message: 'Exam updated successfully', exam });
