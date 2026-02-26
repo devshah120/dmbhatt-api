@@ -48,6 +48,8 @@ const materialRoutes = require('./routes/materialRoutes');
 app.use('/api/material', materialRoutes);
 const mindMapRoutes = require('./routes/mindMapRoutes');
 app.use('/api/mindmap', mindMapRoutes);
+const oneLinerExamRoutes = require('./routes/oneLinerExamRoutes');
+app.use('/api/onelinerexam', oneLinerExamRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
