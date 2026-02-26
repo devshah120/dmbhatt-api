@@ -618,6 +618,109 @@ const getDashboardStats = async (req, res) => {
     }
 };
 
+/**
+ * Get Exam Reports (Admin)
+ */
+const getExamReports = async (req, res) => {
+    try {
+        const ExamResult = require('../models/ExamResult');
+        const results = await ExamResult.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'studentId',
+                    foreignField: '_id',
+                    as: 'student'
+                }
+            },
+            { $unwind: '$student' },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'studentId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    title: 1,
+                    obtainedMarks: 1,
+                    totalMarks: 1,
+                    date: 1,
+                    earnedPoints: 1,
+                    studentName: '$student.firstName',
+                    studentPhone: '$student.phoneNum',
+                    std: '$profile.std',
+                    medium: '$profile.medium'
+                }
+            },
+            { $sort: { date: -1 } }
+        ]);
+
+        res.status(200).json(results);
+    } catch (err) {
+        console.error('Get Exam Reports Error:', err);
+        res.status(500).json({ message: 'Failed to fetch exam reports' });
+    }
+};
+
+/**
+ * Get Student-wise Exam Reports (Admin)
+ */
+const getStudentWiseReports = async (req, res) => {
+    try {
+        const ExamResult = require('../models/ExamResult');
+        const studentReports = await ExamResult.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'studentId',
+                    foreignField: '_id',
+                    as: 'student'
+                }
+            },
+            { $unwind: '$student' },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'studentId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: '$studentId',
+                    name: { $first: '$student.firstName' },
+                    phone: { $first: '$student.phoneNum' },
+                    std: { $first: '$profile.std' },
+                    medium: { $first: '$profile.medium' },
+                    totalExams: { $sum: 1 },
+                    avgMarks: { $avg: '$obtainedMarks' },
+                    exams: {
+                        $push: {
+                            title: '$title',
+                            score: '$obtainedMarks',
+                            total: '$totalMarks',
+                            date: '$date'
+                        }
+                    }
+                }
+            },
+            { $sort: { name: 1 } }
+        ]);
+
+        res.status(200).json(studentReports);
+    } catch (err) {
+        console.error('Get Student Wise Reports Error:', err);
+        res.status(500).json({ message: 'Failed to fetch student wise reports' });
+    }
+};
+
 module.exports = {
     addStudent,
     addAssistant,
@@ -628,5 +731,7 @@ module.exports = {
     editAssistant,
     deleteAssistant,
     importStudents,
-    getDashboardStats
+    getDashboardStats,
+    getExamReports,
+    getStudentWiseReports
 };

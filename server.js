@@ -44,6 +44,10 @@ const paymentRoutes = require('./routes/paymentRoutes');
 app.use('/api/payment', paymentRoutes);
 const mediaRoutes = require('./routes/mediaRoutes');
 app.use('/api/media', mediaRoutes);
+const materialRoutes = require('./routes/materialRoutes');
+app.use('/api/material', materialRoutes);
+const mindMapRoutes = require('./routes/mindMapRoutes');
+app.use('/api/mindmap', mindMapRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {

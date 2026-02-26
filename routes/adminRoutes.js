@@ -40,5 +40,7 @@ router.get('/all-assistants', adminController.getAllAssistants);
 router.put('/edit-assistant/:id', express.json(), adminController.editAssistant);
 router.delete('/delete-assistant/:id', adminController.deleteAssistant);
 router.get('/dashboard-stats', adminController.getDashboardStats);
+router.get('/exam-reports', adminController.getExamReports);
+router.get('/student-reports', adminController.getStudentWiseReports);
 
 module.exports = router;
