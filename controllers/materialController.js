@@ -15,6 +15,7 @@ exports.uploadBoardPaper = async (req, res) => {
             title,
             medium,
             standard,
+            board: req.body.board || 'GSEB',
             stream: stream || 'None',
             year,
             subject,
@@ -45,6 +46,8 @@ exports.uploadSchoolPaper = async (req, res) => {
             subject,
             medium,
             standard,
+            board: req.body.board || 'GSEB',
+            stream: req.body.stream || 'None',
             year,
             schoolName,
             file: fileUrl
@@ -75,6 +78,8 @@ exports.uploadImageMaterial = async (req, res) => {
             unit,
             medium,
             standard,
+            board: req.body.board || 'GSEB',
+            stream: req.body.stream || 'None',
             year,
             schoolName,
             file: fileUrl
@@ -90,8 +95,15 @@ exports.uploadImageMaterial = async (req, res) => {
 
 exports.getAllMaterials = async (req, res) => {
     try {
-        const { type } = req.query;
-        const filter = type ? { type } : {};
+        const { type, standard, medium, board, stream, subject } = req.query;
+        let filter = {};
+        if (type) filter.type = type;
+        if (standard) filter.standard = standard;
+        if (medium) filter.medium = medium;
+        if (board) filter.board = board;
+        if (stream) filter.stream = stream;
+        if (subject) filter.subject = subject;
+
         const materials = await Material.find(filter).sort({ createdAt: -1 });
         res.status(200).json(materials);
     } catch (error) {
@@ -115,6 +127,40 @@ exports.deleteMaterial = async (req, res) => {
         res.status(200).json({ message: 'Material deleted successfully' });
     } catch (error) {
         console.error('Error deleting material:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.updateMaterial = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, subject, medium, standard, board, stream, year, schoolName, unit, type } = req.body;
+
+        let updateData = {
+            title,
+            subject,
+            medium,
+            standard,
+            board: board || 'GSEB',
+            stream: stream || 'None',
+            year,
+            schoolName,
+            unit
+        };
+
+        if (req.files && req.files['file']) {
+            updateData.file = req.files['file'][0].path;
+        }
+
+        const material = await Material.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+
+        if (!material) {
+            return res.status(404).json({ message: 'Material not found' });
+        }
+
+        res.status(200).json({ message: 'Material updated successfully', material });
+    } catch (error) {
+        console.error('Error updating material:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

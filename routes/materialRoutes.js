@@ -23,5 +23,6 @@ router.post('/upload-school-paper', uploadMaterial, materialController.uploadSch
 router.post('/upload-image-material', uploadMaterial, materialController.uploadImageMaterial);
 router.get('/all', materialController.getAllMaterials);
 router.delete('/delete/:id', materialController.deleteMaterial);
+router.put('/update/:id', uploadMaterial, materialController.updateMaterial);
 
 module.exports = router;

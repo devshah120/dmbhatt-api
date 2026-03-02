@@ -10,6 +10,8 @@ const MindMapSchema = new mongoose.Schema({
     unit: { type: String, required: true },
     title: { type: String, required: true },
     std: { type: String, required: true },
+    board: { type: String, required: true, default: 'GSEB' },
+    stream: { type: String, default: 'None' },
     data: {
         name: { type: String, required: true },
         children: { type: Array, default: [] }

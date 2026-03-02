@@ -11,7 +11,12 @@ const fiveMinTestSchema = new mongoose.Schema({
     },
     stream: {
         type: String,
-        default: '-'
+        default: 'None'
+    },
+    board: {
+        type: String,
+        required: true,
+        default: 'GSEB'
     },
     subject: {
         type: String,

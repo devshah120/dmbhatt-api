@@ -25,6 +25,15 @@ const examSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    board: {
+        type: String,
+        required: true,
+        default: 'GSEB'
+    },
+    stream: {
+        type: String,
+        default: 'None'
+    },
     unit: {
         type: String,
         required: true

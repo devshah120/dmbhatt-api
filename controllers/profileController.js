@@ -56,7 +56,7 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const user = req.user;
-        const { firstName, phoneNum, email, school, city, std, medium, schoolName, parentPhone } = req.body;
+        const { firstName, phoneNum, email, school, city, std, stream, medium, board, schoolName, parentPhone } = req.body;
 
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
@@ -78,7 +78,9 @@ const updateProfile = async (req, res) => {
             profile = await StudentProfile.findOne({ userId: user._id });
             if (profile) {
                 if (std) profile.std = std;
+                if (stream) profile.stream = stream;
                 if (medium) profile.medium = medium;
+                if (board) profile.board = board;
                 if (school) profile.school = school;
                 if (parentPhone) profile.parentPhone = parentPhone;
                 await profile.save();

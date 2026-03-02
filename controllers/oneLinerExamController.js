@@ -12,10 +12,12 @@ const createExam = async (req, res) => {
 
 const getAllExams = async (req, res) => {
     try {
-        const { std, medium, subject } = req.query;
+        const { std, medium, board, stream, subject } = req.query;
         let query = {};
         if (std) query.std = std;
         if (medium) query.medium = medium;
+        if (board) query.board = board;
+        if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
         const exams = await OneLinerExam.find(query).sort({ createdAt: -1 });

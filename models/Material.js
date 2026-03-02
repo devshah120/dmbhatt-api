@@ -22,6 +22,11 @@ const MaterialSchema = new mongoose.Schema({
         type: String,
         required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial'].includes(this.type); }
     },
+    board: {
+        type: String,
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial'].includes(this.type); },
+        default: 'GSEB'
+    },
     stream: {
         type: String,
         default: 'None'

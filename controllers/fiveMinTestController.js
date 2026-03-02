@@ -12,10 +12,17 @@ const createTest = async (req, res) => {
     }
 };
 
-// Get All Tests
 const getAllTests = async (req, res) => {
     try {
-        const tests = await FiveMinTest.find().sort({ createdAt: -1 });
+        const { std, medium, board, stream, subject } = req.query;
+        let query = {};
+        if (std) query.std = std;
+        if (medium) query.medium = medium;
+        if (board) query.board = board;
+        if (stream) query.stream = stream;
+        if (subject) query.subject = subject;
+
+        const tests = await FiveMinTest.find(query).sort({ createdAt: -1 });
         res.status(200).json(tests);
     } catch (err) {
         console.error('Get All 5 Min Tests Error:', err);

@@ -721,6 +721,220 @@ const getStudentWiseReports = async (req, res) => {
     }
 };
 
+/**
+ * Get Detailed Stats for a Specific Standard (Admin)
+ */
+const getStandardDetailedStats = async (req, res) => {
+    try {
+        const { standard } = req.params;
+
+        // 1. Board-wise Collection
+        const boardStats = await Payment.aggregate([
+            {
+                $lookup: {
+                    from: 'productpurchases',
+                    localField: 'razorpayPaymentId',
+                    foreignField: 'razorpayPaymentId',
+                    as: 'purchase'
+                }
+            },
+            { $match: { purchase: { $size: 0 } } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: '$profile' },
+            { $match: { 'profile.std': standard } },
+            {
+                $group: {
+                    _id: '$profile.board',
+                    sales: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        // 2. Stream-wise Collection
+        const streamStats = await Payment.aggregate([
+            {
+                $lookup: {
+                    from: 'productpurchases',
+                    localField: 'razorpayPaymentId',
+                    foreignField: 'razorpayPaymentId',
+                    as: 'purchase'
+                }
+            },
+            { $match: { purchase: { $size: 0 } } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: '$profile' },
+            { $match: { 'profile.std': standard } },
+            {
+                $group: {
+                    _id: '$profile.stream',
+                    sales: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        // 3. Medium-wise Collection
+        const mediumStats = await Payment.aggregate([
+            {
+                $lookup: {
+                    from: 'productpurchases',
+                    localField: 'razorpayPaymentId',
+                    foreignField: 'razorpayPaymentId',
+                    as: 'purchase'
+                }
+            },
+            { $match: { purchase: { $size: 0 } } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: '$profile' },
+            { $match: { 'profile.std': standard } },
+            {
+                $group: {
+                    _id: '$profile.medium',
+                    sales: { $sum: { $ifNull: ['$amount', 0] } }
+                }
+            }
+        ]);
+
+        // 4. Student-wise Collection
+        const studentStats = await Payment.aggregate([
+            {
+                $lookup: {
+                    from: 'productpurchases',
+                    localField: 'razorpayPaymentId',
+                    foreignField: 'razorpayPaymentId',
+                    as: 'purchase'
+                }
+            },
+            { $match: { purchase: { $size: 0 } } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: '$profile' },
+            { $match: { 'profile.std': standard } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $group: {
+                    _id: '$userId',
+                    name: { $first: '$user.firstName' },
+                    phone: { $first: '$user.phoneNum' },
+                    amount: { $sum: '$amount' },
+                    board: { $first: '$profile.board' },
+                    medium: { $first: '$profile.medium' },
+                    stream: { $first: '$profile.stream' }
+                }
+            }
+        ]);
+
+        // 5. Plan Upgrades
+        const upgrades = await PlanUpgrade.aggregate([
+            { $match: { newStandard: standard } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $project: {
+                    userId: 1,
+                    amount: 1,
+                    board: { $ifNull: ['$profile.board', 'Unknown'] },
+                    medium: '$medium',
+                    stream: '$stream',
+                    userName: '$user.firstName',
+                    userPhone: '$user.phoneNum'
+                }
+            }
+        ]);
+
+        // Merge Upgrades into Board, Stream, Medium, and Student collections
+        const mergedBoard = {}; boardStats.forEach(b => mergedBoard[b._id || 'Unknown'] = (mergedBoard[b._id || 'Unknown'] || 0) + b.sales);
+        const mergedStream = {}; streamStats.forEach(s => mergedStream[s._id || 'None'] = (mergedStream[s._id || 'None'] || 0) + s.sales);
+        const mergedMedium = {}; mediumStats.forEach(m => mergedMedium[m._id || 'Unknown'] = (mergedMedium[m._id || 'Unknown'] || 0) + m.sales);
+        const mergedStudents = {}; studentStats.forEach(s => mergedStudents[s._id] = s);
+
+        upgrades.forEach(u => {
+            const b = u.board || 'Unknown';
+            const s = u.stream || 'None';
+            const m = u.medium || 'Unknown';
+
+            mergedBoard[b] = (mergedBoard[b] || 0) + u.amount;
+            mergedStream[s] = (mergedStream[s] || 0) + u.amount;
+            mergedMedium[m] = (mergedMedium[m] || 0) + u.amount;
+
+            if (mergedStudents[u.userId]) {
+                mergedStudents[u.userId].amount += u.amount;
+            } else {
+                mergedStudents[u.userId] = {
+                    _id: u.userId,
+                    name: u.userName,
+                    phone: u.userPhone,
+                    amount: u.amount,
+                    board: b,
+                    medium: m,
+                    stream: s
+                };
+            }
+        });
+
+        res.status(200).json({
+            boardStats: Object.keys(mergedBoard).map(k => ({ board: k, sales: mergedBoard[k] })),
+            streamStats: Object.keys(mergedStream).map(k => ({ stream: k, sales: mergedStream[k] })),
+            mediumStats: Object.keys(mergedMedium).map(k => ({ medium: k, sales: mergedMedium[k] })),
+            studentStats: Object.values(mergedStudents).sort((a, b) => b.amount - a.amount)
+        });
+
+    } catch (err) {
+        console.error('Get Standard Detailed Stats Error:', err);
+        res.status(500).json({ message: 'Failed to fetch detailed statistics' });
+    }
+};
+
 module.exports = {
     addStudent,
     addAssistant,
@@ -732,6 +946,7 @@ module.exports = {
     deleteAssistant,
     importStudents,
     getDashboardStats,
+    getStandardDetailedStats,
     getExamReports,
     getStudentWiseReports
 };

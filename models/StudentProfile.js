@@ -17,6 +17,17 @@ const studentProfileSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    board: {
+        type: String,
+        required: true,
+        trim: true,
+        default: 'GSEB'
+    },
+    stream: {
+        type: String,
+        trim: true,
+        default: 'None'
+    },
     school: {
         type: String,
         required: true,

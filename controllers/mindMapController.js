@@ -2,12 +2,12 @@ const MindMap = require('../models/MindMap');
 
 const createMindMap = async (req, res) => {
     try {
-        const { subject, unit, title, std, data } = req.body;
+        const { subject, unit, title, std, board, stream, data } = req.body;
         if (!subject || !unit || !title || !std || !data) {
             return res.status(400).json({ message: 'Subject, Unit, Title, Std, and Data are required' });
         }
 
-        const mindMap = new MindMap({ subject, unit, title, std, data });
+        const mindMap = new MindMap({ subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', data });
         await mindMap.save();
         res.status(201).json({ message: 'Mind Map created successfully', mindMap });
     } catch (err) {
@@ -18,7 +18,14 @@ const createMindMap = async (req, res) => {
 
 const getAllMindMaps = async (req, res) => {
     try {
-        const mindMaps = await MindMap.find().sort({ createdAt: -1 });
+        const { std, board, stream, subject } = req.query;
+        let query = {};
+        if (std) query.std = std;
+        if (board) query.board = board;
+        if (stream) query.stream = stream;
+        if (subject) query.subject = subject;
+
+        const mindMaps = await MindMap.find(query).sort({ createdAt: -1 });
         res.status(200).json(mindMaps);
     } catch (err) {
         console.error('Get All MindMaps Error:', err);
@@ -37,8 +44,30 @@ const deleteMindMap = async (req, res) => {
     }
 };
 
+const updateMindMap = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { subject, unit, title, std, board, stream, data } = req.body;
+
+        const updatedDoc = await MindMap.findByIdAndUpdate(
+            id,
+            { subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', data },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedDoc) {
+            return res.status(404).json({ message: 'Mind Map not found' });
+        }
+        res.status(200).json({ message: 'Mind Map updated successfully', mindMap: updatedDoc });
+    } catch (err) {
+        console.error('Update MindMap Error:', err);
+        res.status(500).json({ message: 'Failed to update Mind Map' });
+    }
+};
+
 module.exports = {
     createMindMap,
     getAllMindMaps,
-    deleteMindMap
+    deleteMindMap,
+    updateMindMap
 };

@@ -180,7 +180,7 @@ const registerAssistant = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, phoneNum, email, std, medium, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
+    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
@@ -295,6 +295,8 @@ const registerStudent = async (req, session) => {
         userId: savedUser._id,
         std,
         medium,
+        board: board || 'GSEB',
+        stream: stream || 'None',
         school,
         rollNo,
         parentPhone
@@ -308,7 +310,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
-    const { firstName, phoneNum, email, loginCode, schoolName, referralCode } = req.body;
+    const { firstName, phoneNum, email, loginCode, board, stream, schoolName, referralCode } = req.body;
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
@@ -378,6 +380,8 @@ const registerGuest = async (req, session) => {
     // Create guest profile
     const guestProfile = new GuestProfile({
         userId: savedUser._id,
+        board: board || 'GSEB',
+        stream: stream || 'None',
         schoolName: schoolName || 'Not specified'
     });
 

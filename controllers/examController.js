@@ -251,7 +251,7 @@ const parseQuestionsErrors = (text) => {
  * Save Exam
  */
 const saveExam = async (req, res) => {
-    const { title, subject, std, medium, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, board, stream, unit, totalMarks, questions } = req.body;
 
     console.log('[DEBUG] Schema Paths:', Object.keys(Exam.schema.paths));
     console.log('[DEBUG] Name Required:', Exam.schema.path('name')?.options?.required);
@@ -268,6 +268,8 @@ const saveExam = async (req, res) => {
             subject,
             std,
             medium,
+            board: board || 'GSEB',
+            stream: stream || 'None',
             unit,
             totalMarks,
             // createdBy: req.user.id // If auth middleware used
@@ -304,11 +306,13 @@ const saveExam = async (req, res) => {
  * Get All Exams
  */
 const getAllExams = async (req, res) => {
-    const { std, medium, subject } = req.query;
+    const { std, medium, board, stream, subject } = req.query;
     try {
         const query = {};
         if (std) query.std = std;
         if (medium) query.medium = medium;
+        if (board) query.board = board;
+        if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
         const exams = await Exam.find(query).sort({ createdAt: -1 });
@@ -365,7 +369,7 @@ const getExamById = async (req, res) => {
  */
 const updateExam = async (req, res) => {
     const { id } = req.params;
-    const { title, subject, std, medium, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, board, stream, unit, totalMarks, questions } = req.body;
 
     try {
         // 1. Update Exam Metadata
@@ -377,6 +381,8 @@ const updateExam = async (req, res) => {
                 subject,
                 std,
                 medium,
+                board: board || 'GSEB',
+                stream: stream || 'None',
                 unit,
                 totalMarks,
             },

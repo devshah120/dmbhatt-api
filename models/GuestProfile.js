@@ -7,6 +7,17 @@ const guestProfileSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    board: {
+        type: String,
+        required: true,
+        trim: true,
+        default: 'GSEB'
+    },
+    stream: {
+        type: String,
+        trim: true,
+        default: 'None'
+    },
     schoolName: {
         type: String,
         required: true,
