@@ -14,15 +14,23 @@ const parseFiveMinTestFormat = (text) => {
 
     let currentSection = "NONE"; // NONE, OVERVIEW, QUESTIONS
     let currentQuestion = null;
+    let currentQuestionType = "MCQ";
 
     lines.forEach((line) => {
+        const lowerLine = line.toLowerCase();
         // Section detection
-        if (line.toLowerCase() === "overview") {
+        if (lowerLine === "overview") {
             currentSection = "OVERVIEW";
             return;
         }
-        if (line.toLowerCase() === "true / false" || line.toLowerCase() === "true/false") {
+        if (lowerLine.includes("true / false") || lowerLine.includes("true/false")) {
             currentSection = "QUESTIONS";
+            currentQuestionType = "True/False";
+            return;
+        }
+        if (lowerLine.includes("fill in the blanks") || lowerLine.includes("fill in the blank")) {
+            currentSection = "QUESTIONS";
+            currentQuestionType = "Fill in the Blanks";
             return;
         }
 
@@ -37,25 +45,40 @@ const parseFiveMinTestFormat = (text) => {
                     questionText: qMatch[2],
                     options: [],
                     correctAnswer: "",
-                    type: "True/False"
+                    type: currentQuestionType
                 };
                 return;
             }
 
-            // Match options: "A. True", "B. False"
-            const optMatch = line.match(/^([A-D])[\.\)\s]\s*(.*)/i);
-            if (optMatch && currentQuestion) {
-                currentQuestion.options.push({
-                    key: optMatch[1].toUpperCase(),
-                    text: optMatch[2].trim()
-                });
-                return;
+            // Match options: "A. True", "B. False" (Only for T/F or MCQ)
+            if (currentQuestionType !== "Fill in the Blanks") {
+                const optMatch = line.match(/^([A-D])[\.\)\s]\s*(.*)/i);
+                if (optMatch && currentQuestion) {
+                    currentQuestion.options.push({
+                        key: optMatch[1].toUpperCase(),
+                        text: optMatch[2].trim()
+                    });
+                    return;
+                }
             }
 
-            // Match answer: "Ans. (A)", "Ans (A)", "Answer: A"
-            const ansMatch = line.match(/(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*([A-D])/i);
+            // Match answer: "Ans. value", "Ans (value)", "Answer: value"
+            const ansMatch = line.match(/(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*\s*(.*)/i);
             if (ansMatch && currentQuestion) {
-                currentQuestion.correctAnswer = "Option " + ansMatch[1].toUpperCase();
+                let answerValue = ansMatch[1].trim();
+
+                // If T/F or MCQ, it might be just a letter mapping
+                if (currentQuestionType !== "Fill in the Blanks") {
+                    const letterMatch = answerValue.match(/^([A-D])/i);
+                    if (letterMatch) {
+                        currentQuestion.correctAnswer = "Option " + letterMatch[1].toUpperCase();
+                    } else {
+                        currentQuestion.correctAnswer = answerValue;
+                    }
+                } else {
+                    // For Fill in the Blanks, take the whole string
+                    currentQuestion.correctAnswer = answerValue;
+                }
                 return;
             }
 

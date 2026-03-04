@@ -33,7 +33,7 @@ const fiveMinTestSchema = new mongoose.Schema({
     questions: [{
         question: String,
         questionImage: String,
-        type: { type: String, default: 'MCQ' }, // MCQ or True/False
+        type: { type: String, default: 'MCQ' }, // MCQ, True/False, or Fill in the Blanks
         optionA: String,
         optionAImage: String,
         optionB: String,
