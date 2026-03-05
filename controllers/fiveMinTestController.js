@@ -202,10 +202,26 @@ const deleteTest = async (req, res) => {
     }
 };
 
+// Get Test By ID
+const getTestById = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const test = await FiveMinTest.findById(id);
+        if (!test) {
+            return res.status(404).json({ message: 'Test not found' });
+        }
+        res.status(200).json(test);
+    } catch (err) {
+        console.error('Get 5 Min Test By ID Error:', err);
+        res.status(500).json({ message: 'Failed to fetch test', error: err.message });
+    }
+};
+
 module.exports = {
     uploadFiveMinTestPdf,
     createTest,
     getAllTests,
     updateTest,
-    deleteTest
+    deleteTest,
+    getTestById
 };

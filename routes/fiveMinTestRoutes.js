@@ -8,6 +8,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post('/upload-pdf', upload.single('file'), fiveMinTestController.uploadFiveMinTestPdf);
 router.post('/create', fiveMinTestController.createTest);
 router.get('/all', fiveMinTestController.getAllTests);
+router.get('/:id', fiveMinTestController.getTestById);
 router.put('/update/:id', fiveMinTestController.updateTest);
 router.delete('/delete/:id', fiveMinTestController.deleteTest);
 

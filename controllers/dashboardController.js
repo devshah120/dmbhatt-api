@@ -35,6 +35,7 @@ const getDashboardData = async (req, res) => {
             totalRewardPoints: totalPoints,
             examResults: examResults.map(exam => ({
                 id: exam._id,
+                examId: exam.examId,
                 title: exam.title,
                 obtainedMarks: exam.obtainedMarks,
                 totalMarks: exam.totalMarks,
