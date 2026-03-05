@@ -30,7 +30,7 @@ const studentProfileSchema = new mongoose.Schema({
     },
     school: {
         type: String,
-        required: true,
+        required: false,
         trim: true
     },
     rollNo: {

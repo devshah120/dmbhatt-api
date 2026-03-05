@@ -54,8 +54,8 @@ const registrationValidation = [
     body('medium').if(body('role').equals('student'))
         .notEmpty().withMessage('Medium is required for student'),
 
-    body('school').if(body('role').equals('student'))
-        .notEmpty().withMessage('School is required for student'),
+    // body('school').if(body('role').equals('student'))
+    //     .notEmpty().withMessage('School is required for student'),
 
     // Guest-specific validation
     body('firstName').if(body('role').equals('guest'))
