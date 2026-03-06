@@ -22,11 +22,24 @@ const protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
-            next();
+            return next();
         } catch (error) {
             console.error(error);
-            res.status(401).json({ message: 'Not authorized' });
+            return res.status(401).json({ message: 'Not authorized' });
         }
+    }
+
+    // Check for Guest Token
+    const guestTokenHeader = req.headers['x-guest-token'];
+    if (guestTokenHeader === 'DMBHATT_GUEST_ACCESS_TOKEN_2024') {
+        req.user = {
+            _id: '000000000000000000000000', // Mock ObjectId
+            role: 'guest',
+            firstName: 'Guest',
+            lastName: 'User',
+            phoneNum: 'Guest'
+        };
+        return next();
     }
 
     if (!token) {

@@ -425,8 +425,7 @@ const login = async (req, res) => {
     } catch (err) {
         console.error('Login Error:', err);
         res.status(401).json({
-            message: 'Login failed',
-            error: err.message
+            message: err.message || 'Login failed'
         });
     }
 };

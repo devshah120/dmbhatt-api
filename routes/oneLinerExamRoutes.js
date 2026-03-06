@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const oneLinerExamController = require('../controllers/oneLinerExamController');
 
-const auth = require('../middleware/auth');
+const { protect } = require('../middleware/authMiddleware');
 
 router.post('/add', oneLinerExamController.createExam);
 router.get('/all', oneLinerExamController.getAllExams);
-router.post('/submit', auth, oneLinerExamController.submitResult);
+router.post('/submit', protect, oneLinerExamController.submitResult);
 router.get('/:id', oneLinerExamController.getExamById);
 router.delete('/:id', oneLinerExamController.deleteExam);
 router.put('/:id', oneLinerExamController.updateExam);
