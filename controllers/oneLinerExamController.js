@@ -1,4 +1,6 @@
 const OneLinerExam = require('../models/OneLinerExam');
+const OneLinerExamResult = require('../models/OneLinerExamResult');
+const StudentProfile = require('../models/StudentProfile');
 
 const createExam = async (req, res) => {
     try {
@@ -71,10 +73,47 @@ const updateExam = async (req, res) => {
     }
 };
 
+const submitResult = async (req, res) => {
+    try {
+        const { examId, title, obtainedMarks, totalMarks, accuracy } = req.body;
+        const studentId = req.user._id;
+
+        // 1. Check for duplicate
+        const existing = await OneLinerExamResult.findOne({ studentId, examId });
+        if (existing) {
+            return res.status(400).json({ success: false, message: 'You have already submitted this exam.' });
+        }
+
+        // 2. Points (1 per 10 marks)
+        const earnedPoints = Math.floor(obtainedMarks / 10);
+        const profile = await StudentProfile.findOne({ userId: studentId });
+        if (profile) {
+            profile.totalRewardPoints = (profile.totalRewardPoints || 0) + earnedPoints;
+            await profile.save();
+        }
+
+        // 3. Save
+        const result = new OneLinerExamResult({
+            studentId,
+            examId,
+            title,
+            obtainedMarks,
+            totalMarks,
+            accuracy: accuracy || 0
+        });
+
+        await result.save();
+        res.status(201).json({ success: true, result, earnedPoints });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 module.exports = {
     createExam,
     getAllExams,
     getExamById,
     deleteExam,
-    updateExam
+    updateExam,
+    submitResult
 };

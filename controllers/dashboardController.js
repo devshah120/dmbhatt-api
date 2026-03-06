@@ -1,4 +1,5 @@
 const ExamResult = require('../models/ExamResult');
+const OneLinerExamResult = require('../models/OneLinerExamResult');
 const StudentProfile = require('../models/StudentProfile');
 // const RewardHistory = require('../models/RewardHistory'); // If needed for detailed history
 
@@ -24,16 +25,24 @@ const getDashboardData = async (req, res) => {
             return res.status(404).json({ message: 'Student profile not found' });
         }
 
-        // Fetch Exam Results
-        // Sort by date descending
-        const examResults = await ExamResult.find({ studentId: user._id }).sort({ date: -1 });
+        // Fetch All Results
+        const [examResults, oneLinerResults] = await Promise.all([
+            ExamResult.find({ studentId: user._id }),
+            OneLinerExamResult.find({ studentId: user._id })
+        ]);
+
+        // Merge and sort by date descending
+        const allResults = [
+            ...examResults.map(e => ({ ...e.toObject(), type: 'REGULAR' })),
+            ...oneLinerResults.map(e => ({ ...e.toObject(), type: 'ONELINER' }))
+        ].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 
         // Consolidate points: Exam Points + Referral Points
         const totalPoints = (studentProfile.totalRewardPoints || 0) + (user.bonusPoints || 0);
 
         res.status(200).json({
             totalRewardPoints: totalPoints,
-            examResults: examResults.map(exam => ({
+            examResults: allResults.map(exam => ({
                 id: exam._id,
                 examId: exam.examId,
                 title: exam.title,
@@ -41,7 +50,9 @@ const getDashboardData = async (req, res) => {
                 totalMarks: exam.totalMarks,
                 earnedPoints: exam.earnedPoints || 0,
                 isOnline: exam.isOnline,
-                date: exam.date
+                date: exam.date || exam.createdAt,
+                type: exam.type,
+                accuracy: exam.accuracy // Optional for One Liners
             }))
         });
 
