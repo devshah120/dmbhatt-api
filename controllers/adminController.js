@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
-const AssistantProfile = require('../models/AssistantProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const ExploreProduct = require('../models/ExploreProduct');
@@ -71,59 +70,6 @@ const addStudent = async (req, res) => {
         await session.abortTransaction();
         console.error('Add Student Error:', err);
         res.status(500).json({ message: err.message || 'Failed to add student' });
-    } finally {
-        session.endSession();
-    }
-};
-
-/**
- * Add Assistant (Admin)
- */
-const addAssistant = async (req, res) => {
-    const { name, phone, password, aadharNumber, address } = req.body;
-
-    if (!name || !phone || !password || !aadharNumber) {
-        return res.status(400).json({ message: 'Name, Phone, Password, and Aadhar Number are required' });
-    }
-
-    const session = await mongoose.startSession();
-    try {
-        session.startTransaction();
-
-        // Check availability
-        const existingUser = await User.findOne({ phoneNum: phone }).session(session);
-        if (existingUser) {
-            throw new Error('User with this Phone Number already exists');
-        }
-
-        // Hash the provided password
-        const loginCodeHash = await hashLoginCode(password);
-
-        // Create User
-        const user = new User({
-            role: 'assistant',
-            firstName: name,
-            phoneNum: phone,
-            loginCodeHash,
-            address: { street: address }
-        });
-        const savedUser = await user.save({ session });
-
-        // Create Profile
-        const assistantProfile = new AssistantProfile({
-            userId: savedUser._id,
-            aadharNum: aadharNumber, // Store actual Aadhar Number
-            // aadharFilePath: [] 
-        });
-        await assistantProfile.save({ session });
-
-        await session.commitTransaction();
-        res.status(201).json({ message: 'Assistant added successfully', assistantId: savedUser._id });
-
-    } catch (err) {
-        await session.abortTransaction();
-        console.error('Add Assistant Error:', err);
-        res.status(500).json({ message: err.message || 'Failed to add assistant' });
     } finally {
         session.endSession();
     }
@@ -286,106 +232,6 @@ const deleteStudent = async (req, res) => {
 };
 
 
-
-/**
- * Get All Assistants
- */
-const getAllAssistants = async (req, res) => {
-    try {
-        const assistants = await User.aggregate([
-            { $match: { role: 'assistant' } },
-            {
-                $lookup: {
-                    from: 'assistantprofiles',
-                    localField: '_id',
-                    foreignField: 'userId',
-                    as: 'profile'
-                }
-            },
-            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 1,
-                    name: '$firstName',
-                    phone: '$phoneNum',
-                    address: '$address.street',
-                    aadharNum: '$profile.aadharNum'
-                }
-            }
-        ]);
-
-        res.status(200).json(assistants);
-    } catch (err) {
-        console.error('Get All Assistants Error:', err);
-        res.status(500).json({ message: 'Failed to fetch assistants' });
-    }
-};
-
-/**
- * Edit Assistant
- */
-const editAssistant = async (req, res) => {
-    const { id } = req.params;
-    const { name, phone, password, address, aadharNumber } = req.body;
-
-    const session = await mongoose.startSession();
-    try {
-        session.startTransaction();
-
-        // 1. Update User
-        const userUpdates = {};
-        if (name) userUpdates.firstName = name;
-        if (phone) userUpdates.phoneNum = phone;
-        if (password) userUpdates.loginCodeHash = await hashLoginCode(password);
-        if (address) userUpdates['address.street'] = address; // Simple update for now
-
-        const user = await User.findByIdAndUpdate(id, { $set: userUpdates }, { session, new: true });
-        if (!user) throw new Error('Assistant not found');
-
-        // 2. Update Profile
-        if (aadharNumber) {
-            await AssistantProfile.findOneAndUpdate(
-                { userId: id },
-                { $set: { aadharNum: aadharNumber } },
-                { session, new: true }
-            );
-        }
-
-        await session.commitTransaction();
-        res.status(200).json({ message: 'Assistant updated successfully' });
-
-    } catch (err) {
-        await session.abortTransaction();
-        console.error('Edit Assistant Error:', err);
-        res.status(500).json({ message: err.message || 'Failed to update assistant' });
-    } finally {
-        session.endSession();
-    }
-};
-
-/**
- * Delete Assistant
- */
-const deleteAssistant = async (req, res) => {
-    const { id } = req.params;
-    const session = await mongoose.startSession();
-    try {
-        session.startTransaction();
-
-        await User.findByIdAndDelete(id).session(session);
-        await AssistantProfile.findOneAndDelete({ userId: id }).session(session);
-
-        await session.commitTransaction();
-        res.status(200).json({ message: 'Assistant deleted successfully' });
-
-    } catch (err) {
-        await session.abortTransaction();
-        console.error('Delete Assistant Error:', err);
-        res.status(500).json({ message: 'Failed to delete assistant' });
-    } finally {
-        session.endSession();
-    }
-};
 
 /**
  * Import Students from Excel
@@ -937,13 +783,9 @@ const getStandardDetailedStats = async (req, res) => {
 
 module.exports = {
     addStudent,
-    addAssistant,
     getAllStudents,
     editStudent,
     deleteStudent,
-    getAllAssistants,
-    editAssistant,
-    deleteAssistant,
     importStudents,
     getDashboardStats,
     getStandardDetailedStats,

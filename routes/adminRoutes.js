@@ -35,10 +35,6 @@ router.post('/import-students', uploadExcel.single('file'), adminController.impo
 router.get('/all-students', adminController.getAllStudents);
 router.put('/edit-student/:id', uploadStudent, adminController.editStudent);
 router.delete('/delete-student/:id', adminController.deleteStudent);
-router.post('/add-assistant', express.json(), adminController.addAssistant);
-router.get('/all-assistants', adminController.getAllAssistants);
-router.put('/edit-assistant/:id', express.json(), adminController.editAssistant);
-router.delete('/delete-assistant/:id', adminController.deleteAssistant);
 router.get('/dashboard-stats', adminController.getDashboardStats);
 router.get('/dashboard/standard-stats/:standard', adminController.getStandardDetailedStats);
 router.get('/exam-reports', adminController.getExamReports);

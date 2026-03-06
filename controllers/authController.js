@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
-const AssistantProfile = require('../models/AssistantProfile');
 const StudentProfile = require('../models/StudentProfile');
 const GuestProfile = require('../models/GuestProfile');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
@@ -20,12 +19,7 @@ const register = async (req, res) => {
         return res.status(400).json({ message: 'Role is required' });
     }
 
-    // Validate role-based file requirements
-    if (role === 'assistant') {
-        if (!req.files?.aadharFile?.length) {
-            return res.status(400).json({ message: 'Aadhar file required for assistant registration' });
-        }
-    }
+
 
     // if (role === 'student' || role === 'guest') {
     //     if (!req.files?.photo?.length) {
@@ -43,9 +37,7 @@ const register = async (req, res) => {
             case 'admin':
                 await registerAdmin(req, session);
                 break;
-            case 'assistant':
-                await registerAssistant(req, session);
-                break;
+
             case 'student':
                 await registerStudent(req, session);
                 break;
@@ -111,69 +103,7 @@ const registerAdmin = async (req, session) => {
     await adminProfile.save({ session });
 };
 
-/**
- * Assistant Registration
- * Required: name, email, phoneNum, aadharNum, aadharFile, address, loginCode
- */
-const registerAssistant = async (req, session) => {
-    const { name, email, phoneNum, aadharNum, address, loginCode } = req.body;
 
-    // Check if aadhar file was uploaded
-    const aadharFiles = req.files?.aadharFile;
-    if (!aadharFiles || aadharFiles.length === 0) {
-        throw new Error('Aadhar card file is required');
-    }
-
-    // Validate file count and types
-    if (aadharFiles.length === 1) {
-        // Allow PDF or Image
-        // Multer filter already checks for allowed types, so we just proceed
-    } else if (aadharFiles.length === 2) {
-        // Allow only Images if 2 files are uploaded
-        const isAllImages = aadharFiles.every(file => ['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype));
-        if (!isAllImages) {
-            throw new Error('If uploading 2 files, both must be images (Front and Back)');
-        }
-    } else {
-        throw new Error('Maximum 2 files allowed for Aadhar card');
-    }
-
-    // Check if user exists
-    const existingUser = await User.findOne({
-        $or: [{ email }, { phoneNum }]
-    }).session(session);
-
-    if (existingUser) {
-        throw new Error('User with this email or phone number already exists');
-    }
-
-    // Hash login code
-    const loginCodeHash = await hashLoginCode(loginCode);
-
-    // Parse address
-    const addressObj = parseAddress(address);
-
-    // Create user
-    const user = new User({
-        role: 'assistant',
-        firstName: name,
-        email,
-        phoneNum,
-        loginCodeHash,
-        address: addressObj
-    });
-
-    const savedUser = await user.save({ session });
-
-    // Create assistant profile
-    const assistantProfile = new AssistantProfile({
-        userId: savedUser._id,
-        aadharNum,
-        aadharFilePath: aadharFiles.map(file => file.path)
-    });
-
-    await assistantProfile.save({ session });
-};
 
 /**
  * Student Registration

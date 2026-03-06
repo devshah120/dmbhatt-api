@@ -6,7 +6,7 @@ const { body, validationResult } = require('express-validator');
 const registrationValidation = [
     body('role')
         .notEmpty().withMessage('Role is required')
-        .isIn(['admin', 'assistant', 'student', 'guest']).withMessage('Invalid role'),
+        .isIn(['admin', 'student', 'guest']).withMessage('Invalid role'),
 
     body('loginCode')
         .notEmpty().withMessage('Login code is required')
@@ -24,20 +24,7 @@ const registrationValidation = [
         .notEmpty().withMessage('Email is required for admin')
         .isEmail().withMessage('Invalid email address'),
 
-    // Assistant-specific validation
-    body('name').if(body('role').equals('assistant'))
-        .notEmpty().withMessage('Name is required for assistant'),
 
-    body('email').if(body('role').equals('assistant'))
-        .notEmpty().withMessage('Email is required for assistant')
-        .isEmail().withMessage('Invalid email address'),
-
-    body('aadharNum').if(body('role').equals('assistant'))
-        .notEmpty().withMessage('Aadhar number is required for assistant')
-        .isLength({ min: 12, max: 12 }).withMessage('Aadhar number must be 12 digits'),
-
-    body('address').if(body('role').equals('assistant'))
-        .notEmpty().withMessage('Address is required for assistant'),
 
     // Student-specific validation
     body('firstName').if(body('role').equals('student'))
@@ -82,7 +69,7 @@ const registrationValidation = [
 const loginValidation = [
     body('role')
         .optional()
-        .isIn(['admin', 'assistant', 'student', 'guest']).withMessage('Invalid role'),
+        .isIn(['admin', 'student', 'guest']).withMessage('Invalid role'),
 
     body('loginCode')
         .notEmpty().withMessage('Login code is required'),
