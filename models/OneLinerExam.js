@@ -30,6 +30,11 @@ const oneLinerExamSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    totalMarks: {
+        type: Number,
+        required: true,
+        default: 20
+    },
     questions: [{
         questionText: { type: String, required: true },
         correctAnswer: { type: String, required: true }

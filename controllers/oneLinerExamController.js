@@ -21,7 +21,17 @@ const getAllExams = async (req, res) => {
         if (subject) query.subject = subject;
 
         const exams = await OneLinerExam.find(query).sort({ createdAt: -1 });
-        res.status(200).json(exams);
+
+        // Ensure totalMarks is explicitly included for older records
+        const processedExams = exams.map(exam => {
+            const obj = exam.toObject();
+            if (obj.totalMarks === undefined || obj.totalMarks === null) {
+                obj.totalMarks = obj.questions ? obj.questions.length : 20;
+            }
+            return obj;
+        });
+
+        res.status(200).json(processedExams);
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -31,7 +41,13 @@ const getExamById = async (req, res) => {
     try {
         const exam = await OneLinerExam.findById(req.params.id);
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
-        res.status(200).json(exam);
+
+        const obj = exam.toObject();
+        if (obj.totalMarks === undefined || obj.totalMarks === null) {
+            obj.totalMarks = obj.questions ? obj.questions.length : 20;
+        }
+
+        res.status(200).json(obj);
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
