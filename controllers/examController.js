@@ -460,14 +460,16 @@ const submitExam = async (req, res) => {
         }
 
         // 4. Save Result
+        const finalIsOnline = isOnline === true || isOnline === 'true';
         const result = new ExamResult({
             studentId,
             examId,
             title,
             obtainedMarks,
             totalMarks,
-            isOnline: isOnline !== undefined ? isOnline : true,
-            earnedPoints: earnedPoints
+            isOnline: finalIsOnline,
+            earnedPoints: earnedPoints,
+            type: req.body.type || (finalIsOnline ? 'REGULAR' : 'QUIZ')
         });
 
         await result.save();

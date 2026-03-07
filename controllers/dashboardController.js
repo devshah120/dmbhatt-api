@@ -33,8 +33,26 @@ const getDashboardData = async (req, res) => {
 
         // Merge and sort by date descending
         const allResults = [
-            ...examResults.map(e => ({ ...e.toObject(), type: 'REGULAR' })),
-            ...oneLinerResults.map(e => ({ ...e.toObject(), type: 'ONELINER' }))
+            ...examResults.map(e => {
+                const obj = e.toObject();
+                // For ExamResult, prioritize explicit type or deduce from isOnline
+                if (!obj.type || (obj.type === 'REGULAR' && obj.isOnline === false)) {
+                    obj.type = obj.isOnline ? 'REGULAR' : 'QUIZ';
+                }
+                return obj;
+            }),
+            ...oneLinerResults.map(e => {
+                const obj = e.toObject();
+                // For OneLiner, type is always 'ONELINER'
+                if (!obj.type) {
+                    obj.type = 'ONELINER';
+                }
+                // Ensure isOnline is true for OneLiner if not present
+                if (obj.isOnline === undefined) {
+                    obj.isOnline = true;
+                }
+                return obj;
+            })
         ].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 
         // Consolidate points: Exam Points + Referral Points

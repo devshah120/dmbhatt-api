@@ -27,6 +27,14 @@ const oneLinerExamResultSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    type: {
+        type: String,
+        default: 'ONELINER'
+    },
+    isOnline: {
+        type: Boolean,
+        default: true
+    },
     date: {
         type: Date,
         default: Date.now

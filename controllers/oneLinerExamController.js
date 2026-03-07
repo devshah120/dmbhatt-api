@@ -99,7 +99,9 @@ const submitResult = async (req, res) => {
             title,
             obtainedMarks,
             totalMarks,
-            accuracy: accuracy || 0
+            accuracy: accuracy || 0,
+            type: req.body.type || 'ONELINER',
+            isOnline: req.body.isOnline !== undefined ? req.body.isOnline : true
         });
 
         await result.save();
