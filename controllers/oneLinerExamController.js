@@ -75,7 +75,8 @@ const updateExam = async (req, res) => {
 
 const submitResult = async (req, res) => {
     try {
-        const { examId, title, obtainedMarks, totalMarks, accuracy } = req.body;
+        const { examId, obtainedMarks, totalMarks, accuracy } = req.body;
+        const title = req.body.title || 'Untitled Exam';
         const studentId = req.user._id;
 
         // 1. Check for duplicate

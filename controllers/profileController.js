@@ -4,6 +4,9 @@ const GuestProfile = require('../models/GuestProfile');
 const AdminProfile = require('../models/AdminProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
+const ExamResult = require('../models/ExamResult');
+const FiveMinTestResult = require('../models/FiveMinTestResult');
+const OneLinerExamResult = require('../models/OneLinerExamResult');
 
 /**
  * Get User Profile
@@ -25,6 +28,12 @@ const getProfile = async (req, res) => {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
 
+        const examCounts = {
+            mainExam: await ExamResult.countDocuments({ studentId: user._id }),
+            fiveMinTest: await FiveMinTestResult.countDocuments({ studentId: user._id }),
+            oneLinerExam: await OneLinerExamResult.countDocuments({ studentId: user._id }),
+        };
+
         res.status(200).json({
             user: {
                 firstName: user.firstName,
@@ -37,6 +46,7 @@ const getProfile = async (req, res) => {
                 address: user.address,
                 isPaid: user.isPaid,
             },
+            examCounts: examCounts,
             profile: profile || {}
         });
 
