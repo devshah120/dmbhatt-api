@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const fiveMinTestSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        default: ''
+    },
     std: {
         type: String,
         required: true
