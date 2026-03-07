@@ -1,7 +1,6 @@
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
 const GuestProfile = require('../models/GuestProfile');
-const AssistantProfile = require('../models/AssistantProfile');
 const AdminProfile = require('../models/AdminProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
@@ -22,8 +21,6 @@ const getProfile = async (req, res) => {
             profile = await StudentProfile.findOne({ userId: user._id });
         } else if (user.role === 'guest') {
             profile = await GuestProfile.findOne({ userId: user._id });
-        } else if (user.role === 'assistant') {
-            profile = await AssistantProfile.findOne({ userId: user._id });
         } else if (user.role === 'admin') {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
@@ -38,6 +35,7 @@ const getProfile = async (req, res) => {
                 photoPath: user.photoPath,
                 role: user.role,
                 address: user.address,
+                isPaid: user.isPaid,
             },
             profile: profile || {}
         });

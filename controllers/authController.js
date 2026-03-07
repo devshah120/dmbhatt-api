@@ -123,9 +123,7 @@ const registerStudent = async (req, session) => {
             throw new Error('Payment verification failed: Invalid signature');
         }
     } else {
-        // If payment is mandatory, throw error here. For flexibility (e.g. free trials or manual entry by admin), we might skip.
-        // Assuming mandatory for online registration:
-        throw new Error('Payment details are missing');
+        console.log('[DEBUG] Registration proceeding without payment details');
     }
 
     // Check if user exists
@@ -139,11 +137,20 @@ const registerStudent = async (req, session) => {
     let savedUser;
 
     if (existingUser) {
-        if (existingUser.role !== 'guest') {
+        if (existingUser.role === 'student') {
+            console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. Checking for payment update.`);
+            // if already paid and no new payment, error
+            if (existingUser.isPaid && !razorpay_payment_id) {
+                throw new Error('User with this phone number already exists');
+            }
+            // Allow update
+            savedUser = existingUser;
+        } else if (existingUser.role !== 'guest') {
             console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
             throw new Error('User with this phone number already exists');
+        } else {
+            console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
         }
-        console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
     }
 
     // Hash login code
@@ -163,15 +170,17 @@ const registerStudent = async (req, session) => {
     }
 
     // Create or update user
-    if (existingUser && existingUser.role === 'guest') {
+    if (existingUser && (existingUser.role === 'guest' || existingUser.role === 'student')) {
         existingUser.role = 'student';
-        existingUser.firstName = firstName;
-        existingUser.email = email;
-        existingUser.loginCodeHash = loginCodeHash;
+        if (firstName) existingUser.firstName = firstName;
+        if (email) existingUser.email = email;
+        if (loginCode) existingUser.loginCodeHash = loginCodeHash;
         existingUser.photoPath = req.files?.photo?.[0]?.path || existingUser.photoPath;
-        existingUser.referredBy = referrerId;
+        if (referrerId) existingUser.referredBy = referrerId;
+        if (razorpay_payment_id) existingUser.isPaid = true;
         savedUser = await existingUser.save({ session });
-    } else {
+    }
+    else {
         const user = new User({
             role: 'student',
             firstName,
@@ -179,7 +188,8 @@ const registerStudent = async (req, session) => {
             phoneNum,
             loginCodeHash,
             photoPath: req.files?.photo?.[0]?.path || '',
-            referredBy: referrerId
+            referredBy: referrerId,
+            isPaid: !!razorpay_payment_id
         });
         savedUser = await user.save({ session });
     }

@@ -5,6 +5,7 @@ const ExploreProduct = require('../models/ExploreProduct');
 const Payment = require('../models/Payment');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const StudentProfile = require('../models/StudentProfile');
+const User = require('../models/User');
 
 const razorpay = new Razorpay({
     key_id: 'rzp_test_RlEXP3KcdFxaDU',
@@ -147,6 +148,9 @@ exports.verifyUpgradePayment = async (req, res) => {
             if (stream) profile.stream = stream;
             await profile.save();
         }
+
+        // Update User isPaid status
+        await User.findByIdAndUpdate(req.user.id, { isPaid: true });
 
         res.status(200).json({ message: 'Plan upgraded successfully', upgrade });
     } catch (error) {
