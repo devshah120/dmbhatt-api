@@ -6,9 +6,13 @@ const fiveMinTestResultSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    testId: {
+    examId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'FiveMinTest',
+        required: true
+    },
+    title: {
+        type: String,
         required: true
     },
     obtainedMarks: {
@@ -18,6 +22,14 @@ const fiveMinTestResultSchema = new mongoose.Schema({
     totalMarks: {
         type: Number,
         required: true
+    },
+    type: {
+        type: String,
+        default: 'QUIZ'
+    },
+    isOnline: {
+        type: Boolean,
+        default: true
     },
     answers: [{
         questionIndex: Number,

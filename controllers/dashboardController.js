@@ -1,7 +1,7 @@
 const ExamResult = require('../models/ExamResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
+const FiveMinTestResult = require('../models/FiveMinTestResult');
 const StudentProfile = require('../models/StudentProfile');
-// const RewardHistory = require('../models/RewardHistory'); // If needed for detailed history
 
 /**
  * Get Student Dashboard Data
@@ -26,9 +26,10 @@ const getDashboardData = async (req, res) => {
         }
 
         // Fetch All Results
-        const [examResults, oneLinerResults] = await Promise.all([
+        const [examResults, oneLinerResults, fiveMinTestResults] = await Promise.all([
             ExamResult.find({ studentId: user._id }),
-            OneLinerExamResult.find({ studentId: user._id })
+            OneLinerExamResult.find({ studentId: user._id }),
+            FiveMinTestResult.find({ studentId: user._id })
         ]);
 
         // Merge and sort by date descending
@@ -48,6 +49,18 @@ const getDashboardData = async (req, res) => {
                     obj.type = 'ONELINER';
                 }
                 // Ensure isOnline is true for OneLiner if not present
+                if (obj.isOnline === undefined) {
+                    obj.isOnline = true;
+                }
+                return obj;
+            }),
+            ...fiveMinTestResults.map(e => {
+                const obj = e.toObject();
+                // For FiveMinTest, type is 'QUIZ'
+                if (!obj.type) {
+                    obj.type = 'QUIZ';
+                }
+                // Ensure isOnline is true for FiveMinTest if not present
                 if (obj.isOnline === undefined) {
                     obj.isOnline = true;
                 }
