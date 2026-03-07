@@ -132,23 +132,38 @@ const registerStudent = async (req, session) => {
         throw new Error('Phone number is missing or undefined');
     }
 
-    const existingUser = await User.findOne({ phoneNum }).session(session);
+    const existingUser = await User.findOne({
+        $or: [
+            { phoneNum },
+            ...(email ? [{ email }] : [])
+        ]
+    }).session(session);
+
     let savedUser;
 
     if (existingUser) {
-        if (existingUser.role === 'student') {
-            console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. Checking for payment update.`);
-            // if already paid and no new payment, error
-            if (existingUser.isPaid && !razorpay_payment_id) {
+        // 1. Check if email is already taken by ANOTHER user
+        if (email && existingUser.email === email && existingUser.phoneNum !== phoneNum) {
+            throw new Error('User with this email already exists');
+        }
+
+        // 2. Handle phone match
+        if (existingUser.phoneNum === phoneNum) {
+            if (existingUser.role === 'student') {
+                console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. Checking for payment update.`);
+                // If student has already paid and no new payment is provided, don't allow re-registration
+                if (existingUser.isPaid && !razorpay_payment_id) {
+                    throw new Error('User with this phone number already exists');
+                }
+                // Allow update for unpaid students or those providing new payment
+                savedUser = existingUser;
+            } else if (existingUser.role !== 'guest') {
+                console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
                 throw new Error('User with this phone number already exists');
+            } else {
+                console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
+                savedUser = existingUser;
             }
-            // Allow update
-            savedUser = existingUser;
-        } else if (existingUser.role !== 'guest') {
-            console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
-            throw new Error('User with this phone number already exists');
-        } else {
-            console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
         }
     }
 
@@ -257,11 +272,18 @@ const registerGuest = async (req, session) => {
     // Photo is NOT required for guest registration
 
 
-    // Check if user exists
-    const existingUser = await User.findOne({ phoneNum }).session(session);
+    // Check if user exists (by phone or email)
+    const existingUser = await User.findOne({
+        $or: [
+            { phoneNum },
+            ...(email ? [{ email }] : [])
+        ]
+    }).session(session);
 
     if (existingUser) {
-        console.log(`[DEBUG] Guest User found: ${existingUser.phoneNum}, ID: ${existingUser._id}`);
+        if (email && existingUser.email === email) {
+            throw new Error('User with this email already exists');
+        }
         throw new Error('User with this phone number already exists');
     }
 
