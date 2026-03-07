@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
 const StudentProfile = require('../models/StudentProfile');
-const GuestProfile = require('../models/GuestProfile');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
@@ -40,9 +39,6 @@ const register = async (req, res) => {
 
             case 'student':
                 await registerStudent(req, session);
-                break;
-            case 'guest':
-                await registerGuest(req, session);
                 break;
             default:
                 await session.abortTransaction();

@@ -1,6 +1,5 @@
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
-const GuestProfile = require('../models/GuestProfile');
 const AdminProfile = require('../models/AdminProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
@@ -22,8 +21,6 @@ const getProfile = async (req, res) => {
         // Fetch profile based on role
         if (user.role === 'student') {
             profile = await StudentProfile.findOne({ userId: user._id });
-        } else if (user.role === 'guest') {
-            profile = await GuestProfile.findOne({ userId: user._id });
         } else if (user.role === 'admin') {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
@@ -91,12 +88,6 @@ const updateProfile = async (req, res) => {
                 if (board) profile.board = board;
                 if (school) profile.school = school;
                 if (parentPhone) profile.parentPhone = parentPhone;
-                await profile.save();
-            }
-        } else if (user.role === 'guest') {
-            profile = await GuestProfile.findOne({ userId: user._id });
-            if (profile) {
-                if (schoolName) profile.schoolName = schoolName;
                 await profile.save();
             }
         }
