@@ -94,13 +94,12 @@ const registerAdmin = async (req, session) => {
 
     const savedUser = await user.save({ session });
 
-    // Create admin profile
-    const adminProfile = new AdminProfile({
-        userId: savedUser._id,
-        name
-    });
-
-    await adminProfile.save({ session });
+    // Create or update admin profile
+    await AdminProfile.findOneAndUpdate(
+        { userId: savedUser._id },
+        { name },
+        { upsert: true, session }
+    );
 };
 
 
@@ -230,19 +229,20 @@ const registerStudent = async (req, session) => {
         );
     }
 
-    // Create student profile
-    const studentProfile = new StudentProfile({
-        userId: savedUser._id,
-        std,
-        medium,
-        board: board || 'GSEB',
-        stream: stream || 'None',
-        school,
-        rollNo,
-        parentPhone
-    });
-
-    await studentProfile.save({ session });
+    // Create or update student profile
+    await StudentProfile.findOneAndUpdate(
+        { userId: savedUser._id },
+        {
+            std,
+            medium,
+            board: board || 'GSEB',
+            stream: stream || 'None',
+            school,
+            rollNo,
+            parentPhone
+        },
+        { upsert: true, session }
+    );
 };
 
 /**
@@ -317,15 +317,16 @@ const registerGuest = async (req, session) => {
         );
     }
 
-    // Create guest profile
-    const guestProfile = new GuestProfile({
-        userId: savedUser._id,
-        board: board || 'GSEB',
-        stream: stream || 'None',
-        schoolName: schoolName || 'Not specified'
-    });
-
-    await guestProfile.save({ session });
+    // Create or update guest profile
+    await GuestProfile.findOneAndUpdate(
+        { userId: savedUser._id },
+        {
+            board: board || 'GSEB',
+            stream: stream || 'None',
+            schoolName: schoolName || 'Not specified'
+        },
+        { upsert: true, session }
+    );
 };
 
 /**
