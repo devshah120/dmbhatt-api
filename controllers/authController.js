@@ -150,12 +150,13 @@ const registerStudent = async (req, session) => {
         // 2. Handle phone match
         if (existingUser.phoneNum === phoneNum) {
             if (existingUser.role === 'student') {
-                console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. Checking for payment update.`);
-                // If student has already paid and no new payment is provided, don't allow re-registration
-                if (existingUser.isPaid && !razorpay_payment_id) {
+                console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. blocking re-registration.`);
+                // Strictly block re-registration if they are already a student (even if unpaid)
+                // Unless they are providing a NEW payment (upgrade or renewal)
+                if (!razorpay_payment_id) {
                     throw new Error('User with this phone number already exists');
                 }
-                // Allow update for unpaid students or those providing new payment
+                // Allow update ONLY if payment is provided
                 savedUser = existingUser;
             } else if (existingUser.role !== 'guest') {
                 console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
