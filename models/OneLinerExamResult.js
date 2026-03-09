@@ -35,6 +35,10 @@ const oneLinerExamResultSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    violationCount: {
+        type: Number,
+        default: 0
+    },
     date: {
         type: Date,
         default: Date.now

@@ -15,6 +15,7 @@ router.post('/create', examController.saveExam);
 // Submit exam result (Student)
 const { protect } = require('../middleware/authMiddleware');
 router.post('/submit', protect, examController.submitExam);
+router.post('/violation', protect, examController.updateViolation);
 
 // Get All Exams
 router.get('/all', examController.getAllExams);

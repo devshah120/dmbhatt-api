@@ -31,6 +31,10 @@ const fiveMinTestResultSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    violationCount: {
+        type: Number,
+        default: 0
+    },
     answers: [{
         questionIndex: Number,
         studentAnswer: String,
