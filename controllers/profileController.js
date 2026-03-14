@@ -54,7 +54,7 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const user = req.user;
-        const { firstName, phoneNum, email, school, city, std, stream, medium, board, schoolName, parentPhone } = req.body;
+        const { firstName, phoneNum, email, school, city, state, std, stream, medium, board, schoolName, parentPhone } = req.body;
 
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
@@ -64,9 +64,10 @@ const updateProfile = async (req, res) => {
             user.photoPath = req.files['photo'][0].path;
         }
 
-        if (city) {
+        if (city || state) {
             user.address = user.address || {};
-            user.address.city = city;
+            if (city) user.address.city = city;
+            if (state) user.address.state = state;
         }
 
         await user.save();

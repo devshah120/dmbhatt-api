@@ -109,7 +109,7 @@ const registerAdmin = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
-    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
+    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state } = req.body;
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
@@ -192,6 +192,16 @@ const registerStudent = async (req, session) => {
         existingUser.photoPath = req.files?.photo?.[0]?.path || existingUser.photoPath;
         if (referrerId) existingUser.referredBy = referrerId;
         if (razorpay_payment_id) existingUser.isPaid = true;
+        
+        // Update city and state in address
+        if (city || state) {
+            existingUser.address = {
+                ...existingUser.address,
+                ...(city && { city }),
+                ...(state && { state })
+            };
+        }
+
         savedUser = await existingUser.save({ session });
     }
     else {
@@ -203,7 +213,11 @@ const registerStudent = async (req, session) => {
             loginCodeHash,
             photoPath: req.files?.photo?.[0]?.path || '',
             referredBy: referrerId,
-            isPaid: !!razorpay_payment_id
+            isPaid: !!razorpay_payment_id,
+            address: {
+                city: city || '',
+                state: state || ''
+            }
         });
         savedUser = await user.save({ session });
     }
