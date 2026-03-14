@@ -1,5 +1,15 @@
 const GameQuestion = require('../models/GameQuestion');
 
+// Get all possible game types from the schema
+exports.getGameTypes = async (req, res) => {
+    try {
+        const gameTypes = GameQuestion.schema.path('gameType').enumValues;
+        res.status(200).json(gameTypes);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
 // Add a new game question
 exports.addGameQuestion = async (req, res) => {
     try {
