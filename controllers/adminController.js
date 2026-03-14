@@ -12,7 +12,7 @@ const xlsx = require('xlsx');
  * Add Student (Admin)
  */
 const addStudent = async (req, res) => {
-    const { name, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
+    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
 
     // Check required fields
     if (!name || !phone || !password) {
@@ -35,7 +35,8 @@ const addStudent = async (req, res) => {
         // Create User
         const user = new User({
             role: 'student',
-            firstName: name, // Store full name in firstName for now usually
+            firstName: name,
+            email: email,
             phoneNum: phone,
             loginCodeHash,
             photoPath: req.files?.image?.[0]?.path,
@@ -98,8 +99,10 @@ const getAllStudents = async (req, res) => {
                 $project: {
                     _id: 1,
                     name: '$firstName',
+                    email: 1,
                     phone: '$phoneNum',
                     photo: '$photoPath',
+                    board: '$profile.board',
                     std: '$profile.std',
                     medium: '$profile.medium',
                     stream: '$profile.stream', // Note: Stream was not explicitly saved in addStudent but schema might support it or it's dynamic
@@ -124,7 +127,7 @@ const getAllStudents = async (req, res) => {
  */
 const editStudent = async (req, res) => {
     const { id } = req.params;
-    const { name, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
+    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
 
     const session = await mongoose.startSession();
     try {
@@ -148,6 +151,7 @@ const editStudent = async (req, res) => {
         if (!user) throw new Error('Student not found');
 
         if (name) user.firstName = name;
+        if (email) user.email = email;
         if (phone) user.phoneNum = phone;
         if (password) user.loginCodeHash = await hashLoginCode(password);
         if (req.files?.image?.[0]?.path) user.photoPath = req.files.image[0].path;
@@ -260,6 +264,7 @@ const importStudents = async (req, res) => {
         for (const row of data) {
             // Flexible Header Matching
             const name = row['Name'] || row['name'];
+            const email = row['Email'] || row['email'];
             const phone = row['Phone Number'] || row['Phone'] || row['phone'];
             const password = row['Password'] || row['password'];
             const parentPhone = row["Parent's Mobile Number"] || row['ParentPhone'] || row['parentPhone'];
@@ -290,6 +295,7 @@ const importStudents = async (req, res) => {
             const user = new User({
                 role: 'student',
                 firstName: name,
+                email: email,
                 phoneNum: String(phone),
                 loginCodeHash,
                 address: {
