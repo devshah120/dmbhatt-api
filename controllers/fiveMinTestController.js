@@ -222,7 +222,10 @@ const getTestById = async (req, res) => {
 // Submit Result
 const submitResult = async (req, res) => {
     try {
-        const { examId, title, obtainedMarks, totalMarks } = req.body;
+        console.log('[DEBUG] Submit 5-Min Test Request Body:', req.body);
+        console.log('[DEBUG] User ID:', req.user._id);
+        const { examId, obtainedMarks, totalMarks } = req.body;
+        const title = req.body.title || 'Untitled Test';
         const studentId = req.user._id;
 
         // 1. Check for duplicate

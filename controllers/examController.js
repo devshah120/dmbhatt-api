@@ -432,14 +432,16 @@ const updateExam = async (req, res) => {
     }
 };
 
+
+
 /**
  * Submit Exam Result
  */
 const submitExam = async (req, res) => {
-    const { examId, title, obtainedMarks, totalMarks, isOnline } = req.body;
+    const { examId, title, obtainedMarks, totalMarks, isOnline, violationCount } = req.body;
     const studentId = req.user._id;
 
-    console.log(`[DEBUG] Received sumbitExam: studentId=${studentId}, examId=${examId}, score=${obtainedMarks}/${totalMarks}`);
+    console.log(`[DEBUG] Received sumbitExam: studentId=${studentId}, examId=${examId}, score=${obtainedMarks}/${totalMarks}, violations=${violationCount}`);
 
     try {
         // 1. Check if student already gave this exam
@@ -469,7 +471,8 @@ const submitExam = async (req, res) => {
             totalMarks,
             isOnline: finalIsOnline,
             earnedPoints: earnedPoints,
-            type: req.body.type || (finalIsOnline ? 'REGULAR' : 'QUIZ')
+            type: req.body.type || (finalIsOnline ? 'REGULAR' : 'QUIZ'),
+            violationCount: violationCount || 0
         });
 
         await result.save();
@@ -485,6 +488,39 @@ const submitExam = async (req, res) => {
     }
 };
 
+/**
+ * Update Exam Violation Count
+ */
+const updateViolation = async (req, res) => {
+    const { examId, examType } = req.body;
+    const studentId = req.user._id;
+
+    try {
+        const ExamViolation = require('../models/ExamViolation');
+        let violation = await ExamViolation.findOne({ studentId, examId });
+
+        if (!violation) {
+            violation = new ExamViolation({
+                studentId,
+                examId,
+                examType,
+                count: 1
+            });
+        } else {
+            violation.count += 1;
+        }
+
+        await violation.save();
+        res.status(200).json({
+            message: 'Violation recorded',
+            count: violation.count
+        });
+    } catch (err) {
+        console.error('Update Violation Error:', err);
+        res.status(500).json({ message: 'Failed to record violation', error: err.message });
+    }
+};
+
 module.exports = {
     uploadExamPdf,
     saveExam,
@@ -492,5 +528,6 @@ module.exports = {
     deleteExam,
     getExamById,
     updateExam,
-    submitExam
+    submitExam,
+    updateViolation
 };

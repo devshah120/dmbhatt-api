@@ -1,9 +1,11 @@
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
-const GuestProfile = require('../models/GuestProfile');
 const AdminProfile = require('../models/AdminProfile');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
+const ExamResult = require('../models/ExamResult');
+const FiveMinTestResult = require('../models/FiveMinTestResult');
+const OneLinerExamResult = require('../models/OneLinerExamResult');
 
 /**
  * Get User Profile
@@ -19,11 +21,15 @@ const getProfile = async (req, res) => {
         // Fetch profile based on role
         if (user.role === 'student') {
             profile = await StudentProfile.findOne({ userId: user._id });
-        } else if (user.role === 'guest') {
-            profile = await GuestProfile.findOne({ userId: user._id });
         } else if (user.role === 'admin') {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
+
+        const examCounts = {
+            mainExam: await ExamResult.countDocuments({ studentId: user._id }),
+            fiveMinTest: await FiveMinTestResult.countDocuments({ studentId: user._id }),
+            oneLinerExam: await OneLinerExamResult.countDocuments({ studentId: user._id }),
+        };
 
         res.status(200).json({
             user: {
@@ -37,6 +43,7 @@ const getProfile = async (req, res) => {
                 address: user.address,
                 isPaid: user.isPaid,
             },
+            examCounts: examCounts,
             profile: profile || {}
         });
 
@@ -82,12 +89,6 @@ const updateProfile = async (req, res) => {
                 if (board) profile.board = board;
                 if (school) profile.school = school;
                 if (parentPhone) profile.parentPhone = parentPhone;
-                await profile.save();
-            }
-        } else if (user.role === 'guest') {
-            profile = await GuestProfile.findOne({ userId: user._id });
-            if (profile) {
-                if (schoolName) profile.schoolName = schoolName;
                 await profile.save();
             }
         }

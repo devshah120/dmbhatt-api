@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
 const StudentProfile = require('../models/StudentProfile');
-const GuestProfile = require('../models/GuestProfile');
+const Session = require('../models/Session');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
@@ -40,9 +40,6 @@ const register = async (req, res) => {
 
             case 'student':
                 await registerStudent(req, session);
-                break;
-            case 'guest':
-                await registerGuest(req, session);
                 break;
             default:
                 await session.abortTransaction();
@@ -150,12 +147,13 @@ const registerStudent = async (req, session) => {
         // 2. Handle phone match
         if (existingUser.phoneNum === phoneNum) {
             if (existingUser.role === 'student') {
-                console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. Checking for payment update.`);
-                // If student has already paid and no new payment is provided, don't allow re-registration
-                if (existingUser.isPaid && !razorpay_payment_id) {
+                console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. blocking re-registration.`);
+                // Strictly block re-registration if they are already a student (even if unpaid)
+                // Unless they are providing a NEW payment (upgrade or renewal)
+                if (!razorpay_payment_id) {
                     throw new Error('User with this phone number already exists');
                 }
-                // Allow update for unpaid students or those providing new payment
+                // Allow update ONLY if payment is provided
                 savedUser = existingUser;
             } else if (existingUser.role !== 'guest') {
                 console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
@@ -386,6 +384,18 @@ const login = async (req, res) => {
         // Generate JWT token
         const token = generateToken(user._id, user.role);
 
+        // Create Session
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // Match JWT expiry (7 days)
+
+        const session = new Session({
+            userId: user._id,
+            token,
+            deviceId: req.body.deviceId || 'unknown',
+            expiresAt
+        });
+        await session.save();
+
         res.status(200).json({
             message: 'Login successful',
             token,
@@ -537,12 +547,35 @@ const updatePassword = async (req, res) => {
     }
 };
 
+/**
+ * Logout - Invalidate current session
+ */
+const logout = async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(' ')[1];
+        
+        // Find session and mark as inactive
+        const session = await Session.findOneAndUpdate(
+            { token },
+            { isActive: false },
+            { new: true }
+        );
+
+        res.status(200).json({ message: 'Logged out successfully' });
+
+    } catch (err) {
+        console.error('Logout Error:', err);
+        res.status(500).json({ message: 'Logout failed', error: err.message });
+    }
+};
+
 module.exports = {
     register,
     login,
     forgetPassword,
     verifyOtp,
     resetPassword,
-    updatePassword
+    updatePassword,
+    logout
 };
 

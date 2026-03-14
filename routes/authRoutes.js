@@ -17,6 +17,7 @@ router.post('/reset-password', authController.resetPassword);
 
 // Protected routes
 const { protect } = require('../middleware/authMiddleware');
+router.post('/logout', protect, authController.logout);
 router.post('/update-password', protect, authController.updatePassword);
 
 module.exports = router;

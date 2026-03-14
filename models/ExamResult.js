@@ -37,6 +37,10 @@ const examResultSchema = new mongoose.Schema({
     },
     type: {
         type: String
+    },
+    violationCount: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
