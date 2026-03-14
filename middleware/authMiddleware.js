@@ -15,6 +15,14 @@ const protect = async (req, res, next) => {
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+            // Check if session is active in database
+            const Session = require('../models/Session');
+            const session = await Session.findOne({ token, isActive: true });
+
+            if (!session) {
+                return res.status(401).json({ message: 'Session expired or logged out' });
+            }
+
             // Get user from the token
             req.user = await User.findById(decoded.userId).select('-loginCodeHash');
 

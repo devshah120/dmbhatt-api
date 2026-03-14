@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
 const StudentProfile = require('../models/StudentProfile');
+const Session = require('../models/Session');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
@@ -369,6 +370,18 @@ const login = async (req, res) => {
         // Generate JWT token
         const token = generateToken(user._id, user.role);
 
+        // Create Session
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // Match JWT expiry (7 days)
+
+        const session = new Session({
+            userId: user._id,
+            token,
+            deviceId: req.body.deviceId || 'unknown',
+            expiresAt
+        });
+        await session.save();
+
         res.status(200).json({
             message: 'Login successful',
             token,
@@ -520,12 +533,35 @@ const updatePassword = async (req, res) => {
     }
 };
 
+/**
+ * Logout - Invalidate current session
+ */
+const logout = async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(' ')[1];
+        
+        // Find session and mark as inactive
+        const session = await Session.findOneAndUpdate(
+            { token },
+            { isActive: false },
+            { new: true }
+        );
+
+        res.status(200).json({ message: 'Logged out successfully' });
+
+    } catch (err) {
+        console.error('Logout Error:', err);
+        res.status(500).json({ message: 'Logout failed', error: err.message });
+    }
+};
+
 module.exports = {
     register,
     login,
     forgetPassword,
     verifyOtp,
     resetPassword,
-    updatePassword
+    updatePassword,
+    logout
 };
 
