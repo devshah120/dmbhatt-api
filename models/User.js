@@ -70,6 +70,14 @@ const userSchema = new mongoose.Schema({
     isPaid: {
         type: Boolean,
         default: false
+    },
+    resetPasswordOTP: {
+        type: String,
+        default: null
+    },
+    resetPasswordExpires: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true

@@ -6,6 +6,7 @@ const Session = require('../models/Session');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
+const { sendOTPEmail } = require('../utils/emailService');
 
 /**
  * Universal Registration Handler
@@ -426,17 +427,27 @@ const login = async (req, res) => {
  * Forgot Password - Send OTP
  */
 const forgetPassword = async (req, res) => {
-    const { phoneNum } = req.body;
+    const { email } = req.body;
 
     try {
-        const user = await User.findOne({ phoneNum });
+        const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ message: 'User not found with this phone number' });
+            return res.status(404).json({ message: 'User not found with this email address' });
         }
 
-        // In a real app, generate and send OTP here.
-        // For now, we imply static OTP '1111' will be used.
-        res.status(200).json({ message: 'OTP sent successfully to your phone number' });
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Save OTP to user
+        user.resetPasswordOTP = otp;
+        user.resetPasswordExpires = otpExpiry;
+        await user.save();
+
+        // Send Email
+        await sendOTPEmail(user.email, otp, user.firstName);
+
+        res.status(200).json({ message: 'OTP sent successfully to your registered email' });
 
     } catch (err) {
         console.error('Forget Password Error:', err);
@@ -448,15 +459,20 @@ const forgetPassword = async (req, res) => {
  * Verify OTP
  */
 const verifyOtp = async (req, res) => {
-    const { phoneNum, otp } = req.body;
+    const { email, otp } = req.body;
 
     try {
-        // Validate static OTP
-        if (otp === '1111') {
-            return res.status(200).json({ message: 'OTP verified successfully' });
-        } else {
-            return res.status(400).json({ message: 'Invalid OTP' });
+        const user = await User.findOne({ 
+            email,
+            resetPasswordOTP: otp,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
+
+        res.status(200).json({ message: 'OTP verified successfully' });
     } catch (err) {
         console.error('Verify OTP Error:', err);
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -467,10 +483,10 @@ const verifyOtp = async (req, res) => {
  * Reset Password
  */
 const resetPassword = async (req, res) => {
-    const { phoneNum, newPassword } = req.body;
+    const { email, newPassword } = req.body;
 
     try {
-        const user = await User.findOne({ phoneNum });
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -479,6 +495,8 @@ const resetPassword = async (req, res) => {
         const loginCodeHash = await hashLoginCode(newPassword);
 
         user.loginCodeHash = loginCodeHash;
+        user.resetPasswordOTP = null;
+        user.resetPasswordExpires = null;
         await user.save();
 
         res.status(200).json({ message: 'Password reset successfully' });
