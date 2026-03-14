@@ -107,6 +107,7 @@ const registerAdmin = async (req, session) => {
  */
 const registerStudent = async (req, session) => {
     const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state } = req.body;
+    console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum}), City: ${city}, State: ${state}`);
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
@@ -193,11 +194,9 @@ const registerStudent = async (req, session) => {
         
         // Update city and state in address
         if (city || state) {
-            existingUser.address = {
-                ...existingUser.address,
-                ...(city && { city }),
-                ...(state && { state })
-            };
+            if (!existingUser.address) existingUser.address = {};
+            if (city) existingUser.address.city = city;
+            if (state) existingUser.address.state = state;
         }
 
         savedUser = await existingUser.save({ session });
@@ -277,7 +276,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
-    const { firstName, phoneNum, email, loginCode, board, stream, schoolName, referralCode } = req.body;
+    const { firstName, phoneNum, email, loginCode, board, stream, schoolName, referralCode, city, state } = req.body;
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
@@ -323,7 +322,11 @@ const registerGuest = async (req, session) => {
         phoneNum,
         loginCodeHash,
         photoPath: req.files?.photo?.[0]?.path || '',
-        referredBy: referrerId
+        referredBy: referrerId,
+        address: {
+            city: city || '',
+            state: state || ''
+        }
     });
 
     const savedUser = await user.save({ session });
