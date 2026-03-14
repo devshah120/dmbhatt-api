@@ -61,6 +61,36 @@ exports.uploadSchoolPaper = async (req, res) => {
     }
 };
 
+exports.uploadNotes = async (req, res) => {
+    try {
+        const { title, board, standard, medium, stream, subject, year } = req.body;
+
+        if (!req.files || !req.files['file']) {
+            return res.status(400).json({ message: 'File is required' });
+        }
+
+        const fileUrl = req.files['file'][0].path;
+
+        const newMaterial = new Material({
+            type: 'Notes',
+            title,
+            board: board || 'GSEB',
+            standard,
+            medium,
+            stream: stream || 'None',
+            subject,
+            year,
+            file: fileUrl
+        });
+
+        await newMaterial.save();
+        res.status(201).json({ message: 'Notes uploaded successfully', material: newMaterial });
+    } catch (error) {
+        console.error('Error uploading notes:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 exports.uploadImageMaterial = async (req, res) => {
     try {
         const { title, subject, unit, medium, standard, year, schoolName } = req.body;

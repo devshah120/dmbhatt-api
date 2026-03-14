@@ -21,6 +21,7 @@ const uploadMaterial = multer({ storage: storage }).fields([{ name: 'file', maxC
 router.post('/upload-board-paper', uploadMaterial, materialController.uploadBoardPaper);
 router.post('/upload-school-paper', uploadMaterial, materialController.uploadSchoolPaper);
 router.post('/upload-image-material', uploadMaterial, materialController.uploadImageMaterial);
+router.post('/upload-notes', uploadMaterial, materialController.uploadNotes);
 router.get('/all', materialController.getAllMaterials);
 router.delete('/delete/:id', materialController.deleteMaterial);
 router.put('/update/:id', uploadMaterial, materialController.updateMaterial);

@@ -4,7 +4,7 @@ const MaterialSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ['BoardPaper', 'SchoolPaper', 'ImageMaterial']
+        enum: ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes']
     },
     title: {
         type: String,
