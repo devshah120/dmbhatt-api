@@ -9,7 +9,6 @@ const gameQuestionSchema = new mongoose.Schema({
             'Speed Math',
             'Word Scramble',
             'Odd One Out',
-            'Code Breaker',
             'Fact or Fiction',
             'Sentence Builder',
             'Grammar Guardian',
@@ -33,7 +32,6 @@ const gameQuestionSchema = new mongoose.Schema({
             'Sequence Memory',
             'Syllable Scramble',
             'Logic Gates Quest',
-            'Stroop Effect Challenge',
             'Word Chain',
         ]
     },
