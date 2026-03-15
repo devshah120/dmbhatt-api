@@ -475,27 +475,66 @@ const getDashboardStats = async (req, res) => {
  */
 const getExamReports = async (req, res) => {
     try {
+        const { type, board, std, medium, stream, studentId } = req.query;
         const ExamResult = require('../models/ExamResult');
-        const results = await ExamResult.aggregate([
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'studentId',
-                    foreignField: '_id',
-                    as: 'student'
-                }
-            },
-            { $unwind: '$student' },
-            {
-                $lookup: {
-                    from: 'studentprofiles',
-                    localField: 'studentId',
-                    foreignField: 'userId',
-                    as: 'profile'
-                }
-            },
-            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
-            {
+        const FiveMinTestResult = require('../models/FiveMinTestResult');
+        const OneLinerExamResult = require('../models/OneLinerExamResult');
+
+        let models = [];
+        if (type === 'REGULAR') {
+            models = [{ model: ExamResult, type: 'REGULAR' }];
+        } else if (type === 'QUIZ') {
+            models = [{ model: FiveMinTestResult, type: 'QUIZ' }];
+        } else if (type === 'ONELINER') {
+            models = [{ model: OneLinerExamResult, type: 'ONELINER' }];
+        } else {
+            // Combined
+            models = [
+                { model: ExamResult, type: 'REGULAR' },
+                { model: FiveMinTestResult, type: 'QUIZ' },
+                { model: OneLinerExamResult, type: 'ONELINER' }
+            ];
+        }
+
+        const matchStage = {};
+        if (studentId) matchStage.studentId = new mongoose.Types.ObjectId(studentId);
+
+        let allResults = [];
+
+        for (const item of models) {
+            const pipeline = [
+                { $match: matchStage },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'studentId',
+                        foreignField: '_id',
+                        as: 'student'
+                    }
+                },
+                { $unwind: '$student' },
+                {
+                    $lookup: {
+                        from: 'studentprofiles',
+                        localField: 'studentId',
+                        foreignField: 'userId',
+                        as: 'profile'
+                    }
+                },
+                { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }
+            ];
+
+            const profileMatch = {};
+            if (board) profileMatch['profile.board'] = board;
+            if (std) profileMatch['profile.std'] = std;
+            if (medium) profileMatch['profile.medium'] = medium;
+            if (stream) profileMatch['profile.stream'] = stream;
+
+            if (Object.keys(profileMatch).length > 0) {
+                pipeline.push({ $match: profileMatch });
+            }
+
+            pipeline.push({
                 $project: {
                     _id: 1,
                     title: 1,
@@ -503,16 +542,22 @@ const getExamReports = async (req, res) => {
                     totalMarks: 1,
                     date: 1,
                     earnedPoints: 1,
+                    type: { $ifNull: ['$type', item.type] },
                     studentName: '$student.firstName',
                     studentPhone: '$student.phoneNum',
                     std: '$profile.std',
-                    medium: '$profile.medium'
+                    medium: '$profile.medium',
+                    board: '$profile.board',
+                    stream: '$profile.stream'
                 }
-            },
-            { $sort: { date: -1 } }
-        ]);
+            });
 
-        res.status(200).json(results);
+            const results = await item.model.aggregate(pipeline);
+            allResults.push(...results);
+        }
+
+        allResults.sort((a, b) => new Date(b.date) - new Date(a.date));
+        res.status(200).json(allResults);
     } catch (err) {
         console.error('Get Exam Reports Error:', err);
         res.status(500).json({ message: 'Failed to fetch exam reports' });
@@ -524,49 +569,108 @@ const getExamReports = async (req, res) => {
  */
 const getStudentWiseReports = async (req, res) => {
     try {
+        const { board, std, medium, stream } = req.query;
         const ExamResult = require('../models/ExamResult');
-        const studentReports = await ExamResult.aggregate([
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'studentId',
-                    foreignField: '_id',
-                    as: 'student'
-                }
-            },
-            { $unwind: '$student' },
-            {
-                $lookup: {
-                    from: 'studentprofiles',
-                    localField: 'studentId',
-                    foreignField: 'userId',
-                    as: 'profile'
-                }
-            },
-            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
-            {
-                $group: {
-                    _id: '$studentId',
-                    name: { $first: '$student.firstName' },
-                    phone: { $first: '$student.phoneNum' },
-                    std: { $first: '$profile.std' },
-                    medium: { $first: '$profile.medium' },
-                    totalExams: { $sum: 1 },
-                    avgMarks: { $avg: '$obtainedMarks' },
-                    exams: {
-                        $push: {
-                            title: '$title',
-                            score: '$obtainedMarks',
-                            total: '$totalMarks',
-                            date: '$date'
-                        }
-                    }
-                }
-            },
-            { $sort: { name: 1 } }
-        ]);
+        const FiveMinTestResult = require('../models/FiveMinTestResult');
+        const OneLinerExamResult = require('../models/OneLinerExamResult');
 
-        res.status(200).json(studentReports);
+        const models = [
+            { model: ExamResult, type: 'REGULAR' },
+            { model: FiveMinTestResult, type: 'QUIZ' },
+            { model: OneLinerExamResult, type: 'ONELINER' }
+        ];
+
+        let allExams = [];
+
+        for (const item of models) {
+            const pipeline = [
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'studentId',
+                        foreignField: '_id',
+                        as: 'student'
+                    }
+                },
+                { $unwind: '$student' },
+                {
+                    $lookup: {
+                        from: 'studentprofiles',
+                        localField: 'studentId',
+                        foreignField: 'userId',
+                        as: 'profile'
+                    }
+                },
+                { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }
+            ];
+
+            const profileMatch = {};
+            if (board) profileMatch['profile.board'] = board;
+            if (std) profileMatch['profile.std'] = std;
+            if (medium) profileMatch['profile.medium'] = medium;
+            if (stream) profileMatch['profile.stream'] = stream;
+
+            if (Object.keys(profileMatch).length > 0) {
+                pipeline.push({ $match: profileMatch });
+            }
+
+            pipeline.push({
+                $project: {
+                    studentId: 1,
+                    studentName: '$student.firstName',
+                    studentPhone: '$student.phoneNum',
+                    std: '$profile.std',
+                    medium: '$profile.medium',
+                    board: '$profile.board',
+                    stream: '$profile.stream',
+                    title: 1,
+                    obtainedMarks: 1,
+                    totalMarks: 1,
+                    date: 1,
+                    type: { $ifNull: ['$type', item.type] }
+                }
+            });
+
+            const results = await item.model.aggregate(pipeline);
+            allExams.push(...results);
+        }
+
+        // Group by Student
+        const grouped = {};
+        allExams.forEach(ex => {
+            const sid = ex.studentId.toString();
+            if (!grouped[sid]) {
+                grouped[sid] = {
+                    _id: ex.studentId,
+                    name: ex.studentName,
+                    phone: ex.studentPhone,
+                    std: ex.std,
+                    medium: ex.medium,
+                    board: ex.board,
+                    stream: ex.stream,
+                    totalExams: 0,
+                    totalObtained: 0,
+                    exams: []
+                };
+            }
+            grouped[sid].totalExams++;
+            grouped[sid].totalObtained += (ex.obtainedMarks || 0);
+            grouped[sid].exams.push({
+                title: ex.title,
+                score: ex.obtainedMarks,
+                total: ex.totalMarks,
+                date: ex.date,
+                type: ex.type
+            });
+        });
+
+        const finalResults = Object.values(grouped).map(g => {
+            g.avgMarks = g.totalExams > 0 ? g.totalObtained / g.totalExams : 0;
+            g.exams.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return g;
+        }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+        res.status(200).json(finalResults);
     } catch (err) {
         console.error('Get Student Wise Reports Error:', err);
         res.status(500).json({ message: 'Failed to fetch student wise reports' });
