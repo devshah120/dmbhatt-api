@@ -13,18 +13,10 @@ const { uploadUniversal } = require('../config/uploadConfig');
 // Since I can't easily change backend config reuse without affecting others, I'll update frontend `api_service` to send 'photo' 
 // OR simpler: Create a local multer middleware here matching frontend.
 const multer = require('multer');
-const { cloudinary } = require('../config/uploadConfig');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { createDiskStorage } = require('../config/uploadConfig');
 const path = require('path');
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'students',
-        allowed_formats: ['jpg', 'png', 'jpeg'],
-        public_id: (req, file) => Date.now() + '-' + path.parse(file.originalname).name
-    }
-});
+const storage = createDiskStorage('students');
 const uploadStudent = multer({ storage: storage }).fields([{ name: 'image', maxCount: 1 }]);
 
 // Excel Upload (Memory Storage)

@@ -6,7 +6,7 @@ exports.createProduct = async (req, res) => {
 
         let imageUrl = '';
         if (req.files && req.files['image']) {
-            imageUrl = req.files['image'][0].path; // Cloudinary path from multer-storage-cloudinary
+            imageUrl = req.files['image'][0].path.replace(/\\/g, '/');
         } else {
             return res.status(400).json({ message: 'Image is required' });
         }
@@ -63,7 +63,7 @@ exports.updateProduct = async (req, res) => {
         // Handle image update
         if (req.files && req.files['image']) {
             // Optional: Delete old image from Cloudinary here if needed
-            product.image = req.files['image'][0].path;
+            product.image = req.files['image'][0].path.replace(/\\/g, '/');
         }
 
         await product.save();

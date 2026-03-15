@@ -1,52 +1,73 @@
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const path = require('path');
-require('dotenv').config();
+const fs = require('fs');
 
-// Configure Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+/**
+ * Creates a disk storage object for a specific folder.
+ * Ensures the folder exists within the 'uploads/' directory.
+ */
+const createDiskStorage = (folderName) => {
+    const uploadDir = path.join('uploads', folderName);
+    
+    // Ensure the directory exists
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
 
-console.log('[DEBUG] Cloudinary Configured with Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
-
-// Storage configuration
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-        try {
-            // Determine folder based on field name
-            let folder = 'others';
-            if (file.fieldname === 'photo') {
-                folder = 'photos';
-            } else if (file.fieldname === 'aadharFile') {
-                folder = 'aadhar';
-            } else if (file.fieldname === 'image') {
-                folder = 'exam_images';
-            }
-
-            // Clean filename to avoid issues with special characters
+    return multer.diskStorage({
+        destination: (req, file, cb) => {
+            cb(null, uploadDir);
+        },
+        filename: (req, file, cb) => {
+            // Clean filename to avoid issues
             const cleanName = path.parse(file.originalname).name.replace(/[^a-zA-Z0-9]/g, '_');
-            const publicId = `${Date.now()}-${cleanName}`;
-
-            return {
-                folder: folder,
-                allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'webp', 'gif'],
-                public_id: publicId
-            };
-        } catch (error) {
-            console.error('Cloudinary Storage Param Error:', error);
-            throw error;
+            const uniqueSuffix = `${Date.now()}-${cleanName}${path.extname(file.originalname)}`;
+            cb(null, uniqueSuffix);
         }
+    });
+};
+
+// Generic storage that determines folder based on fieldname
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        let folder = 'others';
+        if (file.fieldname === 'photo') {
+            folder = 'photos';
+        } else if (file.fieldname === 'aadharFile') {
+            folder = 'aadhar';
+        } else if (file.fieldname === 'image') {
+            folder = 'products'; // Used by explore/media
+        } else if (file.fieldname === 'file') {
+            folder = 'materials';
+        } else if (file.fieldname === 'images') {
+            folder = 'events';
+        }
+        
+        const uploadPath = path.join('uploads', folder);
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const cleanName = path.parse(file.originalname).name.replace(/[^a-zA-Z0-9]/g, '_');
+        const uniqueSuffix = `${Date.now()}-${cleanName}${path.extname(file.originalname)}`;
+        cb(null, uniqueSuffix);
     }
 });
 
-// File filter (optional redundant check as CloudinaryStorage has allowed_formats)
+// File filter
 const fileFilter = (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'image/webp', 'image/gif'];
+    const allowed = [
+        'image/jpeg', 
+        'image/png', 
+        'image/jpg', 
+        'application/pdf', 
+        'image/webp', 
+        'image/gif', 
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+        'application/vnd.ms-excel'
+    ];
     if (allowed.includes(file.mimetype)) {
         cb(null, true);
     } else {
@@ -57,14 +78,17 @@ const fileFilter = (req, file, cb) => {
 const uploadUniversal = multer({
     storage: storage,
     fileFilter: fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 }).fields([
     { name: 'photo', maxCount: 1 },
-    { name: 'aadharFile', maxCount: 5 }
+    { name: 'aadharFile', maxCount: 5 },
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+    { name: 'images', maxCount: 10 }
 ]);
 
 module.exports = {
     uploadUniversal,
-    storage, // Exported storage for use in other routes (e.g., eventRoutes)
-    cloudinary
+    storage,
+    createDiskStorage
 };

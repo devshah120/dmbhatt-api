@@ -2,19 +2,11 @@ const express = require('express');
 const router = express.Router();
 const exploreController = require('../controllers/exploreController');
 const multer = require('multer');
-const { cloudinary } = require('../config/uploadConfig');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { createDiskStorage } = require('../config/uploadConfig');
 const path = require('path');
 
 // Configure storage for Explore Products
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'explore_products',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'pdf'],
-        public_id: (req, file) => Date.now() + '-' + path.parse(file.originalname).name
-    }
-});
+const storage = createDiskStorage('explore_products');
 
 const uploadExplore = multer({ storage: storage }).fields([{ name: 'image', maxCount: 1 }]);
 

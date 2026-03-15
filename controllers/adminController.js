@@ -39,7 +39,7 @@ const addStudent = async (req, res) => {
             email: email,
             phoneNum: phone,
             loginCodeHash,
-            photoPath: req.files?.image?.[0]?.path,
+            photoPath: req.files?.image?.[0]?.path ? req.files.image[0].path.replace(/\\/g, '/') : undefined,
             address: {
                 street: address,
                 city: city,
@@ -138,7 +138,7 @@ const editStudent = async (req, res) => {
         if (name) userUpdates.firstName = name;
         if (phone) userUpdates.phoneNum = phone;
         if (password) userUpdates.loginCodeHash = await hashLoginCode(password);
-        if (req.files?.image?.[0]?.path) userUpdates.photoPath = req.files.image[0].path;
+        if (req.files?.image?.[0]?.path) userUpdates.photoPath = req.files.image[0].path.replace(/\\/g, '/');
 
         // Address update (partial updates need careful handling if nested, but here we construct full object if any part changes or use dot notation)
         // For simplicity, we'll reconstruct address if any part is provided, merging with existing is better but requires fetch first.
@@ -154,7 +154,7 @@ const editStudent = async (req, res) => {
         if (email) user.email = email;
         if (phone) user.phoneNum = phone;
         if (password) user.loginCodeHash = await hashLoginCode(password);
-        if (req.files?.image?.[0]?.path) user.photoPath = req.files.image[0].path;
+        if (req.files?.image?.[0]?.path) user.photoPath = req.files.image[0].path.replace(/\\/g, '/');
 
         if (address || city || state) {
             user.address = {

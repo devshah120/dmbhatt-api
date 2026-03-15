@@ -10,8 +10,9 @@ const uploadImage = async (req, res) => {
             return res.status(400).json({ message: 'No image file provided' });
         }
 
-        // Multer-storage-cloudinary automatically uploads the file and puts the URL in req.file.path
-        const imageUrl = req.file.path;
+        // Multer diskStorage puts the relative path in req.file.path
+        // Normalize backslashes to forward slashes for URLs
+        const imageUrl = req.file.path.replace(/\\/g, '/');
 
         res.status(200).json({
             message: 'Image uploaded successfully',
