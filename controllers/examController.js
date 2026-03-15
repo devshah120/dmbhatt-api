@@ -139,47 +139,49 @@ const parseQuestionsErrors = (text) => {
     // Normalize newlines
     let cleanText = text.replace(/\r\n/g, '\n');
 
-    // IMPROVEMENT: Insert newlines before options that are on the same line
-    // Look for space followed by A-D, dot/paren, and space.
-    // e.g. "Option A text   B. Option B text" -> "Option A text\nB. Option B text"
-    // Using simple regex to catch implicit splits.
+    // IMPROVEMENT: Split lines by options AND Answers
+    // Now splitting by: Space followed by A-D. or Answer/Ans
     cleanText = cleanText.replace(/(\s{1,})([A-D][\.\)]\s+)/g, '\n$2');
+    cleanText = cleanText.replace(/(\s{1,})(Ans[\.\:\s]+|Answer[\.\:\s]+)/gi, '\n$2');
 
     // Pre-processing: Split by newline
     const rawLines = cleanText.split('\n');
 
-    // Flatten multi-column lines:
-    // "1 Q1...   10 Q10..." -> ["1 Q1...", "10 Q10..."]
     const lines = [];
     rawLines.forEach(l => {
         const trimmed = l.trim();
         if (!trimmed) return;
 
-        // Split by 3 or more spaces, BUT treat it carefully.
-        // Check if the parts look like valid independent blocks (start with Number or Option)
-        // Simple Split:
+        // Split by 3 or more spaces
         const parts = trimmed.split(/\s{3,}/);
         parts.forEach(p => lines.push(p.trim()));
     });
 
-    console.log(`[DEBUG] Total lines to parse (after splitting columns): ${lines.length}`);
+    console.log(`[DEBUG] Total lines to parse: ${lines.length}`);
 
     // Regex patterns
-    // Relaxed Question Start: Matches "1. Text", "1) Text", "1 Text"
+    // Relaxed Question Start: Matches "01. Text", "1. Text", "1) Text", "1 Text"
     const questionStart = /^[\W]*(\d{1,3})[\.\)\s]+\s*(.*)/;
 
-    // Answer Regex: Matches "Ans. (C)", "Answer: C", "Ans: C", "Ans (A)"
+    // Answer Regex: Matches "Ans (A)", "Ans. (A)", "Answer: A", "Ans: A"
     const answerPattern = /(?:Answer|Ans|Right Answer)[\s\.\:\-\(\[]*([A-D])/i;
 
     let currentQuestion = null;
 
     lines.forEach((line, index) => {
-        if (index < 10) console.log(`[DEBUG] Line ${index}: "${line}"`);
+        const lowerLine = line.toLowerCase();
+        
+        // Skip common headers
+        if (lowerLine === 'overview' || lowerLine === 'overview:' || 
+            lowerLine.includes('extract mcq') || 
+            lowerLine === 'multiple choice questions' ||
+            lowerLine.startsWith('---')) {
+            return;
+        }
 
-        // 1. Check for Answer (Highest Priority)
+        // 1. Check for Answer
         const ansMatch = line.match(answerPattern);
         if (ansMatch) {
-            console.log(`[DEBUG] Answer detected at line ${index}: ${ansMatch[1]}`);
             if (currentQuestion) {
                 currentQuestion.correctAnswer = ansMatch[1].toUpperCase();
                 questions.push(currentQuestion);
@@ -191,20 +193,13 @@ const parseQuestionsErrors = (text) => {
         // 2. Check for New Question Start
         const qMatch = line.match(questionStart);
         if (qMatch) {
-            // Check if it's really a question. E.g. "55 multiple-choice" matches "55 multiple..."
-            // Heuristic: If we are already in a question, and this line starts with a number?
-            // "1 I come..." matches.
-
-            // To reduce false positives (like "55 multiple..."), ensure the number is roughly sequential or small? 
-            // Or just verify it looks like a question structure.
-
-            console.log(`[DEBUG] Question start detected at line ${index}: ID=${qMatch[1]} Text="${qMatch[2].substring(0, 30)}..."`);
-            // Push pending question
-            if (currentQuestion) {
+            // Push pending question if it was valid
+            if (currentQuestion && currentQuestion.options.length > 0) {
                 questions.push(currentQuestion);
             }
+            
             currentQuestion = {
-                id: Date.now() + Math.random(),
+                id: Date.now() + index + Math.random(),
                 questionText: qMatch[2],
                 options: [],
                 correctAnswer: ''
@@ -214,21 +209,15 @@ const parseQuestionsErrors = (text) => {
 
         // 3. Check for Options
         if (currentQuestion) {
-            // Option Regex: "A. Text", "A) Text", "A Text"
-            // We split lines, so usually one option per line now?
-            // Unlikely to have "A ... B ..." if we split by space.
-
-            // Regex for single option at start:
             const optionMatch = line.match(/^([A-D])[\.\)\s]\s+(.*)/i);
 
             if (optionMatch) {
-                console.log(`[DEBUG] Option detected at line ${index}: Key=${optionMatch[1]} Text="${optionMatch[2].substring(0, 20)}..."`);
                 currentQuestion.options.push({
                     key: optionMatch[1].toUpperCase(),
                     text: optionMatch[2].trim()
                 });
             } else {
-                // Append to previous
+                // If it's not a new question and not an option, append to text
                 if (currentQuestion.options.length === 0) {
                     currentQuestion.questionText += " " + line;
                 } else {
@@ -239,11 +228,11 @@ const parseQuestionsErrors = (text) => {
     });
 
     // Push last one
-    if (currentQuestion) {
+    if (currentQuestion && currentQuestion.options.length > 0) {
         questions.push(currentQuestion);
     }
 
-    console.log(`[DEBUG] Parsed ${questions.length} questions.`);
+    console.log(`[DEBUG] Final Parsed ${questions.length} questions.`);
     return questions;
 };
 
