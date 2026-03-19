@@ -8,7 +8,7 @@ exports.uploadBoardPaper = async (req, res) => {
             return res.status(400).json({ message: 'File is required' });
         }
 
-        const fileUrl = req.files['file'][0].path;
+        const fileUrl = req.files['file'][0].path.replace(/\\/g, '/');
 
         const newMaterial = new Material({
             type: 'BoardPaper',
@@ -38,7 +38,7 @@ exports.uploadSchoolPaper = async (req, res) => {
             return res.status(400).json({ message: 'File is required' });
         }
 
-        const fileUrl = req.files['file'][0].path;
+        const fileUrl = req.files['file'][0].path.replace(/\\/g, '/');
 
         const newMaterial = new Material({
             type: 'SchoolPaper',
@@ -69,7 +69,7 @@ exports.uploadNotes = async (req, res) => {
             return res.status(400).json({ message: 'File is required' });
         }
 
-        const fileUrl = req.files['file'][0].path;
+        const fileUrl = req.files['file'][0].path.replace(/\\/g, '/');
 
         const newMaterial = new Material({
             type: 'Notes',
@@ -99,7 +99,7 @@ exports.uploadImageMaterial = async (req, res) => {
             return res.status(400).json({ message: 'File is required' });
         }
 
-        const fileUrl = req.files['file'][0].path;
+        const fileUrl = req.files['file'][0].path.replace(/\\/g, '/');
 
         const newMaterial = new Material({
             type: 'ImageMaterial',
@@ -181,7 +181,7 @@ exports.updateMaterial = async (req, res) => {
         };
 
         if (req.files && req.files['file']) {
-            updateData.file = req.files['file'][0].path;
+            updateData.file = req.files['file'][0].path.replace(/\\/g, '/');
         }
 
         const material = await Material.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });

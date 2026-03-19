@@ -15,8 +15,8 @@ exports.createEvent = async (req, res) => {
 
         let images = [];
         if (files && files.length > 0) {
-            // Multer-storage-cloudinary puts the URL in 'path'
-            images = files.map(file => file.path);
+            // Multer diskStorage puts the relative path in 'path'
+            images = files.map(file => file.path.replace(/\\/g, '/'));
         }
 
         const newEvent = new Event({
@@ -70,7 +70,7 @@ exports.updateEvent = async (req, res) => {
 
         // Add new images
         if (files && files.length > 0) {
-            const newImageUrls = files.map(file => file.path);
+            const newImageUrls = files.map(file => file.path.replace(/\\/g, '/'));
             currentImages = [...currentImages, ...newImageUrls];
         }
 
