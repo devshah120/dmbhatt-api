@@ -125,16 +125,18 @@ exports.uploadImageMaterial = async (req, res) => {
 
 exports.getAllMaterials = async (req, res) => {
     try {
-        const { type, standard, medium, board, stream, subject } = req.query;
+        const { type, standard, std, medium, board, stream, subject, year } = req.query;
         let filter = {};
+        
         if (type) filter.type = type;
-        if (standard) filter.standard = standard;
+        if (standard || std) filter.standard = standard || std;
         if (medium) filter.medium = medium;
         if (board) filter.board = board;
-        if (stream) filter.stream = stream;
+        if (stream && stream !== 'None' && stream !== '-') filter.stream = stream;
         if (subject) filter.subject = subject;
+        if (year) filter.year = year;
 
-        const materials = await Material.find(filter).sort({ createdAt: -1 });
+        const materials = await Material.find(filter).sort({ createdAt: -1 });    
         res.status(200).json(materials);
     } catch (error) {
         console.error('Error fetching materials:', error);
