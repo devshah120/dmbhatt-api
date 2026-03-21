@@ -5,7 +5,6 @@ const gameQuestionSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: [
-            'Memory Match',
             'Speed Math',
             'Word Scramble',
             'Odd One Out',
@@ -16,9 +15,7 @@ const gameQuestionSchema = new mongoose.Schema({
             'Emoji Decoder',
             'Math Riddles',
             'Number Series',
-            'Magic Square',
             'Algebra Balancer',
-            'Spot The Difference',
             'Flag Explorer',
             'Spelling Master',
             'Synonym & Antonym',
@@ -29,9 +26,7 @@ const gameQuestionSchema = new mongoose.Schema({
             'Proverb Completer',
             'Direction Sense',
             'GK Quiz',
-            'Sequence Memory',
             'Syllable Scramble',
-            'Logic Gates Quest',
             'Word Chain',
         ]
     },
