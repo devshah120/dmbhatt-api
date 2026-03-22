@@ -6,7 +6,17 @@ const ctrl = require('../controllers/superAdminController');
 router.get('/dashboard', ctrl.getSuperAdminDashboard);
 
 // Students
+router.get('/students/export', ctrl.getStudentsExport);
 router.get('/students', ctrl.getStudents);
+router.post('/students', ctrl.createStudent);
+router.put('/students/:id', ctrl.updateStudent);
+router.delete('/students/:id', ctrl.deleteStudent);
+
+// Admins
+router.get('/admins', ctrl.getAdmins);
+router.post('/admins', ctrl.createAdmin);
+router.put('/admins/:id', ctrl.updateAdmin);
+router.delete('/admins/:id', ctrl.deleteAdmin);
 
 // Standards
 router.get('/standards', ctrl.getStandards);
@@ -30,5 +40,17 @@ router.delete('/chapters/:id', ctrl.deleteChapter);
 router.get('/payments', ctrl.getPayments);
 router.get('/product-purchases', ctrl.getProductPurchases);
 router.get('/plan-upgrades', ctrl.getPlanUpgrades);
+
+// Config
+router.get('/config/:type', ctrl.getConfig);
+router.post('/config/:type', ctrl.saveConfig);
+
+const { uploadUniversal } = require('../config/uploadConfig');
+
+// Product Management
+router.get('/products', ctrl.getProducts);
+router.post('/products', uploadUniversal, ctrl.createProduct);
+router.put('/products/:id', uploadUniversal, ctrl.updateProduct);
+router.delete('/products/:id', ctrl.deleteProduct);
 
 module.exports = router;
