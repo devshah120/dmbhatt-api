@@ -886,6 +886,27 @@ const getSuperAdminDashboard = async (req, res) => {
             { $limit: 10 }
         ]);
 
+        // 4. Product Earnings by Product Name
+        const productEarningsByProduct = await ProductPurchase.aggregate([
+            {
+                $lookup: {
+                    from: 'exploreproducts',
+                    localField: 'productId',
+                    foreignField: '_id',
+                    as: 'product'
+                }
+            },
+            { $unwind: '$product' },
+            {
+                $group: {
+                    _id: '$product.name',
+                    totalEarnings: { $sum: '$amount' }
+                }
+            },
+            { $sort: { totalEarnings: -1 } },
+            { $limit: 10 } // Limit to top 10 products for the chart
+        ]);
+
         const totalPurchaseAmount = purchaseSum[0]?.total || 0;
         const totalUpgradeAmount = upgradeSum[0]?.total || 0;
         // totalRevenue is already calculated above as totalPaymentSum + totalUpgradeSum
@@ -903,7 +924,8 @@ const getSuperAdminDashboard = async (req, res) => {
             totalStudents,
             revenueByMonth,
             studentsByStd: studentsByStd.map(s => ({ label: s._id || 'Unknown', value: s.count })),
-            chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count }))
+            chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count })),
+            productEarningsByProduct: productEarningsByProduct.map(p => ({ label: p._id || 'Other', value: p.totalEarnings }))
         });
     } catch (err) {
         console.error('Get Super Admin Dashboard Error:', err);
