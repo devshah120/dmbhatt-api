@@ -8,6 +8,57 @@ const PlanUpgrade = require('../models/PlanUpgrade');
 const User = require('../models/User');
 
 // ==========================================
+//  STUDENTS CRUD
+// ==========================================
+
+const getStudents = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
+        const StudentProfile = require('../models/StudentProfile');
+        const [students, total] = await Promise.all([
+            StudentProfile.aggregate([
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'userId',
+                        foreignField: '_id',
+                        as: 'user'
+                    }
+                },
+                { $unwind: '$user' },
+                {
+                    $project: {
+                        _id: 1,
+                        userId: 1,
+                        firstName: '$user.firstName',
+                        lastName: '$user.lastName',
+                        email: '$user.email',
+                        phoneNum: '$user.phoneNum',
+                        std: 1,
+                        medium: 1,
+                        stream: 1,
+                        totalRewardPoints: 1,
+                        createdAt: 1
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit }
+            ]),
+            StudentProfile.countDocuments()
+        ]);
+
+        res.status(200).json({ students, total, page, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
+        console.error('Get Students Error:', err);
+        res.status(500).json({ message: 'Failed to fetch students' });
+    }
+};
+
+// ==========================================
 //  STANDARDS CRUD
 // ==========================================
 
@@ -442,14 +493,16 @@ const getPlanUpgrades = async (req, res) => {
 
 const getSuperAdminDashboard = async (req, res) => {
     try {
-        const [totalStandards, totalSubjects, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades] =
+        const StudentProfile = require('../models/StudentProfile');
+        const [totalStandards, totalSubjects, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades, totalStudents] =
             await Promise.all([
                 Standard.countDocuments(),
                 Subject.countDocuments(),
                 Chapter.countDocuments(),
                 Payment.countDocuments(),
                 ProductPurchase.countDocuments(),
-                PlanUpgrade.countDocuments()
+                PlanUpgrade.countDocuments(),
+                StudentProfile.countDocuments()
             ]);
 
         // Sum amounts
@@ -554,6 +607,7 @@ const getSuperAdminDashboard = async (req, res) => {
             totalPurchaseAmount,
             totalUpgradeAmount,
             totalRevenue,
+            totalStudents,
             revenueByMonth,
             studentsByStd: studentsByStd.map(s => ({ label: s._id || 'Unknown', value: s.count })),
             chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count }))
@@ -584,6 +638,8 @@ module.exports = {
     getPayments,
     getProductPurchases,
     getPlanUpgrades,
+    // Students
+    getStudents,
     // Dashboard
     getSuperAdminDashboard
 };

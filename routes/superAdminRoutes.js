@@ -5,6 +5,9 @@ const ctrl = require('../controllers/superAdminController');
 // Dashboard
 router.get('/dashboard', ctrl.getSuperAdminDashboard);
 
+// Students
+router.get('/students', ctrl.getStudents);
+
 // Standards
 router.get('/standards', ctrl.getStandards);
 router.post('/standards', ctrl.createStandard);
