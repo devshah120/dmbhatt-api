@@ -564,7 +564,6 @@ const getSuperAdminDashboard = async (req, res) => {
         const revenueByMonth = months.map(m => ({ month: m, amount: revenueMap[m] }));
 
         // 2. Students by Standard
-        const StudentProfile = require('../models/StudentProfile');
         const studentsByStd = await StudentProfile.aggregate([
             { $group: { _id: "$std", count: { $sum: 1 } } },
             { $sort: { count: -1 } }
