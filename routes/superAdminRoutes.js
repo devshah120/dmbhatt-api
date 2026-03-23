@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/superAdminController');
+const adminController = require('../controllers/adminController');
+
+// Reports
+router.get('/reports/exams', adminController.getExamReports);
+router.get('/reports/students', adminController.getStudentWiseReports);
 
 // Dashboard
 router.get('/dashboard', ctrl.getSuperAdminDashboard);
