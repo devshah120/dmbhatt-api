@@ -900,7 +900,7 @@ const getReferEarnReport = async (req, res) => {
 
         const pipeline = [
             { $match: { invitedFriends: { $exists: true, $not: { $size: 0 } } } },
-            { $unwind: '$invitedFriends' },
+            { $unwind: { path: '$invitedFriends', includeArrayIndex: 'refIndex' } },
             {
                 $lookup: {
                     from: 'studentprofiles',
@@ -928,7 +928,7 @@ const getReferEarnReport = async (req, res) => {
                 referrer: '$firstName',
                 referred: '$invitedFriends.name',
                 date: { $dateToString: { format: "%Y-%m-%d", date: "$invitedFriends.joinedAt" } },
-                points: { $literal: 500 } // Standard referral bonus
+                points: { $multiply: [{ $add: ['$refIndex', 1] }, 500] }
             }
         });
 
