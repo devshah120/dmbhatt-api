@@ -31,5 +31,12 @@ router.get('/dashboard-stats', adminController.getDashboardStats);
 router.get('/dashboard/standard-stats/:standard', adminController.getStandardDetailedStats);
 router.get('/exam-reports', adminController.getExamReports);
 router.get('/student-reports', adminController.getStudentWiseReports);
+router.get('/refer-earn-report', adminController.getReferEarnReport);
+router.get('/upgrade-plan-report', adminController.getUpgradePlanReport);
+
+// Redeem Codes
+router.post('/generate-redeem-code', adminController.generateRedeemCode);
+router.get('/redeem-codes', adminController.getRedeemCodes);
+router.delete('/delete-redeem-code/:id', adminController.deleteRedeemCode);
 
 module.exports = router;

@@ -137,9 +137,23 @@ exports.verifyUpgradePayment = async (req, res) => {
             stream,
             razorpayOrderId: razorpay_order_id,
             razorpayPaymentId: razorpay_payment_id,
-            amount: amount
+            amount: amount,
+            redeemCode: req.body.redeemCode
         });
         await upgrade.save();
+
+        // Mark Redeem Code as Used
+        if (req.body.redeemCode) {
+            const RedeemCode = require('../models/RedeemCode');
+            await RedeemCode.findOneAndUpdate(
+                { code: req.body.redeemCode.toUpperCase() },
+                { 
+                    used: true, 
+                    usedBy: req.user.id, 
+                    usedAt: new Date() 
+                }
+            );
+        }
 
         // Update Student Profile
         if (profile) {

@@ -6,6 +6,7 @@ const Session = require('../models/Session');
 const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
+const RedeemCode = require('../models/RedeemCode');
 const { sendOTPEmail } = require('../utils/emailService');
 
 /**
@@ -107,6 +108,7 @@ const registerAdmin = async (req, session) => {
  * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
  */
 const registerStudent = async (req, session) => {
+    let appliedRedeemCode = null;
     const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state } = req.body;
     console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum}), City: ${city}, State: ${state}`);
 
@@ -175,11 +177,18 @@ const registerStudent = async (req, session) => {
     if (referralCode) {
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
         if (referrer) {
-            // Check if referrer has reached max referrals (5)
             if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
                 throw new Error('Referrer has reached maximum referral limit');
             }
             referrerId = referrer._id;
+        } else {
+            const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
+            if (adminCode) {
+                if (adminCode.used) throw new Error('This code has already been used');
+                if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);
+                if (adminCode.board && adminCode.board !== (board || 'GSEB')) throw new Error(`Code only valid for ${adminCode.board} board`);
+                appliedRedeemCode = adminCode;
+            }
         }
     }
 
@@ -233,6 +242,14 @@ const registerStudent = async (req, session) => {
         await payment.save({ session });
     }
 
+    // Mark Admin Redeem Code as used if applied
+    if (appliedRedeemCode) {
+        appliedRedeemCode.used = true;
+        appliedRedeemCode.usedBy = savedUser._id;
+        appliedRedeemCode.usedAt = new Date();
+        await appliedRedeemCode.save({ session });
+    }
+
     // Update referrer's invited friends and award bonus points if referral code was used
     if (referrerId) {
         // Calculate milestone and bonus points
@@ -277,6 +294,7 @@ const registerStudent = async (req, session) => {
  * Required: firstName, middleName, phoneNum, photo, loginCode
  */
 const registerGuest = async (req, session) => {
+    let appliedRedeemCode = null;
     const { firstName, phoneNum, email, loginCode, board, stream, schoolName, referralCode, city, state } = req.body;
 
     // Check if photo was uploaded
@@ -307,11 +325,18 @@ const registerGuest = async (req, session) => {
     if (referralCode) {
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
         if (referrer) {
-            // Check if referrer has reached max referrals (5)
             if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
                 throw new Error('Referrer has reached maximum referral limit');
             }
             referrerId = referrer._id;
+        } else {
+            const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
+            if (adminCode) {
+                if (adminCode.used) throw new Error('This code has already been used');
+                if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);
+                if (adminCode.board && adminCode.board !== (board || 'GSEB')) throw new Error(`Code only valid for ${adminCode.board} board`);
+                appliedRedeemCode = adminCode;
+            }
         }
     }
 
@@ -331,6 +356,13 @@ const registerGuest = async (req, session) => {
     });
 
     const savedUser = await user.save({ session });
+
+    if (appliedRedeemCode) {
+        appliedRedeemCode.used = true;
+        appliedRedeemCode.usedBy = savedUser._id;
+        appliedRedeemCode.usedAt = new Date();
+        await appliedRedeemCode.save({ session });
+    }
 
     // Update referrer's invited friends and award bonus points if referral code was used
     if (referrerId) {

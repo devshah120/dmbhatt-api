@@ -52,6 +52,8 @@ const oneLinerExamRoutes = require('./routes/oneLinerExamRoutes');
 app.use('/api/onelinerexam', oneLinerExamRoutes);
 const superAdminRoutes = require('./routes/superAdminRoutes');
 app.use('/api/superadmin', superAdminRoutes);
+const redeemRoutes = require('./routes/redeemRoutes');
+app.use('/api/redeem', redeemRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {

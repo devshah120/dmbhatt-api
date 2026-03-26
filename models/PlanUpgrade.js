@@ -33,6 +33,9 @@ const PlanUpgradeSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    redeemCode: {
+        type: String
+    },
     createdAt: {
         type: Date,
         default: Date.now

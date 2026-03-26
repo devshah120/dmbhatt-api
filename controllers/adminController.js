@@ -891,6 +891,189 @@ const getStandardDetailedStats = async (req, res) => {
     }
 };
 
+/**
+ * Get Refer & Earn Reports (Admin)
+ */
+const getReferEarnReport = async (req, res) => {
+    try {
+        const { board, std, medium, stream } = req.query;
+
+        const pipeline = [
+            { $match: { invitedFriends: { $exists: true, $not: { $size: 0 } } } },
+            { $unwind: '$invitedFriends' },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: '_id',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }
+        ];
+
+        const profileMatch = {};
+        if (board) profileMatch['profile.board'] = board;
+        if (std) profileMatch['profile.std'] = std;
+        if (medium) profileMatch['profile.medium'] = medium;
+        if (stream) profileMatch['profile.stream'] = stream;
+
+        if (Object.keys(profileMatch).length > 0) {
+            pipeline.push({ $match: profileMatch });
+        }
+
+        pipeline.push({
+            $project: {
+                _id: 1,
+                referrer: '$firstName',
+                referred: '$invitedFriends.name',
+                date: { $dateToString: { format: "%Y-%m-%d", date: "$invitedFriends.joinedAt" } },
+                points: { $literal: 500 } // Standard referral bonus
+            }
+        });
+
+        const results = await User.aggregate(pipeline);
+        res.status(200).json(results);
+    } catch (err) {
+        console.error('Get Refer & Earn Report Error:', err);
+        res.status(500).json({ message: 'Failed to fetch refer & earn report' });
+    }
+};
+
+/**
+ * Get Upgrade Plan Reports (Admin)
+ */
+const getUpgradePlanReport = async (req, res) => {
+    try {
+        const { board, std, medium, stream } = req.query;
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }
+        ];
+
+        const profileMatch = {};
+        if (board) profileMatch['profile.board'] = board;
+        if (std) profileMatch['profile.std'] = std;
+        if (medium) profileMatch['profile.medium'] = medium;
+        if (stream) profileMatch['profile.stream'] = stream;
+
+        if (Object.keys(profileMatch).length > 0) {
+            pipeline.push({ $match: profileMatch });
+        }
+
+        pipeline.push({
+            $project: {
+                _id: 1,
+                student: '$user.firstName',
+                plan: '$newStandard',
+                date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                amount: { $concat: ['₹', { $toString: '$amount' }] }
+            }
+        });
+
+        const results = await PlanUpgrade.aggregate(pipeline);
+        res.status(200).json(results);
+    } catch (err) {
+        console.error('Get Upgrade Plan Report Error:', err);
+        res.status(500).json({ message: 'Failed to fetch upgrade plan report' });
+    }
+};
+
+/**
+ * Generate Redeem Code (Admin)
+ */
+const generateRedeemCode = async (req, res) => {
+    try {
+        const { discount, board, std, medium, stream, createdBy } = req.body;
+        const RedeemCode = require('../models/RedeemCode');
+
+        if (!discount || !createdBy) {
+            return res.status(400).json({ message: 'Discount and Creator are required' });
+        }
+
+        // Generate a random 8-character unique alphanumeric code
+        let code;
+        let isUnique = false;
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        
+        while (!isUnique) {
+            code = '';
+            for (let i = 0; i < 8; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            const existing = await RedeemCode.findOne({ code });
+            if (!existing) isUnique = true;
+        }
+
+        const redeemCode = new RedeemCode({
+            code,
+            discount,
+            board,
+            std,
+            medium,
+            stream,
+            createdBy
+        });
+
+        await redeemCode.save();
+        res.status(201).json(redeemCode);
+    } catch (err) {
+        console.error('Generate Redeem Code Error:', err);
+        res.status(500).json({ message: 'Failed to generate redeem code' });
+    }
+};
+
+/**
+ * Get All Redeem Codes (Admin)
+ */
+const getRedeemCodes = async (req, res) => {
+    try {
+        const RedeemCode = require('../models/RedeemCode');
+        const codes = await RedeemCode.find().sort({ createdAt: -1 });
+        res.status(200).json(codes);
+    } catch (err) {
+        console.error('Get Redeem Codes Error:', err);
+        res.status(500).json({ message: 'Failed to fetch redeem codes' });
+    }
+};
+
+/**
+ * Delete Redeem Code (Admin)
+ */
+const deleteRedeemCode = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const RedeemCode = require('../models/RedeemCode');
+        const code = await RedeemCode.findById(id);
+        
+        if (!code) return res.status(404).json({ message: 'Code not found' });
+        if (code.used) return res.status(400).json({ message: 'Cannot delete a used code' });
+
+        await RedeemCode.findByIdAndDelete(id);
+        res.status(200).json({ message: 'Code deleted successfully' });
+    } catch (err) {
+        console.error('Delete Redeem Code Error:', err);
+        res.status(500).json({ message: 'Failed to delete redeem code' });
+    }
+};
+
 module.exports = {
     addStudent,
     getAllStudents,
@@ -900,5 +1083,10 @@ module.exports = {
     getDashboardStats,
     getStandardDetailedStats,
     getExamReports,
-    getStudentWiseReports
+    getStudentWiseReports,
+    getReferEarnReport,
+    getUpgradePlanReport,
+    generateRedeemCode,
+    getRedeemCodes,
+    deleteRedeemCode
 };
