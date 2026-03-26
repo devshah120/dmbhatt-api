@@ -1,0 +1,19 @@
+{
+  "whatsappEnabled": false,
+  "whatsappApiKey": "",
+  "whatsappSenderId": "",
+  "whatsappTemplate": "",
+  "smsEnabled": false,
+  "smsApiKey": "",
+  "smsSenderId": "",
+  "smsTemplate": "",
+  "emailEnabled": false,
+  "emailHost": "",
+  "emailPort": "",
+  "emailUser": "",
+  "emailPassword": "",
+  "emailFromName": "",
+  "notifyOnNewStudent": false,
+  "notifyOnPayment": false,
+  "notifyOnPlanUpgrade": false
+}

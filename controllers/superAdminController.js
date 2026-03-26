@@ -6,6 +6,267 @@ const Payment = require('../models/Payment');
 const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const User = require('../models/User');
+const ExploreProduct = require('../models/ExploreProduct');
+
+// ==========================================
+//  STUDENTS CRUD
+// ==========================================
+
+const createStudent = async (req, res) => {
+    try {
+        const { firstName, email, phoneNum, std, medium, stream, password } = req.body;
+        if (!firstName || !phoneNum || !std || !medium) {
+            return res.status(400).json({ message: 'Name, phone, standard and medium are required' });
+        }
+        const User = require('../models/User');
+        const StudentProfile = require('../models/StudentProfile');
+        const bcrypt = require('bcryptjs');
+
+        const existing = await User.findOne({ phoneNum });
+        if (existing) return res.status(409).json({ message: 'Phone number already registered' });
+
+        const loginCode = password || phoneNum.slice(-4); // default PIN = last 4 digits of phone
+        const loginCodeHash = await bcrypt.hash(loginCode, 10);
+
+        const user = await User.create({ firstName, email, phoneNum, role: 'student', loginCodeHash });
+        await StudentProfile.create({ userId: user._id, std, medium: medium || 'Gujarati', board: 'GSEB', stream: stream || 'None' });
+
+        res.status(201).json({ message: 'Student created successfully', defaultPin: loginCode });
+    } catch (err) {
+        console.error('Create Student Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to create student' });
+    }
+};
+
+const getStudents = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
+        const StudentProfile = require('../models/StudentProfile');
+        const [students, total] = await Promise.all([
+            StudentProfile.aggregate([
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'userId',
+                        foreignField: '_id',
+                        as: 'user'
+                    }
+                },
+                { $unwind: '$user' },
+                {
+                    $project: {
+                        _id: 1,
+                        userId: 1,
+                        firstName: '$user.firstName',
+                        email: '$user.email',
+                        phoneNum: '$user.phoneNum',
+                        std: 1,
+                        medium: 1,
+                        stream: 1,
+                        totalRewardPoints: 1,
+                        createdAt: 1
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit }
+            ]),
+            StudentProfile.countDocuments()
+        ]);
+
+        res.status(200).json({ students, total, page, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
+        console.error('Get Students Error:', err);
+        res.status(500).json({ message: 'Failed to fetch students' });
+    }
+};
+
+const getStudentsExport = async (req, res) => {
+    try {
+        const StudentProfile = require('../models/StudentProfile');
+        
+        const students = await StudentProfile.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $project: {
+                    _id: 1,
+                    firstName: '$user.firstName',
+                    email: '$user.email',
+                    phoneNum: '$user.phoneNum',
+                    std: 1,
+                    medium: 1,
+                    stream: 1,
+                    totalRewardPoints: 1,
+                    createdAt: 1
+                }
+            },
+            { $sort: { createdAt: -1 } }
+        ]);
+
+        let csv = 'Name,Email,Phone,Standard,Stream,Medium,Reward Points,Joined Date\n';
+
+        students.forEach(s => {
+            const name = `"${(s.firstName || '').replace(/"/g, '""')}"`;
+            const email = `"${(s.email || '').replace(/"/g, '""')}"`;
+            const phone = `"${(s.phoneNum || '').replace(/"/g, '""')}"`;
+            const std = `"${(s.std || '').replace(/"/g, '""')}"`;
+            const stream = `"${(s.stream || '').replace(/"/g, '""')}"`;
+            const medium = `"${(s.medium || '').replace(/"/g, '""')}"`;
+            const points = s.totalRewardPoints || 0;
+            const date = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '';
+
+            csv += `${name},${email},${phone},${std},${stream},${medium},${points},${date}\n`;
+        });
+
+        res.status(200).json({ csv });
+    } catch (err) {
+        console.error('Export Students Error:', err);
+        res.status(500).json({ message: 'Failed to export students' });
+    }
+};
+
+const updateStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { firstName, email, phoneNum, std, medium, stream, totalRewardPoints } = req.body;
+        
+        const StudentProfile = require('../models/StudentProfile');
+        const User = require('../models/User');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+        
+        // Update User
+        const userUpdates = {};
+        if (firstName !== undefined) userUpdates.firstName = firstName.trim();
+        if (email !== undefined) userUpdates.email = email.trim();
+        if (phoneNum !== undefined) userUpdates.phoneNum = phoneNum.trim();
+        if (Object.keys(userUpdates).length > 0) {
+            await User.findByIdAndUpdate(profile.userId, { $set: userUpdates });
+        }
+
+        // Update Profile
+        const profileUpdates = {};
+        if (std !== undefined) profileUpdates.std = std;
+        if (medium !== undefined) profileUpdates.medium = medium;
+        if (stream !== undefined) profileUpdates.stream = stream;
+        if (totalRewardPoints !== undefined) profileUpdates.totalRewardPoints = totalRewardPoints;
+        
+        await StudentProfile.findByIdAndUpdate(id, { $set: profileUpdates });
+        
+        res.status(200).json({ message: 'Student updated successfully' });
+    } catch (err) {
+        console.error('Update Student Error:', err);
+        res.status(500).json({ message: 'Failed to update student' });
+    }
+};
+
+const deleteStudent = async (req, res) => {
+    const mongoose = require('mongoose');
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+        const { id } = req.params;
+        const StudentProfile = require('../models/StudentProfile');
+        const User = require('../models/User');
+
+        const profile = await StudentProfile.findById(id).session(session);
+        if (!profile) throw new Error('Student not found');
+        
+        await User.findByIdAndDelete(profile.userId).session(session);
+        await StudentProfile.findByIdAndDelete(id).session(session);
+        
+        await session.commitTransaction();
+        res.status(200).json({ message: 'Student deleted successfully' });
+    } catch (err) {
+        await session.abortTransaction();
+        console.error('Delete Student Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to delete student' });
+    } finally {
+        session.endSession();
+    }
+};
+
+// ==========================================
+//  ADMINS CRUD
+// ==========================================
+
+const createAdmin = async (req, res) => {
+    try {
+        const { firstName, email, phoneNum, password } = req.body;
+        if (!firstName || !phoneNum) {
+            return res.status(400).json({ message: 'Name and phone number are required' });
+        }
+        const User = require('../models/User');
+        const bcrypt = require('bcryptjs');
+
+        const existing = await User.findOne({ phoneNum });
+        if (existing) return res.status(409).json({ message: 'Phone number already registered' });
+
+        const loginCode = password || phoneNum.slice(-4);
+        const loginCodeHash = await bcrypt.hash(loginCode, 10);
+
+        await User.create({ firstName, email, phoneNum, role: 'admin', loginCodeHash });
+        res.status(201).json({ message: 'Admin created successfully', defaultPin: loginCode });
+    } catch (err) {
+        console.error('Create Admin Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to create admin' });
+    }
+};
+
+const getAdmins = async (req, res) => {
+    try {
+        const User = require('../models/User');
+        const admins = await User.find({ role: 'admin' }).select('-loginCodeHash').sort({ createdAt: -1 });
+        res.status(200).json({ admins });
+    } catch (err) {
+        console.error('Get Admins Error:', err);
+        res.status(500).json({ message: 'Failed to fetch admins' });
+    }
+};
+
+const updateAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { firstName, email, phoneNum, isActive } = req.body;
+        
+        const User = require('../models/User');
+        const userUpdates = {};
+        if (firstName !== undefined) userUpdates.firstName = firstName.trim();
+        if (email !== undefined) userUpdates.email = email.trim();
+        if (phoneNum !== undefined) userUpdates.phoneNum = phoneNum.trim();
+        if (isActive !== undefined) userUpdates.isActive = isActive;
+        
+        await User.findByIdAndUpdate(id, { $set: userUpdates });
+        res.status(200).json({ message: 'Admin updated successfully' });
+    } catch (err) {
+        console.error('Update Admin Error:', err);
+        res.status(500).json({ message: 'Failed to update admin' });
+    }
+};
+
+const deleteAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const User = require('../models/User');
+        await User.findByIdAndDelete(id);
+        res.status(200).json({ message: 'Admin deleted successfully' });
+    } catch (err) {
+        console.error('Delete Admin Error:', err);
+        res.status(500).json({ message: 'Failed to delete admin' });
+    }
+};
 
 // ==========================================
 //  STANDARDS CRUD
@@ -396,60 +657,143 @@ const getPlanUpgrades = async (req, res) => {
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
 
-        const [upgrades, total] = await Promise.all([
-            PlanUpgrade.aggregate([
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-                {
-                    $project: {
-                        _id: 1,
-                        amount: 1,
-                        oldStandard: 1,
-                        newStandard: 1,
-                        medium: 1,
-                        stream: 1,
-                        razorpayOrderId: 1,
-                        razorpayPaymentId: 1,
-                        createdAt: 1,
-                        studentName: '$user.firstName',
-                        studentPhone: '$user.phoneNum'
-                    }
-                },
-                { $sort: { createdAt: -1 } },
-                { $skip: skip },
-                { $limit: limit }
-            ]),
-            PlanUpgrade.countDocuments()
+        // 1. Get all Product Payment IDs to exclude them from general payments
+        const productPaymentIds = await ProductPurchase.distinct('razorpayPaymentId');
+
+        // 2. Fetch Initial Payments (representing first-time plan buys)
+        const initialPayments = await Payment.aggregate([
+            { $match: { razorpayPaymentId: { $nin: productPaymentIds } } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    amount: 1,
+                    oldStandard: { $literal: 'None' },
+                    newStandard: '$profile.std',
+                    medium: '$profile.medium',
+                    stream: '$profile.stream',
+                    razorpayOrderId: 1,
+                    razorpayPaymentId: 1,
+                    createdAt: 1,
+                    studentName: '$user.firstName',
+                    studentPhone: '$user.phoneNum',
+                    isInitial: { $literal: true }
+                }
+            }
         ]);
 
-        res.status(200).json({ upgrades, total, page, totalPages: Math.ceil(total / limit) });
+        // 3. Fetch Upgrades
+        const upgrades = await PlanUpgrade.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    amount: 1,
+                    oldStandard: 1,
+                    newStandard: 1,
+                    medium: 1,
+                    stream: 1,
+                    razorpayOrderId: 1,
+                    razorpayPaymentId: 1,
+                    createdAt: 1,
+                    studentName: '$user.firstName',
+                    studentPhone: '$user.phoneNum',
+                    isInitial: { $literal: false }
+                }
+            }
+        ]);
+
+        // 4. Merge and Sort
+        let combined = [...initialPayments, ...upgrades];
+        combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        const total = combined.length;
+        const pagedData = combined.slice(skip, skip + limit);
+
+        res.status(200).json({ upgrades: pagedData, total, page, totalPages: Math.ceil(total / limit) });
     } catch (err) {
         console.error('Get Plan Upgrades Error:', err);
-        res.status(500).json({ message: 'Failed to fetch plan upgrades' });
+        res.status(500).json({ message: 'Failed to fetch plan purchases' });
     }
 };
 
 // ==========================================
-//  DASHBOARD SUMMARY
+//  CONFIG
+// ==========================================
+
+const path = require('path');
+const fs = require('fs');
+
+const CONFIG_DIR = path.join(__dirname, '../config');
+
+const getConfigPath = (type) => path.join(CONFIG_DIR, `${type}.json`);
+
+const getConfig = async (req, res) => {
+    try {
+        const { type } = req.params;
+        const filePath = getConfigPath(type);
+        if (!fs.existsSync(filePath)) return res.status(200).json({});
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Get Config Error:', err);
+        res.status(500).json({ message: 'Failed to read configuration' });
+    }
+};
+
+const saveConfig = async (req, res) => {
+    try {
+        const { type } = req.params;
+        if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        fs.writeFileSync(getConfigPath(type), JSON.stringify(req.body, null, 2));
+        res.status(200).json({ message: 'Configuration saved successfully' });
+    } catch (err) {
+        console.error('Save Config Error:', err);
+        res.status(500).json({ message: 'Failed to save configuration' });
+    }
+};
+
+// ==========================================
+//  SUPER ADMIN DASHBOARD
 // ==========================================
 
 const getSuperAdminDashboard = async (req, res) => {
     try {
-        const [totalStandards, totalSubjects, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades] =
+        const StudentProfile = require('../models/StudentProfile');
+        const [totalStandards, totalProducts, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades, totalStudents] =
             await Promise.all([
                 Standard.countDocuments(),
-                Subject.countDocuments(),
+                ExploreProduct.countDocuments(),
                 Chapter.countDocuments(),
                 Payment.countDocuments(),
                 ProductPurchase.countDocuments(),
-                PlanUpgrade.countDocuments()
+                PlanUpgrade.countDocuments(),
+                StudentProfile.countDocuments()
             ]);
 
         // Sum amounts
@@ -486,7 +830,6 @@ const getSuperAdminDashboard = async (req, res) => {
         ]);
 
         // Merge revenue by month
-        // Note: Payment is the master source of truth, but we keep the mapping safe
         const revenueMap = {};
         const months = [];
         for (let i = 5; i >= 0; i--) {
@@ -503,15 +846,20 @@ const getSuperAdminDashboard = async (req, res) => {
             }
         });
 
-        // If Upgrades were NOT in Payment, we'd add them here. 
-        // But based on user feedback and counts, Payment is the master.
-        // We only add upgradeRev if we find that the counts are distinct, 
-        // but for now 6120 is the master total.
+        upgradeRev.forEach(item => {
+            if (revenueMap[item._id] !== undefined) {
+                revenueMap[item._id] += item.amount;
+            }
+        });
 
         const revenueByMonth = months.map(m => ({ month: m, amount: revenueMap[m] }));
 
+        // Total Revenue Sum
+        const totalPaymentSum = paymentSum[0]?.total || 0;
+        const totalUpgradeSum = upgradeSum[0]?.total || 0;
+        const totalRevenue = totalPaymentSum + totalUpgradeSum;
+
         // 2. Students by Standard
-        const StudentProfile = require('../models/StudentProfile');
         const studentsByStd = await StudentProfile.aggregate([
             { $group: { _id: "$std", count: { $sum: 1 } } },
             { $sort: { count: -1 } }
@@ -538,29 +886,114 @@ const getSuperAdminDashboard = async (req, res) => {
             { $limit: 10 }
         ]);
 
-        const totalPaymentAmount = paymentSum[0]?.total || 0;
+        // 4. Product Earnings by Product Name
+        const productEarningsByProduct = await ProductPurchase.aggregate([
+            {
+                $lookup: {
+                    from: 'exploreproducts',
+                    localField: 'productId',
+                    foreignField: '_id',
+                    as: 'product'
+                }
+            },
+            { $unwind: '$product' },
+            {
+                $group: {
+                    _id: '$product.name',
+                    totalEarnings: { $sum: '$amount' }
+                }
+            },
+            { $sort: { totalEarnings: -1 } },
+            { $limit: 10 } // Limit to top 10 products for the chart
+        ]);
+
         const totalPurchaseAmount = purchaseSum[0]?.total || 0;
         const totalUpgradeAmount = upgradeSum[0]?.total || 0;
-        const totalRevenue = totalPaymentAmount; // Master total
+        // totalRevenue is already calculated above as totalPaymentSum + totalUpgradeSum
 
         res.status(200).json({
             totalStandards,
-            totalSubjects,
+            totalProducts,
             totalChapters,
             totalPayments,
             totalProductPurchases,
             totalPlanUpgrades,
-            totalPaymentAmount,
             totalPurchaseAmount,
             totalUpgradeAmount,
             totalRevenue,
+            totalStudents,
             revenueByMonth,
             studentsByStd: studentsByStd.map(s => ({ label: s._id || 'Unknown', value: s.count })),
-            chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count }))
+            chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count })),
+            productEarningsByProduct: productEarningsByProduct.map(p => ({ label: p._id || 'Other', value: p.totalEarnings }))
         });
     } catch (err) {
         console.error('Get Super Admin Dashboard Error:', err);
         res.status(500).json({ message: 'Failed to fetch dashboard data' });
+    }
+};
+
+// ==========================================
+//  PRODUCTS CRUD
+// ==========================================
+
+const getProducts = async (req, res) => {
+    try {
+        const { category } = req.query;
+        const filter = {};
+        if (category) filter.category = category;
+        const products = await ExploreProduct.find(filter).sort({ createdAt: -1 });
+        res.status(200).json({ products });
+    } catch (err) {
+        console.error('Get Products Error:', err);
+        res.status(500).json({ message: 'Failed to fetch products' });
+    }
+};
+
+const createProduct = async (req, res) => {
+    try {
+        const productData = { ...req.body };
+        
+        if (req.files && req.files['image']) {
+            productData.image = req.files['image'][0].path.replace(/\\/g, '/');
+        }
+
+        const product = new ExploreProduct(productData);
+        await product.save();
+        res.status(201).json({ message: 'Product created successfully', product });
+    } catch (err) {
+        console.error('Create Product Error:', err);
+        res.status(500).json({ message: 'Failed to create product' });
+    }
+};
+
+const updateProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const productData = { ...req.body };
+
+        if (req.files && req.files['image']) {
+            productData.image = req.files['image'][0].path.replace(/\\/g, '/');
+        }
+
+        const product = await ExploreProduct.findByIdAndUpdate(id, productData, { new: true });
+        if (!product) return res.status(404).json({ message: 'Product not found' });
+        res.status(200).json({ message: 'Product updated successfully', product });
+    } catch (err) {
+        console.error('Update Product Error:', err);
+        res.status(500).json({ message: 'Failed to update product' });
+    }
+};
+
+const deleteProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deleted = await ExploreProduct.findByIdAndDelete(id);
+        if (!deleted) return res.status(404).json({ message: 'Product not found' });
+        res.status(200).json({ message: 'Product deleted successfully' });
+    } catch (err) {
+        console.error('Delete Product Error:', err);
+        res.status(500).json({ message: 'Failed to delete product' });
     }
 };
 
@@ -584,6 +1017,25 @@ module.exports = {
     getPayments,
     getProductPurchases,
     getPlanUpgrades,
+    // Students
+    getStudents,
+    createStudent,
+    getStudentsExport,
+    updateStudent,
+    deleteStudent,
+    // Admins
+    getAdmins,
+    createAdmin,
+    updateAdmin,
+    deleteAdmin,
+    // Config
+    getConfig,
+    saveConfig,
     // Dashboard
-    getSuperAdminDashboard
+    getSuperAdminDashboard,
+    // Products
+    getProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct
 };
