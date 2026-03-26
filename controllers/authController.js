@@ -143,6 +143,11 @@ const registerStudent = async (req, session) => {
     let savedUser;
 
     if (existingUser) {
+        // Check if account was previously deleted
+        if (existingUser.deletedAt) {
+            throw new Error('This account was previously deleted. Registration is not allowed with this phone number.');
+        }
+
         // 1. Check if email is already taken by ANOTHER user
         if (email && existingUser.email === email && existingUser.phoneNum !== phoneNum) {
             throw new Error('User with this email already exists');
@@ -548,6 +553,11 @@ const loginUserByPhone = async (role, phoneNum, loginCode) => {
 
     if (!user) {
         throw new Error('User not found');
+    }
+
+    // Block login for deleted accounts
+    if (user.deletedAt) {
+        throw new Error('This account has been deleted. Please contact support.');
     }
 
     // Enforce role check if role is provided

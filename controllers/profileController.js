@@ -6,6 +6,7 @@ const PlanUpgrade = require('../models/PlanUpgrade');
 const ExamResult = require('../models/ExamResult');
 const FiveMinTestResult = require('../models/FiveMinTestResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
+const Session = require('../models/Session');
 
 /**
  * Get User Profile
@@ -136,9 +137,43 @@ const getUpgradeHistory = async (req, res) => {
     }
 };
 
+/**
+ * Delete Account (Soft Delete)
+ * @route DELETE /api/profile
+ * @access Private
+ */
+const deleteAccount = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Soft delete: mark as deleted and deactivate
+        user.deletedAt = new Date();
+        user.isActive = false;
+        await user.save();
+
+        // Invalidate all sessions for this user
+        await Session.updateMany(
+            { userId: user._id },
+            { isActive: false }
+        );
+
+        console.log(`[DELETE ACCOUNT] User ${user._id} (${user.phoneNum}) soft-deleted at ${user.deletedAt}`);
+
+        res.status(200).json({ message: 'Account deleted successfully' });
+
+    } catch (error) {
+        console.error('Delete Account Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getProfile,
     updateProfile,
     getPurchasedProducts,
-    getUpgradeHistory
+    getUpgradeHistory,
+    deleteAccount
 };
