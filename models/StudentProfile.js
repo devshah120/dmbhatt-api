@@ -44,6 +44,10 @@ const studentProfileSchema = new mongoose.Schema({
     totalRewardPoints: {
         type: Number,
         default: 0
+    },
+    isGifted: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true

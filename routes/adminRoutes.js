@@ -39,4 +39,8 @@ router.post('/generate-redeem-code', adminController.generateRedeemCode);
 router.get('/redeem-codes', adminController.getRedeemCodes);
 router.delete('/delete-redeem-code/:id', adminController.deleteRedeemCode);
 
+// Leaderboard
+router.get('/leaderboard', adminController.getAdminLeaderboard);
+router.post('/toggle-gift-status', adminController.toggleStudentGiftStatus);
+
 module.exports = router;

@@ -1074,6 +1074,74 @@ const deleteRedeemCode = async (req, res) => {
     }
 };
 
+/**
+ * Get Admin Leaderboard (Top 5)
+ */
+const getAdminLeaderboard = async (req, res) => {
+    try {
+        const { board, std, medium, stream } = req.query;
+
+        const matchStage = {};
+        if (board) matchStage.board = board;
+        if (std) matchStage.std = std;
+        if (medium) matchStage.medium = medium;
+        if (stream && stream !== 'None') matchStage.stream = stream;
+
+        const leaderboard = await StudentProfile.aggregate([
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'userData'
+                }
+            },
+            { $unwind: '$userData' },
+            {
+                $project: {
+                    _id: '$userData._id',
+                    name: '$userData.firstName',
+                    points: {
+                        $add: [
+                            { $ifNull: ['$totalRewardPoints', 0] },
+                            { $ifNull: ['$userData.bonusPoints', 0] }
+                        ]
+                    },
+                    avatar: '$userData.photoPath',
+                    isGifted: { $ifNull: ['$isGifted', false] }
+                }
+            },
+            { $sort: { points: -1 } },
+            { $limit: 5 }
+        ]);
+
+        res.status(200).json(leaderboard);
+    } catch (err) {
+        console.error('Get Admin Leaderboard Error:', err);
+        res.status(500).json({ message: 'Failed to fetch leaderboard' });
+    }
+};
+
+/**
+ * Toggle Student Gift Status
+ */
+const toggleStudentGiftStatus = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const profile = await StudentProfile.findOne({ userId });
+        if (!profile) return res.status(404).json({ message: 'Student profile not found' });
+
+        profile.isGifted = !profile.isGifted;
+        await profile.save();
+
+        res.status(200).json({ message: 'Gift status updated', isGifted: profile.isGifted });
+    } catch (err) {
+        console.error('Toggle Gift Status Error:', err);
+        res.status(500).json({ message: 'Failed to update gift status' });
+    }
+};
+
 module.exports = {
     addStudent,
     getAllStudents,
@@ -1088,5 +1156,7 @@ module.exports = {
     getUpgradePlanReport,
     generateRedeemCode,
     getRedeemCodes,
-    deleteRedeemCode
+    deleteRedeemCode,
+    getAdminLeaderboard,
+    toggleStudentGiftStatus
 };
