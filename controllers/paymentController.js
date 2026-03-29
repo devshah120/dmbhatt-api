@@ -172,3 +172,184 @@ exports.verifyUpgradePayment = async (req, res) => {
         res.status(500).json({ message: 'Error verifying payment', error: error.message });
     }
 };
+
+// ============================================================
+// Apple In-App Purchase Verification
+// ============================================================
+
+const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
+const APPLE_VERIFY_RECEIPT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
+
+/**
+ * Verify Apple receipt with Apple servers
+ * Auto-retries with sandbox if production returns status 21007
+ */
+const verifyAppleReceipt = async (receiptData) => {
+    const https = require('https');
+    const fetch = require('node-fetch') || global.fetch;
+
+    const verifyWithUrl = async (url) => {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                'receipt-data': receiptData,
+                // Add password here if you have an App-Specific Shared Secret
+                // 'password': 'YOUR_SHARED_SECRET'
+            })
+        });
+        return response.json();
+    };
+
+    // Try production first
+    let result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_PRODUCTION);
+
+    // If status 21007 — receipt is from sandbox, retry with sandbox URL
+    if (result.status === 21007) {
+        result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_SANDBOX);
+    }
+
+    return result;
+};
+
+/**
+ * Apple IAP: Verify Membership Purchase (Registration)
+ */
+exports.verifyAppleMembership = async (req, res) => {
+    try {
+        const { receipt, productId, transactionId, standard, medium, stream } = req.body;
+
+        if (!receipt || !productId || !transactionId) {
+            return res.status(400).json({ message: 'Receipt, productId, and transactionId are required' });
+        }
+
+        // Verify with Apple
+        const appleResult = await verifyAppleReceipt(receipt);
+
+        if (appleResult.status !== 0) {
+            console.error('Apple receipt verification failed. Status:', appleResult.status);
+            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+        }
+
+        // Save Payment record
+        const payment = new Payment({
+            userId: req.user.id,
+            razorpayOrderId: `apple_${transactionId}`,
+            razorpayPaymentId: transactionId,
+            razorpaySignature: 'apple_iap',
+            amount: 0, // Apple handles pricing
+            status: 'captured'
+        });
+        await payment.save();
+
+        // Mark user as paid
+        await User.findByIdAndUpdate(req.user.id, { isPaid: true });
+
+        res.status(200).json({ message: 'Apple membership verified successfully' });
+    } catch (error) {
+        console.error('Error verifying Apple membership:', error);
+        res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
+    }
+};
+
+/**
+ * Apple IAP: Verify Upgrade Purchase
+ */
+exports.verifyAppleUpgrade = async (req, res) => {
+    try {
+        const { receipt, productId, transactionId, newStandard, medium, stream, amount } = req.body;
+
+        if (!receipt || !productId || !transactionId || !newStandard) {
+            return res.status(400).json({ message: 'Receipt, productId, transactionId, and newStandard are required' });
+        }
+
+        // Verify with Apple
+        const appleResult = await verifyAppleReceipt(receipt);
+
+        if (appleResult.status !== 0) {
+            console.error('Apple receipt verification failed. Status:', appleResult.status);
+            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+        }
+
+        // Find current standard
+        const profile = await StudentProfile.findOne({ userId: req.user.id });
+        const oldStandard = profile ? profile.std : 'Unknown';
+
+        // Save Upgrade record
+        const upgrade = new PlanUpgrade({
+            userId: req.user.id,
+            oldStandard,
+            newStandard,
+            medium,
+            stream,
+            razorpayOrderId: `apple_${transactionId}`,
+            razorpayPaymentId: transactionId,
+            amount: amount || 0
+        });
+        await upgrade.save();
+
+        // Update Student Profile
+        if (profile) {
+            profile.std = newStandard;
+            profile.medium = medium;
+            if (stream) profile.stream = stream;
+            await profile.save();
+        }
+
+        // Update User isPaid status
+        await User.findByIdAndUpdate(req.user.id, { isPaid: true });
+
+        res.status(200).json({ message: 'Plan upgraded successfully via Apple IAP', upgrade });
+    } catch (error) {
+        console.error('Error verifying Apple upgrade:', error);
+        res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
+    }
+};
+
+/**
+ * Apple IAP: Verify Product/Material Purchase
+ */
+exports.verifyAppleProductPurchase = async (req, res) => {
+    try {
+        const { receipt, productId, transactionId, materialProductId, amount } = req.body;
+
+        if (!receipt || !productId || !transactionId || !materialProductId) {
+            return res.status(400).json({ message: 'Receipt, productId, transactionId, and materialProductId are required' });
+        }
+
+        // Verify with Apple
+        const appleResult = await verifyAppleReceipt(receipt);
+
+        if (appleResult.status !== 0) {
+            console.error('Apple receipt verification failed. Status:', appleResult.status);
+            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+        }
+
+        // Save Payment record
+        const payment = new Payment({
+            userId: req.user.id,
+            razorpayOrderId: `apple_${transactionId}`,
+            razorpayPaymentId: transactionId,
+            razorpaySignature: 'apple_iap',
+            amount: amount || 0,
+            status: 'captured'
+        });
+        await payment.save();
+
+        // Save Product Purchase record
+        const purchase = new ProductPurchase({
+            userId: req.user.id,
+            productId: materialProductId,
+            razorpayOrderId: `apple_${transactionId}`,
+            razorpayPaymentId: transactionId,
+            amount: amount || 0
+        });
+        await purchase.save();
+
+        res.status(200).json({ message: 'Apple product purchase verified successfully', purchase });
+    } catch (error) {
+        console.error('Error verifying Apple product purchase:', error);
+        res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
+    }
+};
+
