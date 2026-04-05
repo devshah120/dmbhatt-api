@@ -20,7 +20,7 @@ exports.uploadBoardPaper = async (req, res) => {
             year,
             subject,
             file: fileUrl,
-            createdBy: req.user._id
+            createdBy: req.user?._id
         });
 
         await newMaterial.save();
@@ -52,7 +52,7 @@ exports.uploadSchoolPaper = async (req, res) => {
             year,
             schoolName,
             file: fileUrl,
-            createdBy: req.user._id
+            createdBy: req.user?._id
         });
 
         await newMaterial.save();
@@ -83,7 +83,7 @@ exports.uploadNotes = async (req, res) => {
             subject,
             year,
             file: fileUrl,
-            createdBy: req.user._id
+            createdBy: req.user?._id
         });
 
         await newMaterial.save();
@@ -116,7 +116,7 @@ exports.uploadImageMaterial = async (req, res) => {
             year,
             schoolName,
             file: fileUrl,
-            createdBy: req.user._id
+            createdBy: req.user?._id
         });
 
         await newMaterial.save();
