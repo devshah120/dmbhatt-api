@@ -153,7 +153,8 @@ exports.deleteMaterial = async (req, res) => {
         const { id } = req.params;
         const material = await Material.findByIdAndUpdate(id, { 
             isDeleted: true, 
-            deletedBy: req.user._id 
+            deletedBy: req.user._id,
+            deletedAt: Date.now()
         });
 
         if (!material) {
@@ -185,7 +186,8 @@ exports.updateMaterial = async (req, res) => {
             year,
             schoolName,
             unit,
-            updatedBy: req.user._id
+            updatedBy: req.user._id,
+            updatedAt: Date.now()
         };
 
         if (req.files && req.files['file']) {

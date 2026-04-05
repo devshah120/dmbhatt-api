@@ -329,7 +329,8 @@ const deleteExam = async (req, res) => {
         // Soft delete exam
         await Exam.findByIdAndUpdate(id, { 
             isDeleted: true, 
-            deletedBy: req.user._id 
+            deletedBy: req.user._id,
+            deletedAt: Date.now()
         });
 
         res.status(200).json({ message: 'Exam deleted successfully' });
@@ -377,7 +378,8 @@ const updateExam = async (req, res) => {
                 stream: stream || 'None',
                 unit,
                 totalMarks,
-                updatedBy: req.user._id
+                updatedBy: req.user._id,
+                updatedAt: Date.now()
             },
             { new: true }
         );

@@ -66,6 +66,12 @@ const MaterialSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    updatedAt: {
+        type: Date
+    },
+    deletedAt: {
+        type: Date
     }
 });
 

@@ -214,7 +214,7 @@ exports.getAllGameQuestions = async (req, res) => {
 exports.editGameQuestion = async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = { ...req.body, updatedBy: req.user._id };
+        const updates = { ...req.body, updatedBy: req.user._id, updatedAt: Date.now() };
 
         const updatedQuestion = await GameQuestion.findByIdAndUpdate(id, updates, { new: true });
 
@@ -234,7 +234,8 @@ exports.deleteGameQuestion = async (req, res) => {
         const { id } = req.params;
         const deletedQuestion = await GameQuestion.findByIdAndUpdate(id, { 
             isDeleted: true, 
-            deletedBy: req.user._id 
+            deletedBy: req.user._id,
+            deletedAt: Date.now()
         });
 
         if (!deletedQuestion) {
