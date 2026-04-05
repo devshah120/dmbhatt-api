@@ -55,4 +55,28 @@ const protect = async (req, res, next) => {
     }
 };
 
-module.exports = { protect };
+// Optional auth - populates req.user if token present, but doesn't block
+const optionalProtect = async (req, res, next) => {
+    let token;
+
+    if (
+        req.headers.authorization &&
+        req.headers.authorization.startsWith('Bearer')
+    ) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const Session = require('../models/Session');
+            const session = await Session.findOne({ token, isActive: true });
+            if (session) {
+                req.user = await User.findById(decoded.userId).select('-loginCodeHash');
+            }
+        } catch (error) {
+            // Token invalid - continue without user
+        }
+    }
+
+    next();
+};
+
+module.exports = { protect, optionalProtect };

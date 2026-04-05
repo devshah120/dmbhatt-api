@@ -10,12 +10,12 @@ const storage = createDiskStorage('materials');
 
 const uploadMaterial = multer({ storage: storage }).fields([{ name: 'file', maxCount: 1 }]);
 
-const { protect } = require('../middleware/authMiddleware');
+const { protect, optionalProtect } = require('../middleware/authMiddleware');
 
-router.post('/upload-board-paper', protect, uploadMaterial, materialController.uploadBoardPaper);
-router.post('/upload-school-paper', protect, uploadMaterial, materialController.uploadSchoolPaper);
-router.post('/upload-image-material', protect, uploadMaterial, materialController.uploadImageMaterial);
-router.post('/upload-notes', protect, uploadMaterial, materialController.uploadNotes);
+router.post('/upload-board-paper', optionalProtect, uploadMaterial, materialController.uploadBoardPaper);
+router.post('/upload-school-paper', optionalProtect, uploadMaterial, materialController.uploadSchoolPaper);
+router.post('/upload-image-material', optionalProtect, uploadMaterial, materialController.uploadImageMaterial);
+router.post('/upload-notes', optionalProtect, uploadMaterial, materialController.uploadNotes);
 router.get('/all', materialController.getAllMaterials);
 router.delete('/delete/:id', protect, materialController.deleteMaterial);
 router.put('/update/:id', protect, uploadMaterial, materialController.updateMaterial);
