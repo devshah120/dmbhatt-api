@@ -304,7 +304,10 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const exams = await Exam.find(query).sort({ createdAt: -1 });
+        const exams = await Exam.find(query)
+            .populate('createdBy', 'firstName lastName')
+            .populate('updatedBy', 'firstName lastName')
+            .sort({ createdAt: -1 });    
         res.status(200).json(exams);
     } catch (err) {
         console.error('Get All Exams Error:', err);

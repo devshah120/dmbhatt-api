@@ -140,7 +140,10 @@ exports.getAllMaterials = async (req, res) => {
         if (subject) filter.subject = subject;
         if (year) filter.year = year;
 
-        const materials = await Material.find(filter).sort({ createdAt: -1 });    
+        const materials = await Material.find(filter)
+            .populate('createdBy', 'firstName lastName')
+            .populate('updatedBy', 'firstName lastName')
+            .sort({ createdAt: -1 });    
         res.status(200).json(materials);
     } catch (error) {
         console.error('Error fetching materials:', error);
