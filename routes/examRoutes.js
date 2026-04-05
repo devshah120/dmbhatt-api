@@ -9,24 +9,18 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Upload PDF for parsing (returns JSON)
 router.post('/upload-pdf', upload.single('file'), examController.uploadExamPdf);
 
-// Save verified exam
-router.post('/create', examController.saveExam);
-
 // Submit exam result (Student)
 const { protect } = require('../middleware/authMiddleware');
 router.post('/submit', protect, examController.submitExam);
 router.post('/violation', protect, examController.updateViolation);
 
-// Get All Exams
+// Admin Actions (Protected)
+router.post('/create', protect, examController.saveExam);
+router.put('/update/:id', protect, examController.updateExam);
+router.delete('/delete/:id', protect, examController.deleteExam);
+
+// Public/Open Get Routes
 router.get('/all', examController.getAllExams);
-
-// Get Single Exam
 router.get('/:id', examController.getExamById);
-
-// Update Exam
-router.put('/update/:id', examController.updateExam);
-
-// Delete Exam
-router.delete('/delete/:id', examController.deleteExam);
 
 module.exports = router;

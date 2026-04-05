@@ -19,7 +19,8 @@ exports.uploadBoardPaper = async (req, res) => {
             stream: stream || 'None',
             year,
             subject,
-            file: fileUrl
+            file: fileUrl,
+            createdBy: req.user._id
         });
 
         await newMaterial.save();
@@ -50,7 +51,8 @@ exports.uploadSchoolPaper = async (req, res) => {
             stream: req.body.stream || 'None',
             year,
             schoolName,
-            file: fileUrl
+            file: fileUrl,
+            createdBy: req.user._id
         });
 
         await newMaterial.save();
@@ -80,7 +82,8 @@ exports.uploadNotes = async (req, res) => {
             stream: stream || 'None',
             subject,
             year,
-            file: fileUrl
+            file: fileUrl,
+            createdBy: req.user._id
         });
 
         await newMaterial.save();
@@ -112,7 +115,8 @@ exports.uploadImageMaterial = async (req, res) => {
             stream: req.body.stream || 'None',
             year,
             schoolName,
-            file: fileUrl
+            file: fileUrl,
+            createdBy: req.user._id
         });
 
         await newMaterial.save();
@@ -126,7 +130,7 @@ exports.uploadImageMaterial = async (req, res) => {
 exports.getAllMaterials = async (req, res) => {
     try {
         const { type, standard, std, medium, board, stream, subject, year } = req.query;
-        let filter = {};
+        let filter = { isDeleted: { $ne: true } };
         
         if (type) filter.type = type;
         if (standard || std) filter.standard = standard || std;
@@ -147,7 +151,10 @@ exports.getAllMaterials = async (req, res) => {
 exports.deleteMaterial = async (req, res) => {
     try {
         const { id } = req.params;
-        const material = await Material.findByIdAndDelete(id);
+        const material = await Material.findByIdAndUpdate(id, { 
+            isDeleted: true, 
+            deletedBy: req.user._id 
+        });
 
         if (!material) {
             return res.status(404).json({ message: 'Material not found' });
@@ -177,7 +184,8 @@ exports.updateMaterial = async (req, res) => {
             stream: stream || 'None',
             year,
             schoolName,
-            unit
+            unit,
+            updatedBy: req.user._id
         };
 
         if (req.files && req.files['file']) {

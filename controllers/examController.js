@@ -261,7 +261,7 @@ const saveExam = async (req, res) => {
             stream: stream || 'None',
             unit,
             totalMarks,
-            // createdBy: req.user.id // If auth middleware used
+            createdBy: req.user._id
         });
 
         const savedExam = await exam.save();
@@ -297,7 +297,7 @@ const saveExam = async (req, res) => {
 const getAllExams = async (req, res) => {
     const { std, medium, board, stream, subject } = req.query;
     try {
-        const query = {};
+        const query = { isDeleted: { $ne: true } };
         if (std) query.std = std;
         if (medium) query.medium = medium;
         if (board) query.board = board;
@@ -326,8 +326,11 @@ const deleteExam = async (req, res) => {
         // Delete associated questions
         await Question.deleteMany({ examId: id });
 
-        // Delete exam
-        await Exam.findByIdAndDelete(id);
+        // Soft delete exam
+        await Exam.findByIdAndUpdate(id, { 
+            isDeleted: true, 
+            deletedBy: req.user._id 
+        });
 
         res.status(200).json({ message: 'Exam deleted successfully' });
     } catch (err) {
@@ -374,6 +377,7 @@ const updateExam = async (req, res) => {
                 stream: stream || 'None',
                 unit,
                 totalMarks,
+                updatedBy: req.user._id
             },
             { new: true }
         );

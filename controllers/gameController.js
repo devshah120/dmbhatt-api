@@ -26,7 +26,8 @@ exports.addGameQuestion = async (req, res) => {
             options,
             correctAnswer,
             difficulty,
-            meta
+            meta,
+            createdBy: req.user._id
         });
 
         await newQuestion.save();
@@ -158,7 +159,8 @@ exports.importGameQuestions = async (req, res) => {
                     options,
                     correctAnswer: String(correctAnswer),
                     difficulty,
-                    meta
+                    meta,
+                    createdBy: req.user._id
                 });
 
                 await newQuestion.save();
@@ -183,7 +185,10 @@ exports.importGameQuestions = async (req, res) => {
 exports.getGameQuestions = async (req, res) => {
     try {
         const { gameType } = req.params;
-        const questions = await GameQuestion.find({ gameType });
+        const questions = await GameQuestion.find({ 
+            gameType, 
+            isDeleted: { $ne: true } 
+        });
 
         if (!questions.length) {
             return res.status(404).json({ message: "No questions found for this game type" });
@@ -198,7 +203,7 @@ exports.getGameQuestions = async (req, res) => {
 // Get all game questions (Optional for admin view)
 exports.getAllGameQuestions = async (req, res) => {
     try {
-        const questions = await GameQuestion.find();
+        const questions = await GameQuestion.find({ isDeleted: { $ne: true } });
         res.status(200).json(questions);
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
@@ -209,7 +214,7 @@ exports.getAllGameQuestions = async (req, res) => {
 exports.editGameQuestion = async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body, updatedBy: req.user._id };
 
         const updatedQuestion = await GameQuestion.findByIdAndUpdate(id, updates, { new: true });
 
@@ -227,7 +232,10 @@ exports.editGameQuestion = async (req, res) => {
 exports.deleteGameQuestion = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedQuestion = await GameQuestion.findByIdAndDelete(id);
+        const deletedQuestion = await GameQuestion.findByIdAndUpdate(id, { 
+            isDeleted: true, 
+            deletedBy: req.user._id 
+        });
 
         if (!deletedQuestion) {
             return res.status(404).json({ message: "Question not found" });
