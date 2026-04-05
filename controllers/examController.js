@@ -305,8 +305,8 @@ const getAllExams = async (req, res) => {
         if (subject) query.subject = subject;
 
         const exams = await Exam.find(query)
-            .populate('createdBy', 'firstName lastName')
-            .populate('updatedBy', 'firstName lastName')
+            .populate('createdBy', 'firstName email phoneNum')
+            .populate('updatedBy', 'firstName email phoneNum')
             .sort({ createdAt: -1 });    
         res.status(200).json(exams);
     } catch (err) {

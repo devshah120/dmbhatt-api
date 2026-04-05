@@ -239,7 +239,7 @@ const getAdmins = async (req, res) => {
 const updateAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, email, phoneNum, isActive } = req.body;
+        const { firstName, email, phoneNum, isActive, password } = req.body;
         
         const User = require('../models/User');
         const userUpdates = {};
@@ -247,6 +247,11 @@ const updateAdmin = async (req, res) => {
         if (email !== undefined) userUpdates.email = email.trim();
         if (phoneNum !== undefined) userUpdates.phoneNum = phoneNum.trim();
         if (isActive !== undefined) userUpdates.isActive = isActive;
+
+        if (password && password.trim() !== '') {
+            const bcrypt = require('bcryptjs');
+            userUpdates.loginCodeHash = await bcrypt.hash(password.trim(), 10);
+        }
         
         await User.findByIdAndUpdate(id, { $set: userUpdates });
         res.status(200).json({ message: 'Admin updated successfully' });

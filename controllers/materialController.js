@@ -141,8 +141,8 @@ exports.getAllMaterials = async (req, res) => {
         if (year) filter.year = year;
 
         const materials = await Material.find(filter)
-            .populate('createdBy', 'firstName lastName')
-            .populate('updatedBy', 'firstName lastName')
+            .populate('createdBy', 'firstName email phoneNum')
+            .populate('updatedBy', 'firstName email phoneNum')
             .sort({ createdAt: -1 });    
         res.status(200).json(materials);
     } catch (error) {
