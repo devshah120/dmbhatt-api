@@ -23,7 +23,7 @@ const subjectSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// A subject name must be unique within a standard
-subjectSchema.index({ name: 1, standardId: 1 }, { unique: true });
+// A subject name must be unique within a standard and stream combo
+subjectSchema.index({ name: 1, standardId: 1, stream: 1 }, { unique: true });
 
 module.exports = mongoose.model('Subject', subjectSchema);

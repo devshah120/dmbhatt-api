@@ -367,6 +367,9 @@ const getSubjects = async (req, res) => {
         if (req.query.standardId) {
             filter.standardId = req.query.standardId;
         }
+        if (req.query.stream) {
+            filter.stream = req.query.stream;
+        }
         const subjects = await Subject.find(filter)
             .populate('standardId', 'name')
             .sort({ name: 1 });
