@@ -11,6 +11,10 @@ const subjectSchema = new mongoose.Schema({
         ref: 'Standard',
         required: true
     },
+    stream: {
+        type: String,
+        trim: true
+    },
     isActive: {
         type: Boolean,
         default: true

@@ -379,7 +379,7 @@ const getSubjects = async (req, res) => {
 
 const createSubject = async (req, res) => {
     try {
-        const { name, standardId } = req.body;
+        const { name, standardId, stream } = req.body;
         if (!name || !standardId) {
             return res.status(400).json({ message: 'Subject name and standardId are required' });
         }
@@ -388,7 +388,7 @@ const createSubject = async (req, res) => {
         if (!standard) {
             return res.status(404).json({ message: 'Standard not found' });
         }
-        const subject = new Subject({ name: name.trim(), standardId });
+        const subject = new Subject({ name: name.trim(), standardId, stream: stream || undefined });
         await subject.save();
         const populated = await subject.populate('standardId', 'name');
         res.status(201).json({ message: 'Subject created successfully', subject: populated });
@@ -404,11 +404,12 @@ const createSubject = async (req, res) => {
 const updateSubject = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, standardId, isActive } = req.body;
+        const { name, standardId, isActive, stream } = req.body;
         const updates = {};
         if (name !== undefined) updates.name = name.trim();
         if (standardId !== undefined) updates.standardId = standardId;
         if (isActive !== undefined) updates.isActive = isActive;
+        if (stream !== undefined) updates.stream = stream;
 
         const subject = await Subject.findByIdAndUpdate(id, { $set: updates }, { new: true })
             .populate('standardId', 'name');
