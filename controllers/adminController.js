@@ -64,6 +64,15 @@ const addStudent = async (req, res) => {
         });
         await studentProfile.save({ session });
 
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Admin App';
+        await ActivityLog.create([{
+            entityType: 'Student',
+            action: 'Added',
+            targetName: name,
+            performedBy: performedBy
+        }], { session });
+
         await session.commitTransaction();
         res.status(201).json({ message: 'Student added successfully', studentId: savedUser._id });
 
@@ -196,6 +205,15 @@ const editStudent = async (req, res) => {
             { session, new: true }
         );
 
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Admin App';
+        await ActivityLog.create([{
+            entityType: 'Student',
+            action: 'Updated',
+            targetName: user.firstName,
+            performedBy: performedBy
+        }], { session });
+
         await session.commitTransaction();
         res.status(200).json({ message: 'Student updated successfully' });
 
@@ -217,11 +235,23 @@ const deleteStudent = async (req, res) => {
     try {
         session.startTransaction();
 
+        const user = await User.findById(id).session(session);
+        const targetName = user ? user.firstName : 'Unknown';
+
         // Delete User
         await User.findByIdAndDelete(id).session(session);
 
         // Delete Profile
         await StudentProfile.findOneAndDelete({ userId: id }).session(session);
+
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Admin App';
+        await ActivityLog.create([{
+            entityType: 'Student',
+            action: 'Deleted',
+            targetName: targetName,
+            performedBy: performedBy
+        }], { session });
 
         await session.commitTransaction();
         res.status(200).json({ message: 'Student deleted successfully' });

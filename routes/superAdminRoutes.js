@@ -50,6 +50,9 @@ router.get('/plan-upgrades', ctrl.getPlanUpgrades);
 router.get('/config/:type', ctrl.getConfig);
 router.post('/config/:type', ctrl.saveConfig);
 
+// Logs
+router.get('/logs', ctrl.getLogs);
+
 const { uploadUniversal } = require('../config/uploadConfig');
 
 // Product Management

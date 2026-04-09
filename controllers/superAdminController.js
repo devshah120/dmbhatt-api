@@ -31,6 +31,15 @@ const createStudent = async (req, res) => {
         const user = await User.create({ firstName, email, phoneNum, role: 'student', loginCodeHash });
         await StudentProfile.create({ userId: user._id, std, medium: medium || 'Gujarati', board: 'GSEB', stream: stream || 'None' });
 
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Super Admin';
+        await ActivityLog.create({
+            entityType: 'Student',
+            action: 'Added',
+            targetName: firstName,
+            performedBy: performedBy
+        });
+
         res.status(201).json({ message: 'Student created successfully', defaultPin: loginCode });
     } catch (err) {
         console.error('Create Student Error:', err);
@@ -165,6 +174,19 @@ const updateStudent = async (req, res) => {
         
         await StudentProfile.findByIdAndUpdate(id, { $set: profileUpdates });
         
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Super Admin';
+        
+        // Find user name for logging
+        const updatedUser = await User.findById(profile.userId);
+        
+        await ActivityLog.create({
+            entityType: 'Student',
+            action: 'Updated',
+            targetName: updatedUser ? updatedUser.firstName : 'Unknown Student',
+            performedBy: performedBy
+        });
+
         res.status(200).json({ message: 'Student updated successfully' });
     } catch (err) {
         console.error('Update Student Error:', err);
@@ -184,9 +206,21 @@ const deleteStudent = async (req, res) => {
         const profile = await StudentProfile.findById(id).session(session);
         if (!profile) throw new Error('Student not found');
         
+        const user = await User.findById(profile.userId).session(session);
+        const targetName = user ? user.firstName : 'Unknown';
+
         await User.findByIdAndDelete(profile.userId).session(session);
         await StudentProfile.findByIdAndDelete(id).session(session);
         
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.query.performedBy || 'Super Admin';
+        await ActivityLog.create([{
+            entityType: 'Student',
+            action: 'Deleted',
+            targetName: targetName,
+            performedBy: performedBy
+        }], { session });
+
         await session.commitTransaction();
         res.status(200).json({ message: 'Student deleted successfully' });
     } catch (err) {
@@ -1006,6 +1040,26 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// ==========================================
+//  ACTIVITY LOGS
+// ==========================================
+
+const getLogs = async (req, res) => {
+    try {
+        const ActivityLog = require('../models/ActivityLog');
+        const filter = {};
+        if (req.query.entityType) {
+            filter.entityType = req.query.entityType;
+        }
+
+        const logs = await ActivityLog.find(filter).sort({ createdAt: -1 }).limit(100);
+        res.status(200).json(logs);
+    } catch (err) {
+        console.error('Get Logs Error:', err);
+        res.status(500).json({ message: 'Failed to fetch logs' });
+    }
+};
+
 module.exports = {
     // Standards
     getStandards,
@@ -1046,5 +1100,7 @@ module.exports = {
     getProducts,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    // Logs
+    getLogs
 };
