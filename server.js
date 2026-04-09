@@ -60,6 +60,13 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK' });
 });
 
+// App Config Open Route
+const configCtrl = require('./controllers/superAdminController');
+app.get('/api/config/app', (req, res, next) => {
+    req.params.type = 'app';
+    next();
+}, configCtrl.getConfig);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error('SERVER ERROR:', err);
