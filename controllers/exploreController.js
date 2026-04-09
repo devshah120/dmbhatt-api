@@ -1,4 +1,5 @@
 const ExploreProduct = require('../models/ExploreProduct');
+const ActivityLog = require('../models/ActivityLog');
 
 exports.createProduct = async (req, res) => {
     try {
@@ -23,6 +24,13 @@ exports.createProduct = async (req, res) => {
         });
 
         await newProduct.save();
+
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Added',
+            targetName: name,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
 
         res.status(201).json({ message: 'Product created successfully', product: newProduct });
     } catch (error) {
@@ -68,6 +76,13 @@ exports.updateProduct = async (req, res) => {
 
         await product.save();
 
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Updated',
+            targetName: product.name,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(200).json({ message: 'Product updated successfully', product });
     } catch (error) {
         console.error('Error updating product:', error);
@@ -83,6 +98,13 @@ exports.deleteProduct = async (req, res) => {
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Deleted',
+            targetName: product.name,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
 
         res.status(200).json({ message: 'Product deleted successfully' });
     } catch (error) {

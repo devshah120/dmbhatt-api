@@ -1,6 +1,7 @@
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const ExamResult = require('../models/ExamResult');
+const ActivityLog = require('../models/ActivityLog');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const fs = require('fs');
@@ -283,6 +284,13 @@ const saveExam = async (req, res) => {
         savedExam.questions = questionIds;
         await savedExam.save();
 
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'Exam created successfully', examId: savedExam._id });
 
     } catch (err) {
@@ -330,11 +338,20 @@ const deleteExam = async (req, res) => {
         await Question.deleteMany({ examId: id });
 
         // Soft delete exam
-        await Exam.findByIdAndUpdate(id, { 
+        const deleted = await Exam.findByIdAndUpdate(id, { 
             isDeleted: true, 
             deletedBy: req.user._id,
             deletedAt: Date.now()
         });
+
+        if (deleted) {
+            await ActivityLog.create({
+                entityType: 'Exam',
+                action: 'Deleted',
+                targetName: deleted.title || deleted.name,
+                performedBy: req.query.performedBy || 'Admin App'
+            });
+        }
 
         res.status(200).json({ message: 'Exam deleted successfully' });
     } catch (err) {
@@ -422,6 +439,13 @@ const updateExam = async (req, res) => {
             exam.questions = questionIds;
             await exam.save();
         }
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Updated',
+            targetName: exam.title || exam.name,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
 
         res.status(200).json({ message: 'Exam updated successfully', exam });
     } catch (err) {

@@ -7,6 +7,7 @@ const ProductPurchase = require('../models/ProductPurchase');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const User = require('../models/User');
 const ExploreProduct = require('../models/ExploreProduct');
+const ActivityLog = require('../models/ActivityLog');
 
 // ==========================================
 //  STUDENTS CRUD
@@ -252,6 +253,14 @@ const createAdmin = async (req, res) => {
         const loginCodeHash = await bcrypt.hash(loginCode, 10);
 
         await User.create({ firstName, email, phoneNum, role: 'admin', loginCodeHash });
+
+        await ActivityLog.create({
+            entityType: 'Admin',
+            action: 'Added',
+            targetName: firstName,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(201).json({ message: 'Admin created successfully', defaultPin: loginCode });
     } catch (err) {
         console.error('Create Admin Error:', err);
@@ -287,7 +296,15 @@ const updateAdmin = async (req, res) => {
             userUpdates.loginCodeHash = await bcrypt.hash(password.trim(), 10);
         }
         
-        await User.findByIdAndUpdate(id, { $set: userUpdates });
+        const updated = await User.findByIdAndUpdate(id, { $set: userUpdates }, { new: true });
+
+        await ActivityLog.create({
+            entityType: 'Admin',
+            action: 'Updated',
+            targetName: updated ? updated.firstName : 'Admin',
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Admin updated successfully' });
     } catch (err) {
         console.error('Update Admin Error:', err);
@@ -299,7 +316,17 @@ const deleteAdmin = async (req, res) => {
     try {
         const { id } = req.params;
         const User = require('../models/User');
-        await User.findByIdAndDelete(id);
+        const admin = await User.findByIdAndDelete(id);
+
+        if (admin) {
+            await ActivityLog.create({
+                entityType: 'Admin',
+                action: 'Deleted',
+                targetName: admin.firstName,
+                performedBy: req.query.performedBy || 'Super Admin'
+            });
+        }
+
         res.status(200).json({ message: 'Admin deleted successfully' });
     } catch (err) {
         console.error('Delete Admin Error:', err);
@@ -333,6 +360,14 @@ const createStandard = async (req, res) => {
         }
         const standard = new Standard({ name: name.trim(), displayOrder: displayOrder || 0 });
         await standard.save();
+
+        await ActivityLog.create({
+            entityType: 'Standard',
+            action: 'Added',
+            targetName: name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(201).json({ message: 'Standard created successfully', standard });
     } catch (err) {
         console.error('Create Standard Error:', err);
@@ -353,6 +388,14 @@ const updateStandard = async (req, res) => {
         if (!standard) {
             return res.status(404).json({ message: 'Standard not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Standard',
+            action: 'Updated',
+            targetName: standard.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Standard updated successfully', standard });
     } catch (err) {
         console.error('Update Standard Error:', err);
@@ -379,6 +422,13 @@ const deleteStandard = async (req, res) => {
         if (!deleted) {
             throw new Error('Standard not found');
         }
+
+        await ActivityLog.create([{
+            entityType: 'Standard',
+            action: 'Deleted',
+            targetName: deleted.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        }], { session });
 
         await session.commitTransaction();
         res.status(200).json({ message: 'Standard and related data deleted successfully' });
@@ -428,6 +478,14 @@ const createSubject = async (req, res) => {
         const subject = new Subject({ name: name.trim(), standardId, stream: stream || undefined });
         await subject.save();
         const populated = await subject.populate('standardId', 'name');
+
+        await ActivityLog.create({
+            entityType: 'Subject',
+            action: 'Added',
+            targetName: name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(201).json({ message: 'Subject created successfully', subject: populated });
     } catch (err) {
         if (err.code === 11000) {
@@ -453,6 +511,14 @@ const updateSubject = async (req, res) => {
         if (!subject) {
             return res.status(404).json({ message: 'Subject not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Subject',
+            action: 'Updated',
+            targetName: subject.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Subject updated successfully', subject });
     } catch (err) {
         if (err.code === 11000) {
@@ -475,6 +541,13 @@ const deleteSubject = async (req, res) => {
         if (!deleted) {
             throw new Error('Subject not found');
         }
+
+        await ActivityLog.create([{
+            entityType: 'Subject',
+            action: 'Deleted',
+            targetName: deleted.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        }], { session });
 
         await session.commitTransaction();
         res.status(200).json({ message: 'Subject and related chapters deleted successfully' });
@@ -529,6 +602,14 @@ const createChapter = async (req, res) => {
             select: 'name standardId',
             populate: { path: 'standardId', select: 'name' }
         });
+
+        await ActivityLog.create({
+            entityType: 'Chapter',
+            action: 'Added',
+            targetName: name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(201).json({ message: 'Chapter created successfully', chapter: populated });
     } catch (err) {
         if (err.code === 11000) {
@@ -558,6 +639,14 @@ const updateChapter = async (req, res) => {
         if (!chapter) {
             return res.status(404).json({ message: 'Chapter not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Chapter',
+            action: 'Updated',
+            targetName: chapter.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Chapter updated successfully', chapter });
     } catch (err) {
         if (err.code === 11000) {
@@ -575,6 +664,14 @@ const deleteChapter = async (req, res) => {
         if (!deleted) {
             return res.status(404).json({ message: 'Chapter not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Chapter',
+            action: 'Deleted',
+            targetName: deleted.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Chapter deleted successfully' });
     } catch (err) {
         console.error('Delete Chapter Error:', err);
@@ -1003,6 +1100,14 @@ const createProduct = async (req, res) => {
 
         const product = new ExploreProduct(productData);
         await product.save();
+
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Added',
+            targetName: product.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(201).json({ message: 'Product created successfully', product });
     } catch (err) {
         console.error('Create Product Error:', err);
@@ -1021,6 +1126,14 @@ const updateProduct = async (req, res) => {
 
         const product = await ExploreProduct.findByIdAndUpdate(id, productData, { new: true });
         if (!product) return res.status(404).json({ message: 'Product not found' });
+
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Updated',
+            targetName: product.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Product updated successfully', product });
     } catch (err) {
         console.error('Update Product Error:', err);
@@ -1033,6 +1146,14 @@ const deleteProduct = async (req, res) => {
         const { id } = req.params;
         const deleted = await ExploreProduct.findByIdAndDelete(id);
         if (!deleted) return res.status(404).json({ message: 'Product not found' });
+
+        await ActivityLog.create({
+            entityType: 'Product',
+            action: 'Deleted',
+            targetName: deleted.name,
+            performedBy: req.query.performedBy || 'Super Admin'
+        });
+
         res.status(200).json({ message: 'Product deleted successfully' });
     } catch (err) {
         console.error('Delete Product Error:', err);

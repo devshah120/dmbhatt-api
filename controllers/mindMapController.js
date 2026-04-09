@@ -1,4 +1,5 @@
 const MindMap = require('../models/MindMap');
+const ActivityLog = require('../models/ActivityLog');
 
 const createMindMap = async (req, res) => {
     try {
@@ -9,6 +10,14 @@ const createMindMap = async (req, res) => {
 
         const mindMap = new MindMap({ subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', data });
         await mindMap.save();
+
+        await ActivityLog.create({
+            entityType: 'MindMap',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'Mind Map created successfully', mindMap });
     } catch (err) {
         console.error('Create MindMap Error:', err);
@@ -36,7 +45,17 @@ const getAllMindMaps = async (req, res) => {
 const deleteMindMap = async (req, res) => {
     try {
         const { id } = req.params;
-        await MindMap.findByIdAndDelete(id);
+        const deleted = await MindMap.findByIdAndDelete(id);
+        
+        if (deleted) {
+            await ActivityLog.create({
+                entityType: 'MindMap',
+                action: 'Deleted',
+                targetName: deleted.title,
+                performedBy: req.query.performedBy || 'Admin App'
+            });
+        }
+
         res.status(200).json({ message: 'Mind Map deleted successfully' });
     } catch (err) {
         console.error('Delete MindMap Error:', err);
@@ -58,6 +77,14 @@ const updateMindMap = async (req, res) => {
         if (!updatedDoc) {
             return res.status(404).json({ message: 'Mind Map not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'MindMap',
+            action: 'Updated',
+            targetName: updatedDoc.title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(200).json({ message: 'Mind Map updated successfully', mindMap: updatedDoc });
     } catch (err) {
         console.error('Update MindMap Error:', err);

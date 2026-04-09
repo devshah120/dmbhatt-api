@@ -1,4 +1,5 @@
 const PaperSet = require('../models/PaperSet');
+const ActivityLog = require('../models/ActivityLog');
 
 exports.createPaperSet = async (req, res) => {
     try {
@@ -14,6 +15,13 @@ exports.createPaperSet = async (req, res) => {
         });
 
         await newPaperSet.save();
+
+        await ActivityLog.create({
+            entityType: 'PaperSet',
+            action: 'Added',
+            targetName: examName,
+            performedBy: req.body.performedBy || 'Admin App'
+        });
 
         res.status(201).json({ message: 'Paper Set created successfully', paperSet: newPaperSet });
     } catch (error) {
@@ -98,6 +106,14 @@ exports.editPaperSet = async (req, res) => {
         if (!paperSet) {
             return res.status(404).json({ message: 'Paper Set not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'PaperSet',
+            action: 'Updated',
+            targetName: paperSet.examName,
+            performedBy: req.body.performedBy || 'Admin App'
+        });
+
         res.status(200).json({ message: 'Paper Set updated successfully', paperSet });
     } catch (err) {
         console.error('Edit Paper Set Error:', err);
@@ -112,6 +128,14 @@ exports.deletePaperSet = async (req, res) => {
         if (!paperSet) {
             return res.status(404).json({ message: 'Paper Set not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'PaperSet',
+            action: 'Deleted',
+            targetName: paperSet.examName,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(200).json({ message: 'Paper Set deleted successfully' });
     } catch (err) {
         console.error('Delete Paper Set Error:', err);

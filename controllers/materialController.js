@@ -1,4 +1,5 @@
 const Material = require('../models/Material');
+const ActivityLog = require('../models/ActivityLog');
 
 exports.uploadBoardPaper = async (req, res) => {
     try {
@@ -24,6 +25,14 @@ exports.uploadBoardPaper = async (req, res) => {
         });
 
         await newMaterial.save();
+
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'Board Paper uploaded successfully', material: newMaterial });
     } catch (error) {
         console.error('Error uploading board paper:', error);
@@ -56,6 +65,14 @@ exports.uploadSchoolPaper = async (req, res) => {
         });
 
         await newMaterial.save();
+
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'School Paper uploaded successfully', material: newMaterial });
     } catch (error) {
         console.error('Error uploading school paper:', error);
@@ -87,6 +104,14 @@ exports.uploadNotes = async (req, res) => {
         });
 
         await newMaterial.save();
+
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'Notes uploaded successfully', material: newMaterial });
     } catch (error) {
         console.error('Error uploading notes:', error);
@@ -120,6 +145,14 @@ exports.uploadImageMaterial = async (req, res) => {
         });
 
         await newMaterial.save();
+
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Added',
+            targetName: title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         res.status(201).json({ message: 'Image Material uploaded successfully', material: newMaterial });
     } catch (error) {
         console.error('Error uploading image material:', error);
@@ -164,6 +197,13 @@ exports.deleteMaterial = async (req, res) => {
             return res.status(404).json({ message: 'Material not found' });
         }
 
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Deleted',
+            targetName: material.title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
+
         // Note: For production, we should also delete the file from Cloudinary here.
         // cloudinary.uploader.destroy(public_id);
 
@@ -202,6 +242,13 @@ exports.updateMaterial = async (req, res) => {
         if (!material) {
             return res.status(404).json({ message: 'Material not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Material',
+            action: 'Updated',
+            targetName: material.title,
+            performedBy: req.query.performedBy || 'Admin App'
+        });
 
         res.status(200).json({ message: 'Material updated successfully', material });
     } catch (error) {
