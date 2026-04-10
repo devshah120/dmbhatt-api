@@ -288,7 +288,8 @@ const saveExam = async (req, res) => {
             entityType: 'Exam',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Exam created successfully', examId: savedExam._id });
@@ -349,7 +350,8 @@ const deleteExam = async (req, res) => {
                 entityType: 'Exam',
                 action: 'Deleted',
                 targetName: deleted.title || deleted.name,
-                performedBy: req.query.performedBy || 'Admin App'
+                performedBy: req.query.performedBy || 'Admin App',
+                performedByImg: req.query.performedByImg || ''
             });
         }
 
@@ -444,7 +446,8 @@ const updateExam = async (req, res) => {
             entityType: 'Exam',
             action: 'Updated',
             targetName: exam.title || exam.name,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Exam updated successfully', exam });

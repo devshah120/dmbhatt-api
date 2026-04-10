@@ -21,6 +21,9 @@ const ActivityLogSchema = new mongoose.Schema({
         required: true,
         default: 'Admin'
     },
+    performedByImg: {
+        type: String
+    },
     createdAt: {
         type: Date,
         default: Date.now

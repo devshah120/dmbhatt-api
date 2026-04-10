@@ -20,7 +20,8 @@ exports.createPaperSet = async (req, res) => {
             entityType: 'PaperSet',
             action: 'Added',
             targetName: examName,
-            performedBy: req.body.performedBy || 'Admin App'
+            performedBy: req.body.performedBy || req.query.performedBy || 'Admin App',
+            performedByImg: req.body.performedByImg || req.query.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Paper Set created successfully', paperSet: newPaperSet });
@@ -111,7 +112,8 @@ exports.editPaperSet = async (req, res) => {
             entityType: 'PaperSet',
             action: 'Updated',
             targetName: paperSet.examName,
-            performedBy: req.body.performedBy || 'Admin App'
+            performedBy: req.body.performedBy || req.query.performedBy || 'Admin App',
+            performedByImg: req.body.performedByImg || req.query.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Paper Set updated successfully', paperSet });
@@ -133,7 +135,8 @@ exports.deletePaperSet = async (req, res) => {
             entityType: 'PaperSet',
             action: 'Deleted',
             targetName: paperSet.examName,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Paper Set deleted successfully' });

@@ -29,7 +29,8 @@ exports.createProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Added',
             targetName: name,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Product created successfully', product: newProduct });
@@ -80,7 +81,8 @@ exports.updateProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Updated',
             targetName: product.name,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Product updated successfully', product });
@@ -103,7 +105,8 @@ exports.deleteProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Deleted',
             targetName: product.name,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Product deleted successfully' });

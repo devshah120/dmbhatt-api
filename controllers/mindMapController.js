@@ -15,7 +15,8 @@ const createMindMap = async (req, res) => {
             entityType: 'MindMap',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Mind Map created successfully', mindMap });
@@ -52,7 +53,8 @@ const deleteMindMap = async (req, res) => {
                 entityType: 'MindMap',
                 action: 'Deleted',
                 targetName: deleted.title,
-                performedBy: req.query.performedBy || 'Admin App'
+                performedBy: req.query.performedBy || 'Admin App',
+                performedByImg: req.query.performedByImg || ''
             });
         }
 
@@ -82,7 +84,8 @@ const updateMindMap = async (req, res) => {
             entityType: 'MindMap',
             action: 'Updated',
             targetName: updatedDoc.title,
-            performedBy: req.query.performedBy || 'Admin App'
+            performedBy: req.query.performedBy || 'Admin App',
+            performedByImg: req.query.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Mind Map updated successfully', mindMap: updatedDoc });
