@@ -3,12 +3,12 @@ const ActivityLog = require('../models/ActivityLog');
 
 const createMindMap = async (req, res) => {
     try {
-        const { subject, unit, title, std, board, stream, data } = req.body;
-        if (!subject || !unit || !title || !std || !data) {
-            return res.status(400).json({ message: 'Subject, Unit, Title, Std, and Data are required' });
+        const { subject, unit, title, std, board, stream, medium, data } = req.body;
+        if (!subject || !unit || !title || !std || !medium || !data) {
+            return res.status(400).json({ message: 'Subject, Unit, Title, Std, Medium, and Data are required' });
         }
 
-        const mindMap = new MindMap({ subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', data });
+        const mindMap = new MindMap({ subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', medium, data });
         await mindMap.save();
 
         await ActivityLog.create({
@@ -28,12 +28,13 @@ const createMindMap = async (req, res) => {
 
 const getAllMindMaps = async (req, res) => {
     try {
-        const { std, board, stream, subject } = req.query;
+        const { std, board, stream, subject, medium } = req.query;
         let query = {};
         if (std) query.std = std;
         if (board) query.board = board;
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
+        if (medium) query.medium = medium;
 
         const mindMaps = await MindMap.find(query).sort({ createdAt: -1 });
         res.status(200).json(mindMaps);
@@ -68,11 +69,11 @@ const deleteMindMap = async (req, res) => {
 const updateMindMap = async (req, res) => {
     try {
         const { id } = req.params;
-        const { subject, unit, title, std, board, stream, data } = req.body;
+        const { subject, unit, title, std, board, stream, medium, data } = req.body;
 
         const updatedDoc = await MindMap.findByIdAndUpdate(
             id,
-            { subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', data },
+            { subject, unit, title, std, board: board || 'GSEB', stream: stream || 'None', medium: medium || 'Gujarati', data },
             { new: true, runValidators: true }
         );
 
