@@ -65,7 +65,7 @@ const addStudent = async (req, res) => {
         await studentProfile.save({ session });
 
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Admin App';
+        const performedBy = req.performedBy || req.query.performedBy || 'Admin App';
         await ActivityLog.create([{
             entityType: 'Student',
             action: 'Added',
@@ -206,7 +206,7 @@ const editStudent = async (req, res) => {
         );
 
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Admin App';
+        const performedBy = req.performedBy || req.query.performedBy || 'Admin App';
         await ActivityLog.create([{
             entityType: 'Student',
             action: 'Updated',
@@ -245,7 +245,7 @@ const deleteStudent = async (req, res) => {
         await StudentProfile.findOneAndDelete({ userId: id }).session(session);
 
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Admin App';
+        const performedBy = req.performedBy || req.query.performedBy || 'Admin App';
         await ActivityLog.create([{
             entityType: 'Student',
             action: 'Deleted',

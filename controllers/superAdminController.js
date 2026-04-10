@@ -33,8 +33,8 @@ const createStudent = async (req, res) => {
         await StudentProfile.create({ userId: user._id, std, medium: medium || 'Gujarati', board: 'GSEB', stream: stream || 'None' });
 
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Super Admin';
-        const performedByImg = req.query.performedByImg || '';
+        const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
+        const performedByImg = req.performedByImg || req.query.performedByImg || '';
 
         await ActivityLog.create({
             entityType: 'Student',
@@ -179,8 +179,8 @@ const updateStudent = async (req, res) => {
         await StudentProfile.findByIdAndUpdate(id, { $set: profileUpdates });
         
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Super Admin';
-        const performedByImg = req.query.performedByImg || '';
+        const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
+        const performedByImg = req.performedByImg || req.query.performedByImg || '';
         
         // Find user name for logging
         const updatedUser = await User.findById(profile.userId);
@@ -219,8 +219,8 @@ const deleteStudent = async (req, res) => {
         await StudentProfile.findByIdAndDelete(id).session(session);
         
         const ActivityLog = require('../models/ActivityLog');
-        const performedBy = req.query.performedBy || 'Super Admin';
-        const performedByImg = req.query.performedByImg || '';
+        const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
+        const performedByImg = req.performedByImg || req.query.performedByImg || '';
 
         await ActivityLog.create([{
             entityType: 'Student',
@@ -266,8 +266,8 @@ const createAdmin = async (req, res) => {
             entityType: 'Admin',
             action: 'Added',
             targetName: firstName,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Admin created successfully', defaultPin: loginCode });
@@ -311,8 +311,8 @@ const updateAdmin = async (req, res) => {
             entityType: 'Admin',
             action: 'Updated',
             targetName: updated ? updated.firstName : 'Admin',
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Admin updated successfully' });
@@ -333,8 +333,8 @@ const deleteAdmin = async (req, res) => {
                 entityType: 'Admin',
                 action: 'Deleted',
                 targetName: admin.firstName,
-                performedBy: req.query.performedBy || 'Super Admin',
-                performedByImg: req.query.performedByImg || ''
+                performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+                performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
             });
         }
 
@@ -376,8 +376,8 @@ const createStandard = async (req, res) => {
             entityType: 'Standard',
             action: 'Added',
             targetName: name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Standard created successfully', standard });
@@ -405,8 +405,8 @@ const updateStandard = async (req, res) => {
             entityType: 'Standard',
             action: 'Updated',
             targetName: standard.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Standard updated successfully', standard });
@@ -440,8 +440,8 @@ const deleteStandard = async (req, res) => {
             entityType: 'Standard',
             action: 'Deleted',
             targetName: deleted.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         }], { session });
 
         await session.commitTransaction();
@@ -497,8 +497,8 @@ const createSubject = async (req, res) => {
             entityType: 'Subject',
             action: 'Added',
             targetName: name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Subject created successfully', subject: populated });
@@ -531,8 +531,8 @@ const updateSubject = async (req, res) => {
             entityType: 'Subject',
             action: 'Updated',
             targetName: subject.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Subject updated successfully', subject });
@@ -562,8 +562,8 @@ const deleteSubject = async (req, res) => {
             entityType: 'Subject',
             action: 'Deleted',
             targetName: deleted.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         }], { session });
 
         await session.commitTransaction();
@@ -624,8 +624,8 @@ const createChapter = async (req, res) => {
             entityType: 'Chapter',
             action: 'Added',
             targetName: name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Chapter created successfully', chapter: populated });
@@ -662,8 +662,8 @@ const updateChapter = async (req, res) => {
             entityType: 'Chapter',
             action: 'Updated',
             targetName: chapter.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Chapter updated successfully', chapter });
@@ -688,8 +688,8 @@ const deleteChapter = async (req, res) => {
             entityType: 'Chapter',
             action: 'Deleted',
             targetName: deleted.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Chapter deleted successfully' });
@@ -1125,8 +1125,8 @@ const createProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Added',
             targetName: product.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Product created successfully', product });
@@ -1152,8 +1152,8 @@ const updateProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Updated',
             targetName: product.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Product updated successfully', product });
@@ -1173,8 +1173,8 @@ const deleteProduct = async (req, res) => {
             entityType: 'Product',
             action: 'Deleted',
             targetName: deleted.name,
-            performedBy: req.query.performedBy || 'Super Admin',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Product deleted successfully' });

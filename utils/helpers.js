@@ -27,6 +27,18 @@ const compareLoginCode = async (loginCode, hash) => {
     return await bcrypt.compare(loginCode, hash);
 };
 
+const getUserDisplayName = (user) => {
+    if (!user) return '';
+
+    const nameParts = [];
+    if (user.firstName) nameParts.push(user.firstName);
+    if (user.lastName) nameParts.push(user.lastName);
+    if (user.name) nameParts.push(user.name);
+
+    const displayName = nameParts.filter(Boolean).join(' ').trim();
+    return displayName || user.phoneNum || user.email || 'Admin App';
+};
+
 /**
  * Parse address string into components
  * Format: "Street, City, State, Pincode"
@@ -47,5 +59,6 @@ module.exports = {
     generateToken,
     hashLoginCode,
     compareLoginCode,
-    parseAddress
+    parseAddress,
+    getUserDisplayName
 };

@@ -1,5 +1,26 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getUserDisplayName } = require('../utils/helpers');
+
+const injectPerformedBy = (req) => {
+    if (!req.user) return;
+
+    const performedBy = getUserDisplayName(req.user);
+    const performedByImg = req.user.photoPath || '';
+
+    req.query = req.query || {};
+    req.body = req.body || {};
+
+    // Always prefer the authenticated user's name over what the client sent
+    req.query.performedBy = performedBy;
+    req.query.performedByImg = performedByImg;
+    req.body.performedBy = performedBy;
+    req.body.performedByImg = performedByImg;
+
+    // Provide a consistent request-level performedBy reference for controllers
+    req.performedBy = performedBy;
+    req.performedByImg = performedByImg;
+};
 
 const protect = async (req, res, next) => {
     let token;
@@ -30,6 +51,7 @@ const protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
+            injectPerformedBy(req);
             return next();
         } catch (error) {
             console.error(error);
@@ -70,6 +92,7 @@ const optionalProtect = async (req, res, next) => {
             const session = await Session.findOne({ token, isActive: true });
             if (session) {
                 req.user = await User.findById(decoded.userId).select('-loginCodeHash');
+                injectPerformedBy(req);
             }
         } catch (error) {
             // Token invalid - continue without user

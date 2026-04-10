@@ -30,8 +30,8 @@ exports.uploadBoardPaper = async (req, res) => {
             entityType: 'Material',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Board Paper uploaded successfully', material: newMaterial });
@@ -71,8 +71,8 @@ exports.uploadSchoolPaper = async (req, res) => {
             entityType: 'Material',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'School Paper uploaded successfully', material: newMaterial });
@@ -111,8 +111,8 @@ exports.uploadNotes = async (req, res) => {
             entityType: 'Material',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Notes uploaded successfully', material: newMaterial });
@@ -153,8 +153,8 @@ exports.uploadImageMaterial = async (req, res) => {
             entityType: 'Material',
             action: 'Added',
             targetName: title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(201).json({ message: 'Image Material uploaded successfully', material: newMaterial });
@@ -205,8 +205,8 @@ exports.deleteMaterial = async (req, res) => {
             entityType: 'Material',
             action: 'Deleted',
             targetName: material.title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         // Note: For production, we should also delete the file from Cloudinary here.
@@ -252,8 +252,8 @@ exports.updateMaterial = async (req, res) => {
             entityType: 'Material',
             action: 'Updated',
             targetName: material.title,
-            performedBy: req.query.performedBy || 'Admin App',
-            performedByImg: req.query.performedByImg || ''
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
         res.status(200).json({ message: 'Material updated successfully', material });
