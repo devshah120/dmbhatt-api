@@ -1204,6 +1204,74 @@ const getLogs = async (req, res) => {
     }
 };
 
+// ==========================================
+//  PUSH NOTIFICATIONS
+// ==========================================
+
+const sendPushNotification = async (req, res) => {
+    try {
+        const { title, body } = req.body;
+        if (!title || !body) {
+            return res.status(400).json({ message: 'Title and body are required' });
+        }
+
+        // Get FCM Server Key from config
+        const configPath = getConfigPath('notification');
+        let fcmKey = '';
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            fcmKey = config.fcmServerKey;
+        }
+
+        if (!fcmKey) {
+            return res.status(400).json({ message: 'FCM Server Key not configured. Please add it in settings.' });
+        }
+
+        // Send to FCM (Legacy HTTP API)
+        // Note: For production, consider using firebase-admin SDK or FCM v1 API
+        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `key=${fcmKey}`
+            },
+            body: JSON.stringify({
+                to: '/topics/all', // Target all students
+                notification: {
+                    title: title,
+                    body: body,
+                    sound: 'default'
+                },
+                data: {
+                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                    title: title,
+                    body: body
+                }
+            })
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || 'FCM request failed');
+        }
+
+        // Log Activity
+        await ActivityLog.create({
+            entityType: 'System',
+            action: 'Updated',
+            targetName: `Push Notification: ${title}`,
+            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || ''
+        });
+
+        res.status(200).json({ message: 'Push notification sent successfully', result });
+    } catch (err) {
+        console.error('Send Push Notification Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to send push notification' });
+    }
+};
+
 module.exports = {
     // Standards
     getStandards,
@@ -1246,5 +1314,7 @@ module.exports = {
     updateProduct,
     deleteProduct,
     // Logs
-    getLogs
+    getLogs,
+    // Push Notifications
+    sendPushNotification
 };
