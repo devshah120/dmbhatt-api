@@ -42,3 +42,6 @@ Thumbs.db
 # Temp
 tmp/
 temp/
+
+# Secrets
+config/firebase-service-account.json

@@ -1,4 +1,24 @@
 const mongoose = require('mongoose');
+const admin = require('firebase-admin');
+const path = require('path');
+const fs = require('fs');
+
+// Initialize Firebase Admin
+try {
+    const serviceAccountPath = path.join(__dirname, '../config/firebase-service-account.json');
+    if (fs.existsSync(serviceAccountPath)) {
+        const serviceAccount = require(serviceAccountPath);
+        if (admin.apps.length === 0) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
+        console.log('Firebase Admin initialized successfully');
+    }
+} catch (error) {
+    console.error('Firebase Admin initialization error:', error);
+}
+
 const Standard = require('../models/Standard');
 const Subject = require('../models/Subject');
 const Chapter = require('../models/Chapter');
@@ -1215,46 +1235,26 @@ const sendPushNotification = async (req, res) => {
             return res.status(400).json({ message: 'Title and body are required' });
         }
 
-        // Get FCM Server Key from config
-        const configPath = getConfigPath('notification');
-        let fcmKey = '';
-        if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            fcmKey = config.fcmServerKey;
-        }
-
-        if (!fcmKey) {
-            return res.status(400).json({ message: 'FCM Server Key not configured. Please add it in settings.' });
-        }
-
-        // Send to FCM (Legacy HTTP API)
-        // Note: For production, consider using firebase-admin SDK or FCM v1 API
-        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `key=${fcmKey}`
+        // Send to FCM (V1 API via SDK)
+        const message = {
+            notification: {
+                title: title,
+                body: body
             },
-            body: JSON.stringify({
-                to: '/topics/all', // Target all students
+            topic: 'all', // Target all students
+            android: {
                 notification: {
-                    title: title,
-                    body: body,
-                    sound: 'default'
-                },
-                data: {
-                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                    title: title,
-                    body: body
+                    sound: 'default',
+                    clickAction: 'FLUTTER_NOTIFICATION_CLICK'
                 }
-            })
-        });
+            },
+            data: {
+                title: title,
+                body: body
+            }
+        };
 
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.message || 'FCM request failed');
-        }
+        const response = await admin.messaging().send(message);
 
         // Log Activity
         await ActivityLog.create({
@@ -1265,7 +1265,7 @@ const sendPushNotification = async (req, res) => {
             performedByImg: req.performedByImg || req.query.performedByImg || ''
         });
 
-        res.status(200).json({ message: 'Push notification sent successfully', result });
+        res.status(200).json({ message: 'Push notification sent successfully', messageId: response });
     } catch (err) {
         console.error('Send Push Notification Error:', err);
         res.status(500).json({ message: err.message || 'Failed to send push notification' });
