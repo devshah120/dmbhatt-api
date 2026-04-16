@@ -926,9 +926,6 @@ const getPlanUpgrades = async (req, res) => {
 //  CONFIG
 // ==========================================
 
-const path = require('path');
-const fs = require('fs');
-
 const CONFIG_DIR = path.join(__dirname, '../config');
 
 const getConfigPath = (type) => path.join(CONFIG_DIR, `${type}.json`);
