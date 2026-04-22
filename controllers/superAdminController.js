@@ -973,6 +973,11 @@ const saveConfig = async (req, res) => {
 
 const getSuperAdminDashboard = async (req, res) => {
     try {
+        // Security check: Only super admins can access dashboard stats
+        if (req.user && req.user.role !== 'super admin') {
+            return res.status(403).json({ message: 'Access denied. Super admin role required.' });
+        }
+
         const StudentProfile = require('../models/StudentProfile');
         const [totalStandards, totalProducts, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades, totalStudents] =
             await Promise.all([
