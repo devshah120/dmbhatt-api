@@ -370,6 +370,11 @@ const importStudents = async (req, res) => {
  */
 const getDashboardStats = async (req, res) => {
     try {
+        // Role check: Only super admin can access dashboard stats
+        if (req.user.role !== 'super admin') {
+            return res.status(403).json({ message: 'Access denied. Super admin only.' });
+        }
+
         // 1. Aggregate Sales by Subject from ProductPurchase
         const subjectStats = await ProductPurchase.aggregate([
             {
