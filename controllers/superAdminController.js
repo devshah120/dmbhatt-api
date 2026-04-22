@@ -306,7 +306,7 @@ const createAdmin = async (req, res) => {
 const getAdmins = async (req, res) => {
     try {
         const User = require('../models/User');
-        const admins = await User.find({ role: { $in: ['admin', 'super admin'] } }).select('-loginCodeHash').sort({ createdAt: -1 });
+        const admins = await User.find({ role: 'admin' }).select('-loginCodeHash').sort({ createdAt: -1 });
         res.status(200).json({ admins });
     } catch (err) {
         console.error('Get Admins Error:', err);
