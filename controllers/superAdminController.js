@@ -267,7 +267,13 @@ const deleteStudent = async (req, res) => {
 
 const createAdmin = async (req, res) => {
     try {
-        const { firstName, email, phoneNum, password } = req.body;
+        const { firstName, email, phoneNum, password, role } = req.body;
+
+        // Restriction: ONLY the specific phone number can be assigned 'super admin' role
+        if (role === 'super admin' && phoneNum !== '9825189540') {
+            return res.status(403).json({ message: 'The super admin role is restricted to a specific account.' });
+        }
+
         if (!firstName || !phoneNum) {
             return res.status(400).json({ message: 'Name and phone number are required' });
         }
@@ -280,7 +286,7 @@ const createAdmin = async (req, res) => {
         const loginCode = password || phoneNum.slice(-4);
         const loginCodeHash = await bcrypt.hash(loginCode, 10);
 
-        await User.create({ firstName, email, phoneNum, role: 'admin', loginCodeHash });
+        await User.create({ firstName, email, phoneNum, role: role || 'admin', loginCodeHash });
 
         await ActivityLog.create({
             entityType: 'Admin',
@@ -300,7 +306,7 @@ const createAdmin = async (req, res) => {
 const getAdmins = async (req, res) => {
     try {
         const User = require('../models/User');
-        const admins = await User.find({ role: 'admin' }).select('-loginCodeHash').sort({ createdAt: -1 });
+        const admins = await User.find({ role: { $in: ['admin', 'super admin'] } }).select('-loginCodeHash').sort({ createdAt: -1 });
         res.status(200).json({ admins });
     } catch (err) {
         console.error('Get Admins Error:', err);
@@ -311,7 +317,12 @@ const getAdmins = async (req, res) => {
 const updateAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, email, phoneNum, isActive, password } = req.body;
+        const { firstName, email, phoneNum, isActive, password, role } = req.body;
+
+        // Restriction: ONLY the specific phone number can be assigned 'super admin' role
+        if (role === 'super admin' && phoneNum !== '9825189540') {
+            return res.status(403).json({ message: 'The super admin role is restricted to a specific account.' });
+        }
         
         const User = require('../models/User');
         const userUpdates = {};
@@ -319,6 +330,7 @@ const updateAdmin = async (req, res) => {
         if (email !== undefined) userUpdates.email = email.trim();
         if (phoneNum !== undefined) userUpdates.phoneNum = phoneNum.trim();
         if (isActive !== undefined) userUpdates.isActive = isActive;
+        if (role !== undefined) userUpdates.role = role;
 
         if (password && password.trim() !== '') {
             const bcrypt = require('bcryptjs');

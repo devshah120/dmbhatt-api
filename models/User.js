@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         required: true,
-        enum: ['admin', 'student', 'guest']
+        enum: ['admin', 'student', 'guest', 'super admin']
     },
     // Common fields
     firstName: {

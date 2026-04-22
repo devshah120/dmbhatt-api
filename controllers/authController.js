@@ -562,7 +562,11 @@ const loginUserByPhone = async (role, phoneNum, loginCode) => {
 
     // Enforce role check if role is provided
     if (role && user.role !== role) {
-        throw new Error('wrong mobile number or password');
+        // Special Case: super admin can log in as admin or super admin
+        const isSuperAdminLogin = (role === 'admin' && user.role === 'super admin');
+        if (!isSuperAdminLogin) {
+            throw new Error('wrong mobile number or password');
+        }
     }
 
     const isMatch = await compareLoginCode(loginCode, user.loginCodeHash);

@@ -22,7 +22,7 @@ const getProfile = async (req, res) => {
         // Fetch profile based on role
         if (user.role === 'student') {
             profile = await StudentProfile.findOne({ userId: user._id });
-        } else if (user.role === 'admin') {
+        } else if (user.role === 'admin' || user.role === 'super admin') {
             profile = await AdminProfile.findOne({ userId: user._id });
         }
 

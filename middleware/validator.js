@@ -6,7 +6,7 @@ const { body, validationResult } = require('express-validator');
 const registrationValidation = [
     body('role')
         .notEmpty().withMessage('Role is required')
-        .isIn(['admin', 'student', 'guest']).withMessage('Invalid role'),
+        .isIn(['admin', 'student', 'guest', 'super admin']).withMessage('Invalid role'),
 
     body('loginCode')
         .notEmpty().withMessage('Login code is required')
@@ -17,10 +17,10 @@ const registrationValidation = [
         .isMobilePhone().withMessage('Invalid phone number'),
 
     // Admin-specific validation
-    body('name').if(body('role').equals('admin'))
+    body('name').if(body('role').isIn(['admin', 'super admin']))
         .notEmpty().withMessage('Name is required for admin'),
 
-    body('email').if(body('role').equals('admin'))
+    body('email').if(body('role').isIn(['admin', 'super admin']))
         .notEmpty().withMessage('Email is required for admin')
         .isEmail().withMessage('Invalid email address'),
 
@@ -69,7 +69,7 @@ const registrationValidation = [
 const loginValidation = [
     body('role')
         .optional()
-        .isIn(['admin', 'student', 'guest']).withMessage('Invalid role'),
+        .isIn(['admin', 'student', 'guest', 'super admin']).withMessage('Invalid role'),
 
     body('loginCode')
         .notEmpty().withMessage('Login code is required'),
