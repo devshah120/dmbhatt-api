@@ -967,6 +967,25 @@ const saveConfig = async (req, res) => {
     }
 };
 
+const getPublicConfig = async (req, res) => {
+    try {
+        const { type } = req.params;
+        const filePath = getConfigPath(type);
+        if (!fs.existsSync(filePath)) return res.status(200).json({});
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        
+        // Filter sensitive data
+        if (type === 'payment') {
+            delete data.razorpayKeySecret;
+        }
+        
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Get Public Config Error:', err);
+        res.status(500).json({ message: 'Failed to read configuration' });
+    }
+};
+
 // ==========================================
 //  SUPER ADMIN DASHBOARD
 // ==========================================
@@ -1320,6 +1339,7 @@ module.exports = {
     // Config
     getConfig,
     saveConfig,
+    getPublicConfig,
     // Dashboard
     getSuperAdminDashboard,
     // Products

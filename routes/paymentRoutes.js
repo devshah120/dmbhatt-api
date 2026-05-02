@@ -4,10 +4,31 @@ const Razorpay = require('razorpay');
 const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
 
-const razorpay = new Razorpay({
-    key_id: 'rzp_test_RlEXP3KcdFxaDU',
-    key_secret: 'IHUC5CwHWJwCgVIuvG7ZAti6'
-});
+const fs = require('fs');
+const path = require('path');
+
+const getRazorpayConfig = () => {
+    try {
+        const configPath = path.join(__dirname, '../config/payment.json');
+        if (fs.existsSync(configPath)) {
+            return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        }
+    } catch (err) {
+        console.error('Error reading Razorpay config:', err);
+    }
+    return {
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
+        razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || ''
+    };
+};
+
+const getRazorpayInstance = () => {
+    const config = getRazorpayConfig();
+    return new Razorpay({
+        key_id: config.razorpayKeyId,
+        key_secret: config.razorpayKeySecret
+    });
+};
 
 router.post('/create-order', async (req, res) => {
     // ... existing generic order logic
@@ -24,6 +45,7 @@ router.post('/create-order', async (req, res) => {
             receipt
         };
 
+        const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
         res.json(order);
     } catch (error) {

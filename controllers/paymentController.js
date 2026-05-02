@@ -6,11 +6,31 @@ const Payment = require('../models/Payment');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const StudentProfile = require('../models/StudentProfile');
 const User = require('../models/User');
+const fs = require('fs');
+const path = require('path');
 
-const razorpay = new Razorpay({
-    key_id: 'rzp_test_RlEXP3KcdFxaDU',
-    key_secret: 'IHUC5CwHWJwCgVIuvG7ZAti6'
-});
+const getRazorpayConfig = () => {
+    try {
+        const configPath = path.join(__dirname, '../config/payment.json');
+        if (fs.existsSync(configPath)) {
+            return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        }
+    } catch (err) {
+        console.error('Error reading Razorpay config:', err);
+    }
+    return {
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+        razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET
+    };
+};
+
+const getRazorpayInstance = () => {
+    const config = getRazorpayConfig();
+    return new Razorpay({
+        key_id: config.razorpayKeyId,
+        key_secret: config.razorpayKeySecret
+    });
+};
 
 exports.createProductOrder = async (req, res) => {
     try {
@@ -26,6 +46,7 @@ exports.createProductOrder = async (req, res) => {
             receipt: `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`
         };
 
+        const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
         res.json(order);
     } catch (error) {
@@ -45,7 +66,8 @@ exports.verifyProductPayment = async (req, res) => {
         } = req.body;
 
         // Verify signature
-        const shasum = crypto.createHmac('sha256', 'IHUC5CwHWJwCgVIuvG7ZAti6');
+        const config = getRazorpayConfig();
+        const shasum = crypto.createHmac('sha256', config.razorpayKeySecret);
         shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
         const digest = shasum.digest('hex');
 
@@ -95,6 +117,7 @@ exports.createUpgradeOrder = async (req, res) => {
             receipt: `upg_${Date.now()}_${Math.floor(Math.random() * 1000)}`
         };
 
+        const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
         res.json(order);
     } catch (error) {
