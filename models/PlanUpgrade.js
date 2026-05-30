@@ -22,15 +22,21 @@ const PlanUpgradeSchema = new mongoose.Schema({
         type: String
     },
     razorpayOrderId: {
-        type: String,
-        required: true
+        type: String
     },
     razorpayPaymentId: {
-        type: String,
-        required: true
+        type: String
+    },
+    appleTransactionId: {
+        type: String
     },
     amount: {
         type: Number,
+        required: true
+    },
+    paymentMethod: {
+        type: String,
+        enum: ['razorpay', 'apple'],
         required: true
     },
     redeemCode: {

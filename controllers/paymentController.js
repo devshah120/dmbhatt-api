@@ -161,6 +161,7 @@ exports.verifyUpgradePayment = async (req, res) => {
             razorpayOrderId: razorpay_order_id,
             razorpayPaymentId: razorpay_payment_id,
             amount: amount,
+            paymentMethod: 'razorpay',
             redeemCode: req.body.redeemCode
         });
         await upgrade.save();
@@ -240,10 +241,10 @@ const verifyAppleReceipt = async (receiptData) => {
  */
 exports.verifyAppleMembership = async (req, res) => {
     try {
-        const { receipt, productId, transactionId, standard, medium, stream } = req.body;
+        const { receipt, productId, apple_transaction_id, standard, medium, stream } = req.body;
 
-        if (!receipt || !productId || !transactionId) {
-            return res.status(400).json({ message: 'Receipt, productId, and transactionId are required' });
+        if (!receipt || !productId || !apple_transaction_id) {
+            return res.status(400).json({ message: 'Receipt, productId, and apple_transaction_id are required' });
         }
 
         // Verify with Apple
@@ -257,8 +258,8 @@ exports.verifyAppleMembership = async (req, res) => {
         // Save Payment record
         const payment = new Payment({
             userId: req.user.id,
-            razorpayOrderId: `apple_${transactionId}`,
-            razorpayPaymentId: transactionId,
+            razorpayOrderId: `apple_${apple_transaction_id}`,
+            razorpayPaymentId: apple_transaction_id,
             razorpaySignature: 'apple_iap',
             amount: 0, // Apple handles pricing
             status: 'captured'
@@ -280,10 +281,10 @@ exports.verifyAppleMembership = async (req, res) => {
  */
 exports.verifyAppleUpgrade = async (req, res) => {
     try {
-        const { receipt, productId, transactionId, newStandard, medium, stream, amount } = req.body;
+        const { receipt, productId, apple_transaction_id, newStandard, medium, stream, amount } = req.body;
 
-        if (!receipt || !productId || !transactionId || !newStandard) {
-            return res.status(400).json({ message: 'Receipt, productId, transactionId, and newStandard are required' });
+        if (!receipt || !productId || !apple_transaction_id || !newStandard) {
+            return res.status(400).json({ message: 'Receipt, productId, apple_transaction_id, and newStandard are required' });
         }
 
         // Verify with Apple
@@ -305,9 +306,9 @@ exports.verifyAppleUpgrade = async (req, res) => {
             newStandard,
             medium,
             stream,
-            razorpayOrderId: `apple_${transactionId}`,
-            razorpayPaymentId: transactionId,
-            amount: amount || 0
+            appleTransactionId: apple_transaction_id,
+            amount: amount || 0,
+            paymentMethod: 'apple'
         });
         await upgrade.save();
 
@@ -334,10 +335,10 @@ exports.verifyAppleUpgrade = async (req, res) => {
  */
 exports.verifyAppleProductPurchase = async (req, res) => {
     try {
-        const { receipt, productId, transactionId, materialProductId, amount } = req.body;
+        const { receipt, productId, apple_transaction_id, materialProductId, amount } = req.body;
 
-        if (!receipt || !productId || !transactionId || !materialProductId) {
-            return res.status(400).json({ message: 'Receipt, productId, transactionId, and materialProductId are required' });
+        if (!receipt || !productId || !apple_transaction_id || !materialProductId) {
+            return res.status(400).json({ message: 'Receipt, productId, apple_transaction_id, and materialProductId are required' });
         }
 
         // Verify with Apple
@@ -351,8 +352,8 @@ exports.verifyAppleProductPurchase = async (req, res) => {
         // Save Payment record
         const payment = new Payment({
             userId: req.user.id,
-            razorpayOrderId: `apple_${transactionId}`,
-            razorpayPaymentId: transactionId,
+            razorpayOrderId: `apple_${apple_transaction_id}`,
+            razorpayPaymentId: apple_transaction_id,
             razorpaySignature: 'apple_iap',
             amount: amount || 0,
             status: 'captured'
@@ -363,8 +364,8 @@ exports.verifyAppleProductPurchase = async (req, res) => {
         const purchase = new ProductPurchase({
             userId: req.user.id,
             productId: materialProductId,
-            razorpayOrderId: `apple_${transactionId}`,
-            razorpayPaymentId: transactionId,
+            razorpayOrderId: `apple_${apple_transaction_id}`,
+            razorpayPaymentId: apple_transaction_id,
             amount: amount || 0
         });
         await purchase.save();

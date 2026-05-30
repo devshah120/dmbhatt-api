@@ -62,4 +62,9 @@ router.post('/product/verify', protect, paymentController.verifyProductPayment);
 router.post('/upgrade/create-order', protect, paymentController.createUpgradeOrder);
 router.post('/upgrade/verify', protect, paymentController.verifyUpgradePayment);
 
+// --- Apple In-App Purchase Routes ---
+router.post('/apple/verify-membership', protect, paymentController.verifyAppleMembership);
+router.post('/apple/verify-upgrade', protect, paymentController.verifyAppleUpgrade);
+router.post('/apple/verify-product', protect, paymentController.verifyAppleProductPurchase);
+
 module.exports = router;
