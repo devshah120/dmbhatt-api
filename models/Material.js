@@ -16,11 +16,11 @@ const MaterialSchema = new mongoose.Schema({
     },
     medium: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
     },
     standard: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
     },
     board: {
         type: String,
@@ -33,7 +33,7 @@ const MaterialSchema = new mongoose.Schema({
     },
     year: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
     },
     schoolName: {
         type: String,
