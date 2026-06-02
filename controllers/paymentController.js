@@ -203,37 +203,50 @@ exports.verifyUpgradePayment = async (req, res) => {
 
 const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_VERIFY_RECEIPT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
+const APPLE_APP_SHARED_SECRET = process.env.APPLE_APP_SHARED_SECRET || '';
 
 /**
  * Verify Apple receipt with Apple servers
  * Auto-retries with sandbox if production returns status 21007
  */
 const verifyAppleReceipt = async (receiptData) => {
-    const https = require('https');
-    const fetch = require('node-fetch') || global.fetch;
-
     const verifyWithUrl = async (url) => {
+        const payload = {
+            'receipt-data': receiptData
+        };
+
+        if (APPLE_APP_SHARED_SECRET) {
+            payload['password'] = APPLE_APP_SHARED_SECRET;
+        }
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                'receipt-data': receiptData,
-                // Add password here if you have an App-Specific Shared Secret
-                // 'password': 'YOUR_SHARED_SECRET'
-            })
+            body: JSON.stringify(payload)
         });
+
+        if (!response.ok) {
+            throw new Error(`Apple API returned HTTP ${response.status}`);
+        }
+
         return response.json();
     };
 
-    // Try production first
-    let result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_PRODUCTION);
+    try {
+        // Try production first
+        let result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_PRODUCTION);
 
-    // If status 21007 — receipt is from sandbox, retry with sandbox URL
-    if (result.status === 21007) {
-        result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_SANDBOX);
+        // If status 21007 — receipt is from sandbox, retry with sandbox URL
+        if (result.status === 21007) {
+            console.log('Receipt is from sandbox, retrying with sandbox URL');
+            result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_SANDBOX);
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Apple receipt verification error:', error.message);
+        throw error;
     }
-
-    return result;
 };
 
 /**
@@ -251,8 +264,18 @@ exports.verifyAppleMembership = async (req, res) => {
         const appleResult = await verifyAppleReceipt(receipt);
 
         if (appleResult.status !== 0) {
-            console.error('Apple receipt verification failed. Status:', appleResult.status);
-            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+            console.error('Apple receipt verification failed. Status:', appleResult.status, 'Response:', appleResult);
+            const statusMessages = {
+                21000: 'Invalid receipt',
+                21002: 'Receipt data malformed',
+                21003: 'Receipt cannot be authenticated',
+                21004: 'Shared secret does not match',
+                21005: 'Receipt server unavailable',
+                21007: 'Receipt from test environment (should auto-retry with sandbox)',
+                21008: 'Receipt from production environment'
+            };
+            const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
+            return res.status(400).json({ message, status: appleResult.status });
         }
 
         // Save Payment record
@@ -291,8 +314,18 @@ exports.verifyAppleUpgrade = async (req, res) => {
         const appleResult = await verifyAppleReceipt(receipt);
 
         if (appleResult.status !== 0) {
-            console.error('Apple receipt verification failed. Status:', appleResult.status);
-            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+            console.error('Apple receipt verification failed. Status:', appleResult.status, 'Response:', appleResult);
+            const statusMessages = {
+                21000: 'Invalid receipt',
+                21002: 'Receipt data malformed',
+                21003: 'Receipt cannot be authenticated',
+                21004: 'Shared secret does not match',
+                21005: 'Receipt server unavailable',
+                21007: 'Receipt from test environment (should auto-retry with sandbox)',
+                21008: 'Receipt from production environment'
+            };
+            const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
+            return res.status(400).json({ message, status: appleResult.status });
         }
 
         // Find current standard
@@ -345,8 +378,18 @@ exports.verifyAppleProductPurchase = async (req, res) => {
         const appleResult = await verifyAppleReceipt(receipt);
 
         if (appleResult.status !== 0) {
-            console.error('Apple receipt verification failed. Status:', appleResult.status);
-            return res.status(400).json({ message: 'Apple receipt verification failed', status: appleResult.status });
+            console.error('Apple receipt verification failed. Status:', appleResult.status, 'Response:', appleResult);
+            const statusMessages = {
+                21000: 'Invalid receipt',
+                21002: 'Receipt data malformed',
+                21003: 'Receipt cannot be authenticated',
+                21004: 'Shared secret does not match',
+                21005: 'Receipt server unavailable',
+                21007: 'Receipt from test environment (should auto-retry with sandbox)',
+                21008: 'Receipt from production environment'
+            };
+            const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
+            return res.status(400).json({ message, status: appleResult.status });
         }
 
         // Save Payment record
