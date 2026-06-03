@@ -1244,13 +1244,30 @@ const deleteProduct = async (req, res) => {
 const getLogs = async (req, res) => {
     try {
         const ActivityLog = require('../models/ActivityLog');
+        const { entityType, skip = 0, limit = 10 } = req.query;
+
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
+
         const filter = {};
-        if (req.query.entityType) {
-            filter.entityType = req.query.entityType;
+        if (entityType) {
+            filter.entityType = entityType;
         }
 
-        const logs = await ActivityLog.find(filter).sort({ createdAt: -1 }).limit(100);
-        res.status(200).json(logs);
+        const [logs, total] = await Promise.all([
+            ActivityLog.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skipNum)
+                .limit(limitNum),
+            ActivityLog.countDocuments(filter)
+        ]);
+
+        res.status(200).json({
+            data: logs,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('Get Logs Error:', err);
         res.status(500).json({ message: 'Failed to fetch logs' });

@@ -304,7 +304,7 @@ const saveExam = async (req, res) => {
  * Get All Exams
  */
 const getAllExams = async (req, res) => {
-    const { std, medium, board, stream, subject } = req.query;
+    const { std, medium, board, stream, subject, skip = 0, limit = 10 } = req.query;
     try {
         const query = { isDeleted: { $ne: true } };
         if (std) query.std = std;
@@ -313,11 +313,25 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const exams = await Exam.find(query)
-            .populate('createdBy', 'firstName email phoneNum')
-            .populate('updatedBy', 'firstName email phoneNum')
-            .sort({ createdAt: -1 });    
-        res.status(200).json(exams);
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
+
+        const [exams, total] = await Promise.all([
+            Exam.find(query)
+                .populate('createdBy', 'firstName email phoneNum')
+                .populate('updatedBy', 'firstName email phoneNum')
+                .sort({ createdAt: -1 })
+                .skip(skipNum)
+                .limit(limitNum),
+            Exam.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            data: exams,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('Get All Exams Error:', err);
         res.status(500).json({ message: 'Failed to fetch exams', error: err.message });

@@ -510,7 +510,7 @@ const getDashboardStats = async (req, res) => {
  */
 const getExamReports = async (req, res) => {
     try {
-        const { type, board, std, medium, stream, studentId } = req.query;
+        const { type, board, std, medium, stream, studentId, skip = 0, limit = 10 } = req.query;
         const ExamResult = require('../models/ExamResult');
         const FiveMinTestResult = require('../models/FiveMinTestResult');
         const OneLinerExamResult = require('../models/OneLinerExamResult');
@@ -530,6 +530,9 @@ const getExamReports = async (req, res) => {
                 { model: OneLinerExamResult, type: 'ONELINER' }
             ];
         }
+
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
 
         const matchStage = {};
         if (studentId) matchStage.studentId = new mongoose.Types.ObjectId(studentId);
@@ -592,7 +595,16 @@ const getExamReports = async (req, res) => {
         }
 
         allResults.sort((a, b) => new Date(b.date) - new Date(a.date));
-        res.status(200).json(allResults);
+
+        const total = allResults.length;
+        const paginatedResults = allResults.slice(skipNum, skipNum + limitNum);
+
+        res.status(200).json({
+            data: paginatedResults,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('Get Exam Reports Error:', err);
         res.status(500).json({ message: 'Failed to fetch exam reports' });
@@ -604,10 +616,13 @@ const getExamReports = async (req, res) => {
  */
 const getStudentWiseReports = async (req, res) => {
     try {
-        const { board, std, medium, stream } = req.query;
+        const { board, std, medium, stream, skip = 0, limit = 10 } = req.query;
         const ExamResult = require('../models/ExamResult');
         const FiveMinTestResult = require('../models/FiveMinTestResult');
         const OneLinerExamResult = require('../models/OneLinerExamResult');
+
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
 
         const models = [
             { model: ExamResult, type: 'REGULAR' },
@@ -705,7 +720,15 @@ const getStudentWiseReports = async (req, res) => {
             return g;
         }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-        res.status(200).json(finalResults);
+        const total = finalResults.length;
+        const paginatedResults = finalResults.slice(skipNum, skipNum + limitNum);
+
+        res.status(200).json({
+            data: paginatedResults,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('Get Student Wise Reports Error:', err);
         res.status(500).json({ message: 'Failed to fetch student wise reports' });

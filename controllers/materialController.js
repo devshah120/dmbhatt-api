@@ -166,9 +166,9 @@ exports.uploadImageMaterial = async (req, res) => {
 
 exports.getAllMaterials = async (req, res) => {
     try {
-        const { type, standard, std, medium, board, stream, subject, year } = req.query;
+        const { type, standard, std, medium, board, stream, subject, year, skip = 0, limit = 10 } = req.query;
         let filter = { isDeleted: { $ne: true } };
-        
+
         if (type) filter.type = type;
         if (standard || std) filter.standard = standard || std;
         if (medium) filter.medium = medium;
@@ -177,11 +177,25 @@ exports.getAllMaterials = async (req, res) => {
         if (subject) filter.subject = subject;
         if (year) filter.year = year;
 
-        const materials = await Material.find(filter)
-            .populate('createdBy', 'firstName email phoneNum')
-            .populate('updatedBy', 'firstName email phoneNum')
-            .sort({ createdAt: -1 });    
-        res.status(200).json(materials);
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
+
+        const [materials, total] = await Promise.all([
+            Material.find(filter)
+                .populate('createdBy', 'firstName email phoneNum')
+                .populate('updatedBy', 'firstName email phoneNum')
+                .sort({ createdAt: -1 })
+                .skip(skipNum)
+                .limit(limitNum),
+            Material.countDocuments(filter)
+        ]);
+
+        res.status(200).json({
+            data: materials,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (error) {
         console.error('Error fetching materials:', error);
         res.status(500).json({ message: 'Server error', error: error.message });

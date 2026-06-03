@@ -161,7 +161,7 @@ const createTest = async (req, res) => {
 
 const getAllTests = async (req, res) => {
     try {
-        const { std, medium, board, stream, subject } = req.query;
+        const { std, medium, board, stream, subject, skip = 0, limit = 10 } = req.query;
         let query = {};
         if (std) query.std = std;
         if (medium) query.medium = medium;
@@ -169,8 +169,23 @@ const getAllTests = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const tests = await FiveMinTest.find(query).sort({ createdAt: -1 });
-        res.status(200).json(tests);
+        const skipNum = parseInt(skip) || 0;
+        const limitNum = parseInt(limit) || 10;
+
+        const [tests, total] = await Promise.all([
+            FiveMinTest.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skipNum)
+                .limit(limitNum),
+            FiveMinTest.countDocuments(query)
+        ]);
+
+        res.status(200).json({
+            data: tests,
+            total: total,
+            skip: skipNum,
+            limit: limitNum
+        });
     } catch (err) {
         console.error('Get All 5 Min Tests Error:', err);
         res.status(500).json({ message: 'Failed to fetch tests', error: err.message });
