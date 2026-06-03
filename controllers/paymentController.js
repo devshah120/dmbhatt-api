@@ -202,24 +202,22 @@ exports.verifyUpgradePayment = async (req, res) => {
 // ============================================================
 
 const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
-const APPLE_VERIFY_RECEIPT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_APP_SHARED_SECRET = process.env.APPLE_APP_SHARED_SECRET || '';
 
 /**
- * Verify Apple receipt with Apple servers
- * Auto-retries with sandbox if production returns status 21007
+ * Verify Apple receipt with Apple servers (Sandbox only)
  */
 const verifyAppleReceipt = async (receiptData) => {
-    const verifyWithUrl = async (url) => {
-        const payload = {
-            'receipt-data': receiptData
-        };
+    const payload = {
+        'receipt-data': receiptData
+    };
 
-        if (APPLE_APP_SHARED_SECRET) {
-            payload['password'] = APPLE_APP_SHARED_SECRET;
-        }
+    if (APPLE_APP_SHARED_SECRET) {
+        payload['password'] = APPLE_APP_SHARED_SECRET;
+    }
 
-        const response = await fetch(url, {
+    try {
+        const response = await fetch(APPLE_VERIFY_RECEIPT_SANDBOX, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -230,19 +228,6 @@ const verifyAppleReceipt = async (receiptData) => {
         }
 
         return response.json();
-    };
-
-    try {
-        // Try production first
-        let result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_PRODUCTION);
-
-        // If status 21007 — receipt is from sandbox, retry with sandbox URL
-        if (result.status === 21007) {
-            console.log('Receipt is from sandbox, retrying with sandbox URL');
-            result = await verifyWithUrl(APPLE_VERIFY_RECEIPT_SANDBOX);
-        }
-
-        return result;
     } catch (error) {
         console.error('Apple receipt verification error:', error.message);
         throw error;
