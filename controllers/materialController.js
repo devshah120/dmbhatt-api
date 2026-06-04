@@ -171,7 +171,18 @@ exports.getAllMaterials = async (req, res) => {
 
         if (type) filter.type = type;
         if (standard || std) filter.standard = standard || std;
-        if (medium) filter.medium = medium;
+
+        // If medium is not provided explicitly, use the logged-in user's medium
+        let userMedium = medium;
+        if (!userMedium && req.user) {
+            const StudentProfile = require('../models/StudentProfile');
+            const profile = await StudentProfile.findOne({ userId: req.user._id });
+            if (profile) {
+                userMedium = profile.medium;
+            }
+        }
+        if (userMedium) filter.medium = userMedium;
+
         if (board) filter.board = board;
         if (stream && stream !== 'None' && stream !== '-') filter.stream = stream;
         if (subject) filter.subject = subject;
