@@ -43,6 +43,7 @@ const getProfile = async (req, res) => {
                 role: user.role,
                 address: user.address,
                 isPaid: user.isPaid,
+                dob: user.dob,
             },
             examCounts: examCounts,
             profile: profile || {}
@@ -62,11 +63,12 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const user = req.user;
-        const { firstName, phoneNum, email, school, city, state, std, stream, medium, board, schoolName, parentPhone } = req.body;
+        const { firstName, phoneNum, email, school, city, state, std, stream, medium, board, schoolName, parentPhone, dob } = req.body;
 
         if (firstName) user.firstName = firstName;
         if (phoneNum) user.phoneNum = phoneNum;
         if (email) user.email = email;
+        if (dob) user.dob = dob;
 
         if (req.files && req.files['photo'] && req.files['photo'][0]) {
             user.photoPath = req.files['photo'][0].path;

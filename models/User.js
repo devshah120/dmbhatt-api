@@ -32,6 +32,9 @@ const userSchema = new mongoose.Schema({
     photoPath: {
         type: String // For student and guest
     },
+    dob: {
+        type: Date
+    },
     address: {
         street: String,
         city: String,

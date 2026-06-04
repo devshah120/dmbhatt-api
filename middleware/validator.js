@@ -16,6 +16,10 @@ const registrationValidation = [
         .notEmpty().withMessage('Phone number is required')
         .isMobilePhone().withMessage('Invalid phone number'),
 
+    body('dob')
+        .optional()
+        .isISO8601().withMessage('Date of Birth must be a valid ISO 8601 date'),
+
     // Admin-specific validation
     body('name').if(body('role').isIn(['admin', 'super admin']))
         .notEmpty().withMessage('Name is required for admin'),

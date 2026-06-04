@@ -109,8 +109,8 @@ const registerAdmin = async (req, session) => {
  */
 const registerStudent = async (req, session) => {
     let appliedRedeemCode = null;
-    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state } = req.body;
-    console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum}), City: ${city}, State: ${state}`);
+    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state, dob } = req.body;
+    console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum}), City: ${city}, State: ${state}, DOB: ${dob}`);
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
@@ -206,6 +206,7 @@ const registerStudent = async (req, session) => {
         existingUser.photoPath = req.files?.photo?.[0]?.path || existingUser.photoPath;
         if (referrerId) existingUser.referredBy = referrerId;
         if (razorpay_payment_id) existingUser.isPaid = true;
+        if (dob) existingUser.dob = dob;
         
         // Update city and state in address
         if (city || state) {
@@ -226,6 +227,7 @@ const registerStudent = async (req, session) => {
             photoPath: req.files?.photo?.[0]?.path || '',
             referredBy: referrerId,
             isPaid: !!razorpay_payment_id,
+            dob: dob || null,
             address: {
                 city: city || '',
                 state: state || ''
