@@ -14,7 +14,7 @@ const createExam = async (req, res) => {
 
 const getAllExams = async (req, res) => {
     try {
-        const { std, medium, board, stream, subject, skip = 0, limit = 10 } = req.query;
+        const { std, medium, board, stream, subject } = req.query;
         let query = {};
         if (std) query.std = std;
         if (medium) query.medium = medium;
@@ -22,16 +22,8 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const skipNum = parseInt(skip) || 0;
-        const limitNum = parseInt(limit) || 10;
-
-        const [exams, total] = await Promise.all([
-            OneLinerExam.find(query)
-                .sort({ createdAt: -1 })
-                .skip(skipNum)
-                .limit(limitNum),
-            OneLinerExam.countDocuments(query)
-        ]);
+        const exams = await OneLinerExam.find(query)
+            .sort({ createdAt: -1 });
 
         // Ensure totalMarks is explicitly included for older records
         const processedExams = exams.map(exam => {
@@ -42,12 +34,7 @@ const getAllExams = async (req, res) => {
             return obj;
         });
 
-        res.status(200).json({
-            data: processedExams,
-            total: total,
-            skip: skipNum,
-            limit: limitNum
-        });
+        res.status(200).json(processedExams);
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

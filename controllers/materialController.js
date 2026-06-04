@@ -180,22 +180,12 @@ exports.getAllMaterials = async (req, res) => {
         const skipNum = parseInt(skip) || 0;
         const limitNum = parseInt(limit) || 10;
 
-        const [materials, total] = await Promise.all([
-            Material.find(filter)
-                .populate('createdBy', 'firstName email phoneNum')
-                .populate('updatedBy', 'firstName email phoneNum')
-                .sort({ createdAt: -1 })
-                .skip(skipNum)
-                .limit(limitNum),
-            Material.countDocuments(filter)
-        ]);
+        const materials = await Material.find(filter)
+            .populate('createdBy', 'firstName email phoneNum')
+            .populate('updatedBy', 'firstName email phoneNum')
+            .sort({ createdAt: -1 });
 
-        res.status(200).json({
-            data: materials,
-            total: total,
-            skip: skipNum,
-            limit: limitNum
-        });
+        res.status(200).json(materials);
     } catch (error) {
         console.error('Error fetching materials:', error);
         res.status(500).json({ message: 'Server error', error: error.message });

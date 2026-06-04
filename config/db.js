@@ -1,17 +1,28 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 require('dotenv').config();
+
+// Configure DNS to use Google DNS (8.8.8.8) to resolve MongoDB Atlas
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 const connectDB = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URI, {
-            // These options are now default in Mongoose 6+
-            // useNewUrlParser: true,
-            // useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 10000,
+            socketTimeoutMS: 45000,
+            retryWrites: true,
+            w: 'majority',
+            maxPoolSize: 10,
+            minPoolSize: 5,
         });
-        console.log('Connected to MongoDB');
+        console.log('✓ Connected to MongoDB');
     } catch (err) {
-        console.error('Database Connection Failed!', err);
-        process.exit(1);
+        console.error('✗ Database Connection Failed!', err.message);
+        console.error('  MongoDB URI:', process.env.MONGODB_URI);
+
+        // Retry connection after 5 seconds
+        console.log('  Retrying connection in 5 seconds...');
+        setTimeout(connectDB, 5000);
     }
 };
 

@@ -73,44 +73,35 @@ const createStudent = async (req, res) => {
 
 const getStudents = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 50;
-        const skip = (page - 1) * limit;
-
         const StudentProfile = require('../models/StudentProfile');
-        const [students, total] = await Promise.all([
-            StudentProfile.aggregate([
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: '$user' },
-                {
-                    $project: {
-                        _id: 1,
-                        userId: 1,
-                        firstName: '$user.firstName',
-                        email: '$user.email',
-                        phoneNum: '$user.phoneNum',
-                        std: 1,
-                        medium: 1,
-                        stream: 1,
-                        totalRewardPoints: 1,
-                        createdAt: 1
-                    }
-                },
-                { $sort: { createdAt: -1 } },
-                { $skip: skip },
-                { $limit: limit }
-            ]),
-            StudentProfile.countDocuments()
+        const students = await StudentProfile.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $project: {
+                    _id: 1,
+                    userId: 1,
+                    firstName: '$user.firstName',
+                    email: '$user.email',
+                    phoneNum: '$user.phoneNum',
+                    std: 1,
+                    medium: 1,
+                    stream: 1,
+                    totalRewardPoints: 1,
+                    createdAt: 1
+                }
+            },
+            { $sort: { createdAt: -1 } }
         ]);
 
-        res.status(200).json({ students, total, page, totalPages: Math.ceil(total / limit) });
+        res.status(200).json(students);
     } catch (err) {
         console.error('Get Students Error:', err);
         res.status(500).json({ message: 'Failed to fetch students' });
@@ -737,53 +728,44 @@ const deleteChapter = async (req, res) => {
 
 const getPayments = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
-
-        const [payments, total] = await Promise.all([
-            Payment.aggregate([
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-                {
-                    $lookup: {
-                        from: 'studentprofiles',
-                        localField: 'userId',
-                        foreignField: 'userId',
-                        as: 'profile'
-                    }
-                },
-                { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
-                {
-                    $project: {
-                        _id: 1,
-                        amount: 1,
-                        currency: 1,
-                        status: 1,
-                        razorpayOrderId: 1,
-                        razorpayPaymentId: 1,
-                        createdAt: 1,
-                        studentName: '$user.firstName',
-                        studentPhone: '$user.phoneNum',
-                        standard: '$profile.std',
-                        medium: '$profile.medium'
-                    }
-                },
-                { $sort: { createdAt: -1 } },
-                { $skip: skip },
-                { $limit: limit }
-            ]),
-            Payment.countDocuments()
+        const payments = await Payment.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'studentprofiles',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'profile'
+                }
+            },
+            { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    amount: 1,
+                    currency: 1,
+                    status: 1,
+                    razorpayOrderId: 1,
+                    razorpayPaymentId: 1,
+                    createdAt: 1,
+                    studentName: '$user.firstName',
+                    studentPhone: '$user.phoneNum',
+                    standard: '$profile.std',
+                    medium: '$profile.medium'
+                }
+            },
+            { $sort: { createdAt: -1 } }
         ]);
 
-        res.status(200).json({ payments, total, page, totalPages: Math.ceil(total / limit) });
+        res.status(200).json(payments);
     } catch (err) {
         console.error('Get Payments Error:', err);
         res.status(500).json({ message: 'Failed to fetch payments' });
@@ -792,51 +774,42 @@ const getPayments = async (req, res) => {
 
 const getProductPurchases = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
-
-        const [purchases, total] = await Promise.all([
-            ProductPurchase.aggregate([
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-                {
-                    $lookup: {
-                        from: 'exploreproducts',
-                        localField: 'productId',
-                        foreignField: '_id',
-                        as: 'product'
-                    }
-                },
-                { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
-                {
-                    $project: {
-                        _id: 1,
-                        amount: 1,
-                        razorpayOrderId: 1,
-                        razorpayPaymentId: 1,
-                        createdAt: 1,
-                        studentName: '$user.firstName',
-                        studentPhone: '$user.phoneNum',
-                        productName: '$product.name',
-                        productCategory: '$product.category'
-                    }
-                },
-                { $sort: { createdAt: -1 } },
-                { $skip: skip },
-                { $limit: limit }
-            ]),
-            ProductPurchase.countDocuments()
+        const purchases = await ProductPurchase.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'exploreproducts',
+                    localField: 'productId',
+                    foreignField: '_id',
+                    as: 'product'
+                }
+            },
+            { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    amount: 1,
+                    razorpayOrderId: 1,
+                    razorpayPaymentId: 1,
+                    createdAt: 1,
+                    studentName: '$user.firstName',
+                    studentPhone: '$user.phoneNum',
+                    productName: '$product.name',
+                    productCategory: '$product.category'
+                }
+            },
+            { $sort: { createdAt: -1 } }
         ]);
 
-        res.status(200).json({ purchases, total, page, totalPages: Math.ceil(total / limit) });
+        res.status(200).json(purchases);
     } catch (err) {
         console.error('Get Product Purchases Error:', err);
         res.status(500).json({ message: 'Failed to fetch product purchases' });
@@ -845,10 +818,6 @@ const getProductPurchases = async (req, res) => {
 
 const getPlanUpgrades = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
-
         // 1. Get all Product Payment IDs to exclude them from general payments
         const productPaymentIds = await ProductPurchase.distinct('razorpayPaymentId');
 
@@ -924,10 +893,7 @@ const getPlanUpgrades = async (req, res) => {
         let combined = [...initialPayments, ...upgrades];
         combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        const total = combined.length;
-        const pagedData = combined.slice(skip, skip + limit);
-
-        res.status(200).json({ upgrades: pagedData, total, page, totalPages: Math.ceil(total / limit) });
+        res.status(200).json(combined);
     } catch (err) {
         console.error('Get Plan Upgrades Error:', err);
         res.status(500).json({ message: 'Failed to fetch plan purchases' });
@@ -1244,30 +1210,17 @@ const deleteProduct = async (req, res) => {
 const getLogs = async (req, res) => {
     try {
         const ActivityLog = require('../models/ActivityLog');
-        const { entityType, skip = 0, limit = 10 } = req.query;
-
-        const skipNum = parseInt(skip) || 0;
-        const limitNum = parseInt(limit) || 10;
+        const { entityType } = req.query;
 
         const filter = {};
         if (entityType) {
             filter.entityType = entityType;
         }
 
-        const [logs, total] = await Promise.all([
-            ActivityLog.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skipNum)
-                .limit(limitNum),
-            ActivityLog.countDocuments(filter)
-        ]);
+        const logs = await ActivityLog.find(filter)
+            .sort({ createdAt: -1 });
 
-        res.status(200).json({
-            data: logs,
-            total: total,
-            skip: skipNum,
-            limit: limitNum
-        });
+        res.status(200).json(logs);
     } catch (err) {
         console.error('Get Logs Error:', err);
         res.status(500).json({ message: 'Failed to fetch logs' });
