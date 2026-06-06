@@ -1233,9 +1233,15 @@ const getLogs = async (req, res) => {
 
 const sendPushNotification = async (req, res) => {
     try {
-        const { title, body } = req.body;
+        const { title, body, std } = req.body;
         if (!title || !body) {
             return res.status(400).json({ message: 'Title and body are required' });
+        }
+
+        // Determine topic based on std filter
+        let topic = 'all';
+        if (std && std !== 'all') {
+            topic = `std_${std}`;
         }
 
         // Send to FCM (V1 API via SDK)
@@ -1244,7 +1250,7 @@ const sendPushNotification = async (req, res) => {
                 title: title,
                 body: body
             },
-            topic: 'all', // Target all students
+            topic: topic,
             android: {
                 notification: {
                     sound: 'default',
@@ -1260,10 +1266,11 @@ const sendPushNotification = async (req, res) => {
         const response = await admin.messaging().send(message);
 
         // Log Activity
+        const targetDesc = std && std !== 'all' ? `Standard ${std}` : 'All Students';
         await ActivityLog.create({
             entityType: 'System',
             action: 'Updated',
-            targetName: `Push Notification: ${title}`,
+            targetName: `Push Notification (${targetDesc}): ${title}`,
             performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
             performedByImg: req.performedByImg || req.query.performedByImg || ''
         });
