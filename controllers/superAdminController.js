@@ -1299,7 +1299,7 @@ const scheduleNotification = async (req, res) => {
 
         await ActivityLog.create({
             entityType: 'System',
-            action: 'Created',
+            action: 'Added',
             targetName: `Scheduled Push Notification: ${title}`,
             performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
             performedByImg: req.performedByImg || req.query.performedByImg || ''
