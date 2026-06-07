@@ -1291,18 +1291,20 @@ const scheduleNotification = async (req, res) => {
 
         const ScheduledNotification = require('../models/ScheduledNotification');
 
-        // Frontend sends time as YYYY-MM-DDTHH:mm in local time
-        // We need to convert it to UTC timestamp while preserving the local time
-        // by adjusting for the timezone offset
+        // Frontend sends time as YYYY-MM-DDTHH:mm in IST (local browser time)
+        // JavaScript automatically treats this as UTC, so we need to offset it back
+        // IST is UTC+5:30, so we subtract 5.5 hours to get the actual UTC time
         const dateTime = new Date(scheduledTime);
-        const timezoneOffset = dateTime.getTimezoneOffset() * 60000; // Convert to milliseconds
-        const localTime = new Date(dateTime.getTime() + timezoneOffset);
+
+        // Offset: IST is UTC+5:30, so subtract 5:30 hours (5.5 * 60 * 60 * 1000 ms)
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const utcTime = new Date(dateTime.getTime() - istOffset);
 
         const notification = await ScheduledNotification.create({
             title,
             body,
             std: std || 'all',
-            scheduledTime: localTime
+            scheduledTime: utcTime
         });
 
         await ActivityLog.create({
