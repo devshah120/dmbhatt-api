@@ -52,6 +52,13 @@ router.post('/config/:type', ctrl.saveConfig);
 
 // Push Notifications
 router.post('/push-notifications', ctrl.sendPushNotification);
+router.post('/push-notifications/schedule', ctrl.scheduleNotification);
+router.get('/scheduled-notifications', ctrl.getScheduledNotifications);
+router.delete('/scheduled-notifications/:id', ctrl.deleteScheduledNotification);
+
+// Birthday Notifications
+router.get('/config/birthday-notification', ctrl.getBirthdayNotificationConfig);
+router.post('/config/birthday-notification', ctrl.saveBirthdayNotificationConfig);
 
 // Logs
 router.get('/logs', ctrl.getLogs);

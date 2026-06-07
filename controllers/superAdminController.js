@@ -1282,6 +1282,126 @@ const sendPushNotification = async (req, res) => {
     }
 };
 
+const scheduleNotification = async (req, res) => {
+    try {
+        const { title, body, std, scheduledTime } = req.body;
+        if (!title || !body || !scheduledTime) {
+            return res.status(400).json({ message: 'Title, body, and scheduled time are required' });
+        }
+
+        const ScheduledNotification = require('../models/ScheduledNotification');
+        const notification = await ScheduledNotification.create({
+            title,
+            body,
+            std: std || 'all',
+            scheduledTime: new Date(scheduledTime)
+        });
+
+        await ActivityLog.create({
+            entityType: 'System',
+            action: 'Created',
+            targetName: `Scheduled Push Notification: ${title}`,
+            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || ''
+        });
+
+        res.status(201).json({ message: 'Notification scheduled successfully', notification });
+    } catch (err) {
+        console.error('Schedule Notification Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to schedule notification' });
+    }
+};
+
+const getBirthdayNotificationConfig = async (req, res) => {
+    try {
+        const BirthdayNotificationConfig = require('../models/BirthdayNotificationConfig');
+        let config = await BirthdayNotificationConfig.findOne();
+        if (!config) {
+            config = await BirthdayNotificationConfig.create({});
+        }
+        res.status(200).json(config);
+    } catch (err) {
+        console.error('Get Birthday Config Error:', err);
+        res.status(500).json({ message: 'Failed to fetch birthday configuration' });
+    }
+};
+
+const saveBirthdayNotificationConfig = async (req, res) => {
+    try {
+        const BirthdayNotificationConfig = require('../models/BirthdayNotificationConfig');
+        let config = await BirthdayNotificationConfig.findOne();
+        if (!config) {
+            config = new BirthdayNotificationConfig(req.body);
+        } else {
+            Object.assign(config, req.body);
+        }
+        config.updatedAt = new Date();
+        await config.save();
+
+        await ActivityLog.create({
+            entityType: 'System',
+            action: 'Updated',
+            targetName: 'Birthday Notification Configuration',
+            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || ''
+        });
+
+        res.status(200).json({ message: 'Birthday configuration saved successfully', config });
+    } catch (err) {
+        console.error('Save Birthday Config Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to save birthday configuration' });
+    }
+};
+
+const getScheduledNotifications = async (req, res) => {
+    try {
+        const ScheduledNotification = require('../models/ScheduledNotification');
+        const { skip = 0, limit = 25, status } = req.query;
+
+        const query = {};
+        if (status && status !== 'all') {
+            query.status = status;
+        }
+
+        const data = await ScheduledNotification.find(query)
+            .sort({ scheduledTime: -1 })
+            .skip(parseInt(skip))
+            .limit(parseInt(limit));
+
+        const total = await ScheduledNotification.countDocuments(query);
+
+        res.status(200).json({ data, total });
+    } catch (err) {
+        console.error('Get Scheduled Notifications Error:', err);
+        res.status(500).json({ message: 'Failed to fetch scheduled notifications' });
+    }
+};
+
+const deleteScheduledNotification = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ScheduledNotification = require('../models/ScheduledNotification');
+
+        const notification = await ScheduledNotification.findByIdAndDelete(id);
+        if (!notification) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+
+        await ActivityLog.create({
+            entityType: 'System',
+            action: 'Deleted',
+            targetName: `Scheduled Notification: ${notification.title}`,
+            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || ''
+        });
+
+        res.status(200).json({ message: 'Notification deleted successfully' });
+    } catch (err) {
+        console.error('Delete Scheduled Notification Error:', err);
+        res.status(500).json({ message: 'Failed to delete notification' });
+    }
+};
+
 module.exports = {
     // Standards
     getStandards,
@@ -1327,5 +1447,10 @@ module.exports = {
     // Logs
     getLogs,
     // Push Notifications
-    sendPushNotification
+    sendPushNotification,
+    scheduleNotification,
+    getScheduledNotifications,
+    deleteScheduledNotification,
+    getBirthdayNotificationConfig,
+    saveBirthdayNotificationConfig
 };
