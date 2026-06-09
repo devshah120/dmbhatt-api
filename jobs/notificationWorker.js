@@ -136,27 +136,31 @@ const processBirthdayNotifications = async () => {
         const hour = now.getHours();
         const minute = now.getMinutes();
 
-        // Check if current time is within the 11:40 PM slot (between 23:40 and 23:59)
-        const is9AMWindow = hour === 23 && minute >= 40;
+        // Check if current time is within the notification window (23:30 - 23:59 by default)
+        // This is wider than the original 20-minute window to increase reliability
+        const notificationHour = parseInt(process.env.BIRTHDAY_NOTIFICATION_HOUR) || 23;
+        const notificationStartMinute = parseInt(process.env.BIRTHDAY_NOTIFICATION_START_MINUTE) || 30;
 
-        if (!is9AMWindow) {
+        const isNotificationWindow = hour === notificationHour && minute >= notificationStartMinute;
+
+        if (!isNotificationWindow) {
             return;
         }
 
-        // Check if we already processed birthdays in this hour to avoid duplicate sends
+        // Check if we already processed birthdays today to avoid duplicate sends
         if (lastBirthdayCheckTime) {
-            const lastCheckHour = lastBirthdayCheckTime.getHours();
             const lastCheckDate = lastBirthdayCheckTime.toDateString();
             const currentDate = now.toDateString();
 
-            if (lastCheckDate === currentDate && lastCheckHour === hour) {
-                return; // Already processed for this hour
+            if (lastCheckDate === currentDate) {
+                console.log(`[${now.toISOString()}] Birthday notifications already processed for today`);
+                return; // Already processed today
             }
         }
 
         lastBirthdayCheckTime = now;
 
-        console.log(`[${now.toISOString()}] Processing birthday notifications at 9 AM...`);
+        console.log(`[${now.toISOString()}] Processing birthday notifications...`);
 
         // Get today's date (month-day for birthday comparison)
         const today = new Date();
@@ -171,7 +175,7 @@ const processBirthdayNotifications = async () => {
             _id: { $in: userIds },
             dob: { $exists: true, $ne: null },
             isActive: true
-        });
+        }).lean();
 
         const todayBirthdays = birthdayStudents.filter(user => {
             if (!user.dob) return false;
@@ -187,8 +191,12 @@ const processBirthdayNotifications = async () => {
         console.log(`[${now.toISOString()}] Found ${todayBirthdays.length} birthday(s) to notify`);
 
         // Send notifications and emails
+        const notificationResults = { success: 0, failed: 0 };
         for (const student of todayBirthdays) {
             try {
+                let notificationSent = false;
+                let emailSent = false;
+
                 // Send push notification
                 if (config.enableBirthdayNotification && config.birthdayNotificationTitle && config.birthdayNotificationBody) {
                     const title = config.birthdayNotificationTitle;
@@ -208,7 +216,8 @@ const processBirthdayNotifications = async () => {
 
                     try {
                         const response = await admin.messaging().send(message);
-                        console.log(`✓ Birthday notification sent to ${student.firstName} (${student._id})`);
+                        console.log(`✓ Birthday notification sent to ${student.firstName} (${student._id}) | FCM: ${response}`);
+                        notificationSent = true;
                     } catch (pushErr) {
                         console.error(`✗ Failed to send push notification to ${student.firstName}:`, pushErr.message);
                     }
@@ -231,15 +240,28 @@ const processBirthdayNotifications = async () => {
 
                             await transporter.sendMail(mailOptions);
                             console.log(`✓ Birthday email sent to ${student.firstName} (${student.email})`);
+                            emailSent = true;
+                        } else {
+                            console.warn(`⚠ SMTP not configured - skipping email for ${student.firstName}`);
                         }
                     } catch (emailErr) {
                         console.error(`✗ Failed to send email to ${student.firstName}:`, emailErr.message);
                     }
                 }
+
+                // Count as success if at least one notification method worked
+                if (notificationSent || emailSent || (!config.enableBirthdayNotification && !config.enableBirthdayEmail)) {
+                    notificationResults.success++;
+                } else {
+                    notificationResults.failed++;
+                }
             } catch (err) {
                 console.error(`✗ Error processing birthday for ${student.firstName}:`, err.message);
+                notificationResults.failed++;
             }
         }
+
+        console.log(`[${now.toISOString()}] Birthday notification summary - Success: ${notificationResults.success}, Failed: ${notificationResults.failed}`);
     } catch (err) {
         console.error('Error in birthday notification processor:', err);
     }
@@ -248,7 +270,12 @@ const processBirthdayNotifications = async () => {
 const startWorker = (intervalMs = 60000) => {
     initializeFirebase();
 
+    const notificationHour = parseInt(process.env.BIRTHDAY_NOTIFICATION_HOUR) || 23;
+    const notificationStartMinute = parseInt(process.env.BIRTHDAY_NOTIFICATION_START_MINUTE) || 30;
+
     console.log(`Starting notification worker (checking every ${intervalMs}ms)...`);
+    console.log(`⏰ Birthday notification window: ${notificationHour}:${String(notificationStartMinute).padStart(2, '0')} - ${notificationHour}:59 (IST)`);
+    console.log(`   To customize, set BIRTHDAY_NOTIFICATION_HOUR and BIRTHDAY_NOTIFICATION_START_MINUTE env vars`);
 
     // Run immediately on start
     processScheduledNotifications();

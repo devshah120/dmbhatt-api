@@ -25,6 +25,27 @@ const birthdayNotificationConfigSchema = new mongoose.Schema({
         type: String,
         default: '<h1>Happy Birthday {{studentName}}!</h1><p>Wishing you a wonderful day filled with joy and celebrations!</p>'
     },
+    // SMTP Configuration for Email
+    emailHost: {
+        type: String,
+        default: 'mail.bondbyte.in'
+    },
+    emailPort: {
+        type: Number,
+        default: 587
+    },
+    emailUser: {
+        type: String,
+        default: 'support@bondbyte.in'
+    },
+    emailPassword: {
+        type: String,
+        default: ''
+    },
+    emailFromName: {
+        type: String,
+        default: 'Padhaku'
+    },
     updatedAt: {
         type: Date,
         default: Date.now
