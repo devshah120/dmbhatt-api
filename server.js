@@ -2,12 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const { optionalProtect } = require('./middleware/authMiddleware');
+const { startWorker } = require('./jobs/notificationWorker');
 require('dotenv').config();
 
 const app = express();
 
 // Connect to MongoDB
 connectDB();
+
+// Start notification worker (checks every 60 seconds by default)
+startWorker(parseInt(process.env.NOTIFICATION_CHECK_INTERVAL) || 60000);
 
 // Middleware
 app.use(cors());

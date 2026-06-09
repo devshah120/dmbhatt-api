@@ -23,7 +23,8 @@ const scheduledNotificationSchema = new mongoose.Schema({
         default: 'pending'
     },
     sentAt: Date,
-    error: String,
+    errorMessage: String,
+    fcmMessageId: String,
     createdAt: {
         type: Date,
         default: Date.now
