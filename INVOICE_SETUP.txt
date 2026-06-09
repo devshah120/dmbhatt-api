@@ -1,0 +1,123 @@
+═══════════════════════════════════════════════════════════════
+                    INVOICE SYSTEM SETUP
+═══════════════════════════════════════════════════════════════
+
+✅ DONE: PDF Template copied to config folder
+
+Location: dmbhatt-api/config/invoice-template.pdf
+Size: 74 KB
+Status: Ready to use
+
+═══════════════════════════════════════════════════════════════
+                    FOLDER STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+dmbhatt-api/
+├── config/
+│   └── invoice-template.pdf          ← Your PDF template
+├── uploads/
+│   └── invoices/                     ← Generated invoices (auto-created)
+├── utils/
+│   └── invoiceGenerator.js           ← PDF generation logic
+├── models/
+│   └── Invoice.js                    ← Invoice database schema
+├── controllers/
+│   ├── paymentController.js          ← Auto-invokes invoice on payment
+│   └── invoiceController.js          ← Invoice API endpoints
+└── routes/
+    └── invoiceRoutes.js              ← Invoice routes
+
+═══════════════════════════════════════════════════════════════
+                    HOW IT WORKS
+═══════════════════════════════════════════════════════════════
+
+1. Student makes purchase
+   ↓
+2. Payment verified via Razorpay
+   ↓
+3. invoiceGenerator.js creates PDF with:
+   - Student name, email, phone
+   - Product/service description
+   - Amount and invoice number
+   ↓
+4. PDF saved to: uploads/invoices/invoice_xxx_timestamp.pdf
+   ↓
+5. Record saved to MongoDB (invoices collection)
+   ↓
+6. Invoice emailed to student via SMTP
+   ↓
+7. Email status updated in database
+
+═══════════════════════════════════════════════════════════════
+                    INVOICE FIELDS
+═══════════════════════════════════════════════════════════════
+
+Invoice includes these fields:
+
+Header:
+  - Logo "PADHAKU DESK"
+  - Invoice title
+  - Date (from transaction date)
+
+FROM section:
+  - PADHAKU DESK
+  - 409, Radhekishan Villa
+  - Above SBI Bank, Gowindvadi
+  - Isanpur
+
+BILL TO section:
+  - Student Name
+  - Student Email
+  - Student Phone
+
+Table:
+  - SL: 1
+  - Description: Product/Service name
+  - Amount: ₹ XXX.XX
+
+Total:
+  - ₹ XXX.XX
+
+Footer:
+  - Invoice Number (INV-2026-06-0001)
+  - Payment ID
+  - Generated date/time
+  - Thank you message
+
+═══════════════════════════════════════════════════════════════
+                    REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+✅ PDF template: config/invoice-template.pdf
+✅ Invoices folder: uploads/invoices/ (auto-created)
+✅ SMTP configured: NotificationConfig in MongoDB
+✅ PDFKit package: Already installed (pdfkit)
+
+═══════════════════════════════════════════════════════════════
+                    TESTING
+═══════════════════════════════════════════════════════════════
+
+1. Make a test purchase via the app
+2. Check response - should show invoice details
+3. Check email - student should receive invoice PDF
+4. Check database:
+   db.invoices.find()
+5. Check folder:
+   ls uploads/invoices/
+
+═══════════════════════════════════════════════════════════════
+                    IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════
+
+• PDF is generated dynamically on each purchase
+• Template PDF in config folder is for reference/backup
+• Invoices are customized with student data each time
+• All invoices stored in: uploads/invoices/
+• Invoice records tracked in MongoDB
+• Email sent automatically after invoice creation
+• If SMTP not configured, invoice still created but email won't send
+
+═══════════════════════════════════════════════════════════════
+
+Ready to deploy! Everything is configured and ready to go.
+Just restart the server and test with a purchase.

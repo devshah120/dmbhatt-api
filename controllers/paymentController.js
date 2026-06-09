@@ -1,11 +1,15 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const ProductPurchase = require('../models/ProductPurchase');
 const ExploreProduct = require('../models/ExploreProduct');
 const Payment = require('../models/Payment');
 const PlanUpgrade = require('../models/PlanUpgrade');
 const StudentProfile = require('../models/StudentProfile');
 const User = require('../models/User');
+const Invoice = require('../models/Invoice');
+const { generateInvoice } = require('../utils/invoiceGenerator');
+const NotificationConfig = require('../models/NotificationConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -30,6 +34,64 @@ const getRazorpayInstance = () => {
         key_id: config.razorpayKeyId,
         key_secret: config.razorpayKeySecret
     });
+};
+
+// Helper function to send invoice email
+const sendInvoiceEmail = async (user, invoiceData) => {
+    try {
+        const config = await NotificationConfig.findOne();
+
+        if (!config?.emailHost || !config?.emailUser || !config?.emailPassword) {
+            console.warn('⚠️ SMTP not configured - invoice email will not be sent');
+            return false;
+        }
+
+        const transporter = nodemailer.createTransport({
+            host: config.emailHost,
+            port: parseInt(config.emailPort) || 587,
+            secure: parseInt(config.emailPort) === 465,
+            auth: {
+                user: config.emailUser,
+                pass: config.emailPassword
+            }
+        });
+
+        const mailOptions = {
+            from: `"${config.emailFromName || 'Padhaku'}" <${config.emailUser}>`,
+            to: user.email,
+            subject: `Invoice #${invoiceData.invoiceNumber} - Padhaku Desk`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2>Invoice Confirmation</h2>
+                    <p>Dear ${user.firstName},</p>
+                    <p>Thank you for your purchase! Your invoice has been generated and is attached to this email.</p>
+                    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <p><strong>Invoice Details:</strong></p>
+                        <p>Invoice #: ${invoiceData.invoiceNumber}</p>
+                        <p>Description: ${invoiceData.description}</p>
+                        <p>Amount: ₹${invoiceData.amount.toFixed(2)}</p>
+                        <p>Payment ID: ${invoiceData.razorpayPaymentId}</p>
+                        <p>Date: ${new Date().toLocaleDateString('en-IN')}</p>
+                    </div>
+                    <p>If you have any questions, please contact our support team.</p>
+                    <p>Best regards,<br><strong>Padhaku Desk</strong></p>
+                </div>
+            `,
+            attachments: [
+                {
+                    filename: invoiceData.fileName,
+                    path: invoiceData.filePath
+                }
+            ]
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✓ Invoice email sent to ${user.email}`);
+        return true;
+    } catch (error) {
+        console.error(`✗ Failed to send invoice email:`, error.message);
+        return false;
+    }
 };
 
 exports.createProductOrder = async (req, res) => {
@@ -75,7 +137,15 @@ exports.verifyProductPayment = async (req, res) => {
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
 
-        // Save Payment record (optional but good for tracking)
+        // Get user and product details
+        const user = await User.findById(req.user.id);
+        const product = await ExploreProduct.findById(productId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Save Payment record
         const payment = new Payment({
             userId: req.user.id,
             razorpayOrderId: razorpay_order_id,
@@ -96,7 +166,70 @@ exports.verifyProductPayment = async (req, res) => {
         });
         await purchase.save();
 
-        res.status(200).json({ message: 'Payment verified and purchase recorded successfully', purchase });
+        // Generate Invoice
+        let invoiceRecord = null;
+        try {
+            const invoiceData = await generateInvoice({
+                invoiceNumber: `${Date.now()}`, // Temporary, will be replaced by model
+                date: new Date(),
+                studentName: user.firstName,
+                studentEmail: user.email,
+                studentPhone: user.phoneNum,
+                description: product ? product.name : 'Product Purchase',
+                amount: amount,
+                paymentId: razorpay_payment_id
+            });
+
+            // Save invoice record to database
+            invoiceRecord = new Invoice({
+                userId: req.user.id,
+                paymentType: 'product',
+                productId: productId,
+                description: product ? product.name : 'Product Purchase',
+                amount: amount,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpayOrderId: razorpay_order_id,
+                filePath: invoiceData.filepath,
+                fileName: invoiceData.filename
+            });
+            await invoiceRecord.save();
+
+            console.log(`✓ Invoice generated: ${invoiceRecord.invoiceNumber}`);
+
+            // Send invoice email
+            if (user.email) {
+                const emailSent = await sendInvoiceEmail(user, {
+                    invoiceNumber: invoiceRecord.invoiceNumber,
+                    description: invoiceRecord.description,
+                    amount: invoiceRecord.amount,
+                    razorpayPaymentId: razorpay_payment_id,
+                    fileName: invoiceData.filename,
+                    filePath: invoiceData.filepath
+                });
+
+                if (emailSent) {
+                    invoiceRecord.emailSent = true;
+                    invoiceRecord.emailSentAt = new Date();
+                    await invoiceRecord.save();
+                } else {
+                    invoiceRecord.emailSent = false;
+                    invoiceRecord.emailError = 'SMTP not configured';
+                    await invoiceRecord.save();
+                }
+            }
+        } catch (invoiceError) {
+            console.error('Invoice generation failed:', invoiceError.message);
+            // Continue with payment success even if invoice fails
+        }
+
+        res.status(200).json({
+            message: 'Payment verified and purchase recorded successfully',
+            purchase,
+            invoice: invoiceRecord ? {
+                invoiceNumber: invoiceRecord.invoiceNumber,
+                emailSent: invoiceRecord.emailSent
+            } : null
+        });
     } catch (error) {
         console.error('Error verifying product payment:', error);
         res.status(500).json({ message: 'Error verifying payment', error: error.message });
@@ -147,7 +280,8 @@ exports.verifyUpgradePayment = async (req, res) => {
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
 
-        // Find current standard
+        // Get user and find current standard
+        const user = await User.findById(req.user.id);
         const profile = await StudentProfile.findOne({ userId: req.user.id });
         const oldStandard = profile ? profile.std : 'Unknown';
 
@@ -171,10 +305,10 @@ exports.verifyUpgradePayment = async (req, res) => {
             const RedeemCode = require('../models/RedeemCode');
             await RedeemCode.findOneAndUpdate(
                 { code: req.body.redeemCode.toUpperCase() },
-                { 
-                    used: true, 
-                    usedBy: req.user.id, 
-                    usedAt: new Date() 
+                {
+                    used: true,
+                    usedBy: req.user.id,
+                    usedAt: new Date()
                 }
             );
         }
@@ -190,7 +324,64 @@ exports.verifyUpgradePayment = async (req, res) => {
         // Update User isPaid status
         await User.findByIdAndUpdate(req.user.id, { isPaid: true });
 
-        res.status(200).json({ message: 'Plan upgraded successfully', upgrade });
+        // Generate Invoice for subscription upgrade
+        let invoiceRecord = null;
+        try {
+            const description = `Plan Upgrade: ${oldStandard} → ${newStandard}`;
+            const invoiceData = await generateInvoice({
+                invoiceNumber: `${Date.now()}`,
+                date: new Date(),
+                studentName: user.firstName,
+                studentEmail: user.email,
+                studentPhone: user.phoneNum,
+                description: description,
+                amount: amount,
+                paymentId: razorpay_payment_id
+            });
+
+            invoiceRecord = new Invoice({
+                userId: req.user.id,
+                paymentType: 'subscription',
+                description: description,
+                amount: amount,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpayOrderId: razorpay_order_id,
+                filePath: invoiceData.filepath,
+                fileName: invoiceData.filename
+            });
+            await invoiceRecord.save();
+
+            console.log(`✓ Invoice generated: ${invoiceRecord.invoiceNumber}`);
+
+            // Send invoice email
+            if (user.email) {
+                const emailSent = await sendInvoiceEmail(user, {
+                    invoiceNumber: invoiceRecord.invoiceNumber,
+                    description: invoiceRecord.description,
+                    amount: invoiceRecord.amount,
+                    razorpayPaymentId: razorpay_payment_id,
+                    fileName: invoiceData.filename,
+                    filePath: invoiceData.filepath
+                });
+
+                if (emailSent) {
+                    invoiceRecord.emailSent = true;
+                    invoiceRecord.emailSentAt = new Date();
+                    await invoiceRecord.save();
+                }
+            }
+        } catch (invoiceError) {
+            console.error('Invoice generation failed:', invoiceError.message);
+        }
+
+        res.status(200).json({
+            message: 'Plan upgraded successfully',
+            upgrade,
+            invoice: invoiceRecord ? {
+                invoiceNumber: invoiceRecord.invoiceNumber,
+                emailSent: invoiceRecord.emailSent
+            } : null
+        });
     } catch (error) {
         console.error('Error verifying upgrade payment:', error);
         res.status(500).json({ message: 'Error verifying payment', error: error.message });

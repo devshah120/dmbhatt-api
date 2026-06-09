@@ -60,6 +60,8 @@ const superAdminRoutes = require('./routes/superAdminRoutes');
 app.use('/api/superadmin', superAdminRoutes);
 const redeemRoutes = require('./routes/redeemRoutes');
 app.use('/api/redeem', redeemRoutes);
+const invoiceRoutes = require('./routes/invoiceRoutes');
+app.use('/api/invoice', invoiceRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
