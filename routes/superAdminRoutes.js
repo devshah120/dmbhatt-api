@@ -46,7 +46,7 @@ router.get('/payments', ctrl.getPayments);
 router.get('/product-purchases', ctrl.getProductPurchases);
 router.get('/plan-upgrades', ctrl.getPlanUpgrades);
 
-// Config
+// Config - Generic for any type (notification, payment, app, etc.)
 router.get('/config/:type', ctrl.getConfig);
 router.post('/config/:type', ctrl.saveConfig);
 

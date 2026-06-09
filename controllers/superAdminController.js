@@ -28,6 +28,7 @@ const PlanUpgrade = require('../models/PlanUpgrade');
 const User = require('../models/User');
 const ExploreProduct = require('../models/ExploreProduct');
 const ActivityLog = require('../models/ActivityLog');
+const NotificationConfig = require('../models/NotificationConfig');
 
 // ==========================================
 //  STUDENTS CRUD
@@ -911,6 +912,18 @@ const getConfigPath = (type) => path.join(CONFIG_DIR, `${type}.json`);
 const getConfig = async (req, res) => {
     try {
         const { type } = req.params;
+
+        // Handle notification config from database
+        if (type === 'notification') {
+            const NotificationConfig = require('../models/NotificationConfig');
+            let config = await NotificationConfig.findOne();
+            if (!config) {
+                config = await NotificationConfig.create({});
+            }
+            return res.status(200).json(config);
+        }
+
+        // Handle other configs from file system
         const filePath = getConfigPath(type);
         if (!fs.existsSync(filePath)) return res.status(200).json({});
         const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -924,6 +937,22 @@ const getConfig = async (req, res) => {
 const saveConfig = async (req, res) => {
     try {
         const { type } = req.params;
+
+        // Handle notification config in database
+        if (type === 'notification') {
+            const NotificationConfig = require('../models/NotificationConfig');
+            let config = await NotificationConfig.findOne();
+            if (!config) {
+                config = new NotificationConfig(req.body);
+            } else {
+                Object.assign(config, req.body);
+            }
+            config.updatedAt = new Date();
+            await config.save();
+            return res.status(200).json({ message: 'Configuration saved successfully', config });
+        }
+
+        // Handle other configs in file system
         if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
         fs.writeFileSync(getConfigPath(type), JSON.stringify(req.body, null, 2));
         res.status(200).json({ message: 'Configuration saved successfully' });
