@@ -156,7 +156,7 @@ exports.verifyProductPayment = async (req, res) => {
         });
         await payment.save();
 
-        // Save Product Purchase record
+        // Save Product Purchase record (will link invoiceId after invoice creation)
         const purchase = new ProductPurchase({
             userId: req.user.id,
             productId: productId,
@@ -194,6 +194,10 @@ exports.verifyProductPayment = async (req, res) => {
             });
             await invoiceRecord.save();
 
+            // Link invoice to product purchase
+            purchase.invoiceId = invoiceRecord._id;
+            await purchase.save();
+
             console.log(`✓ Invoice generated: ${invoiceRecord.invoiceNumber}`);
 
             // Send invoice email
@@ -226,6 +230,7 @@ exports.verifyProductPayment = async (req, res) => {
             message: 'Payment verified and purchase recorded successfully',
             purchase,
             invoice: invoiceRecord ? {
+                invoiceId: invoiceRecord._id,
                 invoiceNumber: invoiceRecord.invoiceNumber,
                 emailSent: invoiceRecord.emailSent
             } : null
@@ -351,6 +356,10 @@ exports.verifyUpgradePayment = async (req, res) => {
             });
             await invoiceRecord.save();
 
+            // Link invoice to upgrade record
+            upgrade.invoiceId = invoiceRecord._id;
+            await upgrade.save();
+
             console.log(`✓ Invoice generated: ${invoiceRecord.invoiceNumber}`);
 
             // Send invoice email
@@ -378,6 +387,7 @@ exports.verifyUpgradePayment = async (req, res) => {
             message: 'Plan upgraded successfully',
             upgrade,
             invoice: invoiceRecord ? {
+                invoiceId: invoiceRecord._id,
                 invoiceNumber: invoiceRecord.invoiceNumber,
                 emailSent: invoiceRecord.emailSent
             } : null

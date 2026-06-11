@@ -42,6 +42,10 @@ const PlanUpgradeSchema = new mongoose.Schema({
     redeemCode: {
         type: String
     },
+    invoiceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Invoice'
+    },
     createdAt: {
         type: Date,
         default: Date.now

@@ -23,6 +23,10 @@ const ProductPurchaseSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    invoiceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Invoice'
+    },
     createdAt: {
         type: Date,
         default: Date.now
