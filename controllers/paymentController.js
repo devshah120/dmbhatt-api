@@ -464,21 +464,61 @@ exports.verifyAppleMembership = async (req, res) => {
             return res.status(400).json({ message, status: appleResult.status });
         }
 
-        // Save Payment record
+        // Extract receipt data from Apple response
+        const receiptInfo = appleResult.receipt || {};
+        const bundleId = receiptInfo.bundle_id;
+        const purchaseDate = receiptInfo.purchase_date_ms ? new Date(parseInt(receiptInfo.purchase_date_ms)) : new Date();
+        const expiresDate = receiptInfo.expires_date_ms ? new Date(parseInt(receiptInfo.expires_date_ms)) : null;
+
+        // Validate that the productId matches what was requested
+        if (bundleId !== productId) {
+            return res.status(400).json({ message: 'Product ID mismatch - receipt does not match requested product' });
+        }
+
+        // Save Payment record with complete verification details
         const payment = new Payment({
             userId: req.user.id,
             razorpayOrderId: `apple_${apple_transaction_id}`,
             razorpayPaymentId: apple_transaction_id,
             razorpaySignature: 'apple_iap',
             amount: 0, // Apple handles pricing
-            status: 'captured'
+            status: 'captured',
+            appleReceiptData: {
+                bundleId,
+                purchaseDate,
+                expiresDate,
+                originalTransactionId: receiptInfo.original_transaction_id
+            }
         });
-        await payment.save();
+        const savedPayment = await payment.save();
+
+        // Update Student Profile with new standard if provided
+        if (standard) {
+            const profile = await StudentProfile.findOne({ userId: req.user.id });
+            if (profile) {
+                profile.std = standard;
+                if (medium) profile.medium = medium;
+                if (stream) profile.stream = stream;
+                await profile.save();
+            }
+        }
 
         // Mark user as paid
-        await User.findByIdAndUpdate(req.user.id, { isPaid: true });
+        const updatedUser = await User.findByIdAndUpdate(req.user.id, { isPaid: true }, { new: true });
 
-        res.status(200).json({ message: 'Apple membership verified successfully' });
+        // Verify that user was actually updated
+        if (!updatedUser || !updatedUser.isPaid) {
+            return res.status(500).json({ message: 'Apple purchase completed, but verification details are missing. Please try again.' });
+        }
+
+        res.status(200).json({
+            message: 'Apple membership verified successfully',
+            payment: {
+                paymentId: savedPayment._id,
+                status: savedPayment.status,
+                verifiedAt: new Date()
+            }
+        });
     } catch (error) {
         console.error('Error verifying Apple membership:', error);
         res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
@@ -514,11 +554,22 @@ exports.verifyAppleUpgrade = async (req, res) => {
             return res.status(400).json({ message, status: appleResult.status });
         }
 
+        // Extract receipt data from Apple response
+        const receiptInfo = appleResult.receipt || {};
+        const bundleId = receiptInfo.bundle_id;
+        const purchaseDate = receiptInfo.purchase_date_ms ? new Date(parseInt(receiptInfo.purchase_date_ms)) : new Date();
+        const expiresDate = receiptInfo.expires_date_ms ? new Date(parseInt(receiptInfo.expires_date_ms)) : null;
+
+        // Validate that the productId matches what was requested
+        if (bundleId !== productId) {
+            return res.status(400).json({ message: 'Product ID mismatch - receipt does not match requested product' });
+        }
+
         // Find current standard
         const profile = await StudentProfile.findOne({ userId: req.user.id });
         const oldStandard = profile ? profile.std : 'Unknown';
 
-        // Save Upgrade record
+        // Save Upgrade record with complete verification details
         const upgrade = new PlanUpgrade({
             userId: req.user.id,
             oldStandard,
@@ -527,9 +578,15 @@ exports.verifyAppleUpgrade = async (req, res) => {
             stream,
             appleTransactionId: apple_transaction_id,
             amount: amount || 0,
-            paymentMethod: 'apple'
+            paymentMethod: 'apple',
+            appleReceiptData: {
+                bundleId,
+                purchaseDate,
+                expiresDate,
+                originalTransactionId: receiptInfo.original_transaction_id
+            }
         });
-        await upgrade.save();
+        const savedUpgrade = await upgrade.save();
 
         // Update Student Profile
         if (profile) {
@@ -540,9 +597,23 @@ exports.verifyAppleUpgrade = async (req, res) => {
         }
 
         // Update User isPaid status
-        await User.findByIdAndUpdate(req.user.id, { isPaid: true });
+        const updatedUser = await User.findByIdAndUpdate(req.user.id, { isPaid: true }, { new: true });
 
-        res.status(200).json({ message: 'Plan upgraded successfully via Apple IAP', upgrade });
+        // Verify that user was actually updated
+        if (!updatedUser || !updatedUser.isPaid) {
+            return res.status(500).json({ message: 'Apple purchase completed, but verification details are missing. Please try again.' });
+        }
+
+        res.status(200).json({
+            message: 'Plan upgraded successfully via Apple IAP',
+            upgrade: {
+                upgradeId: savedUpgrade._id,
+                oldStandard,
+                newStandard,
+                paymentMethod: 'apple',
+                verifiedAt: new Date()
+            }
+        });
     } catch (error) {
         console.error('Error verifying Apple upgrade:', error);
         res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
@@ -578,28 +649,63 @@ exports.verifyAppleProductPurchase = async (req, res) => {
             return res.status(400).json({ message, status: appleResult.status });
         }
 
-        // Save Payment record
+        // Extract receipt data from Apple response
+        const receiptInfo = appleResult.receipt || {};
+        const bundleId = receiptInfo.bundle_id;
+        const purchaseDate = receiptInfo.purchase_date_ms ? new Date(parseInt(receiptInfo.purchase_date_ms)) : new Date();
+        const expiresDate = receiptInfo.expires_date_ms ? new Date(parseInt(receiptInfo.expires_date_ms)) : null;
+
+        // Validate that the productId matches what was requested
+        if (bundleId !== productId) {
+            return res.status(400).json({ message: 'Product ID mismatch - receipt does not match requested product' });
+        }
+
+        // Save Payment record with complete verification details
         const payment = new Payment({
             userId: req.user.id,
             razorpayOrderId: `apple_${apple_transaction_id}`,
             razorpayPaymentId: apple_transaction_id,
             razorpaySignature: 'apple_iap',
             amount: amount || 0,
-            status: 'captured'
+            status: 'captured',
+            appleReceiptData: {
+                bundleId,
+                purchaseDate,
+                expiresDate,
+                originalTransactionId: receiptInfo.original_transaction_id
+            }
         });
-        await payment.save();
+        const savedPayment = await payment.save();
 
-        // Save Product Purchase record
+        // Save Product Purchase record with complete verification details
         const purchase = new ProductPurchase({
             userId: req.user.id,
             productId: materialProductId,
             razorpayOrderId: `apple_${apple_transaction_id}`,
             razorpayPaymentId: apple_transaction_id,
-            amount: amount || 0
+            amount: amount || 0,
+            appleReceiptData: {
+                bundleId,
+                purchaseDate,
+                originalTransactionId: receiptInfo.original_transaction_id
+            }
         });
-        await purchase.save();
+        const savedPurchase = await purchase.save();
 
-        res.status(200).json({ message: 'Apple product purchase verified successfully', purchase });
+        // Verify that purchase was actually saved
+        if (!savedPurchase || !savedPurchase._id) {
+            return res.status(500).json({ message: 'Apple purchase completed, but verification details are missing. Please try again.' });
+        }
+
+        res.status(200).json({
+            message: 'Apple product purchase verified successfully',
+            purchase: {
+                purchaseId: savedPurchase._id,
+                productId: materialProductId,
+                status: 'completed',
+                verifiedAt: new Date()
+            }
+        });
     } catch (error) {
         console.error('Error verifying Apple product purchase:', error);
         res.status(500).json({ message: 'Error verifying Apple purchase', error: error.message });
