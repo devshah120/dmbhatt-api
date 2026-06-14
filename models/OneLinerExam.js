@@ -37,7 +37,8 @@ const oneLinerExamSchema = new mongoose.Schema({
     },
     questions: [{
         questionText: { type: String, required: true },
-        correctAnswer: { type: String, required: true }
+        correctAnswer: { type: String, required: true },
+        mark: { type: Number, required: true, default: 1 }
     }]
 }, { timestamps: true });
 
