@@ -402,7 +402,7 @@ exports.verifyUpgradePayment = async (req, res) => {
 // Apple In-App Purchase Verification
 // ============================================================
 
-const APPLE_VERIFY_RECEIPT_URL = 'https://buy.itunes.apple.com/verifyReceipt';
+const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_APP_SHARED_SECRET = process.env.APPLE_APP_SHARED_SECRET || '';
 
 /**
@@ -418,7 +418,7 @@ const verifyAppleReceipt = async (receiptData) => {
     }
 
     try {
-        const response = await fetch(APPLE_VERIFY_RECEIPT_URL, {
+        const response = await fetch(APPLE_VERIFY_RECEIPT_SANDBOX, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
