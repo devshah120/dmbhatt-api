@@ -1320,14 +1320,18 @@ const scheduleNotification = async (req, res) => {
 
         const ScheduledNotification = require('../models/ScheduledNotification');
 
-        // Frontend sends time as YYYY-MM-DDTHH:mm in IST (browser local time)
-        // Simply store it as-is without any conversion
-        // The frontend will adjust when displaying
+        // Frontend sends time as YYYY-MM-DDTHH:mm which is in IST (local browser time)
+        // Convert to UTC for proper storage in MongoDB
+        // IST is UTC+5:30, so we subtract 5.5 hours to get UTC time
+        const istDate = new Date(scheduledTime);
+        const istOffsetMs = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const utcDate = new Date(istDate.getTime() - istOffsetMs);
+
         const notification = await ScheduledNotification.create({
             title,
             body,
             std: std || 'all',
-            scheduledTime: new Date(scheduledTime)
+            scheduledTime: utcDate
         });
 
         await ActivityLog.create({
