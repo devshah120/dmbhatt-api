@@ -1320,15 +1320,18 @@ const scheduleNotification = async (req, res) => {
 
         const ScheduledNotification = require('../models/ScheduledNotification');
 
-        // Frontend sends "2026-06-15T19:45" meaning 7:45 PM IST
-        // new Date('2026-06-15T19:45') treats string as UTC and creates:
-        //   timestamp for 2026-06-15 19:45 UTC
-        // When displayed in IST, this shows as 2026-06-16 01:15 (19:45 + 5:30)
-        // But we want the timestamp to represent 2026-06-15 19:45 IST = 2026-06-15 14:15 UTC
-        // So subtract 5:30 from the "treated as UTC" timestamp
+        // Frontend sends "2026-06-15T22:00" meaning 10:00 PM IST
+        // We need to store the UTC equivalent: 2026-06-15 16:30 UTC (22:00 - 5:30)
+        // Parse the string manually to avoid JS timezone interpretation
+        const [dateStr, timeStr] = scheduledTime.split('T');
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const [hours, minutes] = timeStr.split(':').map(Number);
+
+        // Create UTC date directly: treat the input as IST and convert to UTC
+        // IST = UTC + 5:30, so: UTC = IST - 5:30
         const istOffsetMs = 5.5 * 60 * 60 * 1000;
-        const treatedAsUtc = new Date(scheduledTime);
-        const actualUtc = new Date(treatedAsUtc.getTime() - istOffsetMs);
+        const istDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+        const actualUtc = new Date(istDate.getTime() - istOffsetMs);
 
         const notification = await ScheduledNotification.create({
             title,
