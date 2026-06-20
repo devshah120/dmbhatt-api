@@ -1,5 +1,6 @@
 const Invoice = require('../models/Invoice');
 const User = require('../models/User');
+const emailTemplates = require('../utils/emailTemplates');
 const fs = require('fs');
 const path = require('path');
 
@@ -111,26 +112,19 @@ exports.resendInvoiceEmail = async (req, res) => {
             }
         });
 
+        const emailTemplate = emailTemplates.invoiceConfirmation(user, {
+            invoiceNumber: invoice.invoiceNumber,
+            description: invoice.description,
+            amount: invoice.amount,
+            razorpayPaymentId: invoice.razorpayPaymentId,
+            createdAt: invoice.createdAt
+        });
+
         const mailOptions = {
-            from: `"${config.emailFromName || 'Padhaku'}" <${config.emailUser}>`,
+            from: `"${config.emailFromName || 'Padhaku Desk'}" <${config.emailUser}>`,
             to: user.email,
-            subject: `Invoice #${invoice.invoiceNumber} - Padhaku Desk`,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Invoice</h2>
-                    <p>Dear ${user.firstName},</p>
-                    <p>Please find your invoice attached.</p>
-                    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                        <p><strong>Invoice Details:</strong></p>
-                        <p>Invoice #: ${invoice.invoiceNumber}</p>
-                        <p>Description: ${invoice.description}</p>
-                        <p>Amount: ₹${invoice.amount.toFixed(2)}</p>
-                        <p>Payment ID: ${invoice.razorpayPaymentId}</p>
-                        <p>Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}</p>
-                    </div>
-                    <p>Best regards,<br><strong>Padhaku Desk</strong></p>
-                </div>
-            `,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
             attachments: [
                 {
                     filename: invoice.fileName,

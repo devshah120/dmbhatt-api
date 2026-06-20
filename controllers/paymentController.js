@@ -10,6 +10,7 @@ const User = require('../models/User');
 const Invoice = require('../models/Invoice');
 const { generateInvoice } = require('../utils/invoiceGenerator');
 const NotificationConfig = require('../models/NotificationConfig');
+const emailTemplates = require('../utils/emailTemplates');
 const fs = require('fs');
 const path = require('path');
 
@@ -63,7 +64,7 @@ const getRazorpayInstance = () => {
 };
 
 // Helper function to send invoice email
-const sendInvoiceEmail = async (user, invoiceData) => {
+const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additionalData = {}) => {
     try {
         const config = await NotificationConfig.findOne();
 
@@ -82,27 +83,21 @@ const sendInvoiceEmail = async (user, invoiceData) => {
             }
         });
 
+        // Select email template based on type
+        let emailTemplate;
+        if (emailType === 'upgrade') {
+            emailTemplate = emailTemplates.planUpgradeConfirmation(user, additionalData.upgrade, invoiceData);
+        } else if (emailType === 'product') {
+            emailTemplate = emailTemplates.materialPurchaseConfirmation(user, additionalData.product, invoiceData);
+        } else {
+            emailTemplate = emailTemplates.invoiceConfirmation(user, invoiceData);
+        }
+
         const mailOptions = {
-            from: `"${config.emailFromName || 'Padhaku'}" <${config.emailUser}>`,
+            from: `"${config.emailFromName || 'Padhaku Desk'}" <${config.emailUser}>`,
             to: user.email,
-            subject: `Invoice #${invoiceData.invoiceNumber} - Padhaku Desk`,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Invoice Confirmation</h2>
-                    <p>Dear ${user.firstName},</p>
-                    <p>Thank you for your purchase! Your invoice has been generated and is attached to this email.</p>
-                    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                        <p><strong>Invoice Details:</strong></p>
-                        <p>Invoice #: ${invoiceData.invoiceNumber}</p>
-                        <p>Description: ${invoiceData.description}</p>
-                        <p>Amount: ₹${invoiceData.amount.toFixed(2)}</p>
-                        <p>Payment ID: ${invoiceData.razorpayPaymentId}</p>
-                        <p>Date: ${new Date().toLocaleDateString('en-IN')}</p>
-                    </div>
-                    <p>If you have any questions, please contact our support team.</p>
-                    <p>Best regards,<br><strong>Padhaku Desk</strong></p>
-                </div>
-            `,
+            subject: emailTemplate.subject,
+            html: emailTemplate.html,
             attachments: [
                 {
                     filename: invoiceData.fileName,
@@ -112,7 +107,7 @@ const sendInvoiceEmail = async (user, invoiceData) => {
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`✓ Invoice email sent to ${user.email}`);
+        console.log(`✓ Invoice email sent to ${user.email} (type: ${emailType})`);
         return true;
     } catch (error) {
         console.error(`✗ Failed to send invoice email:`, error.message);
@@ -234,8 +229,9 @@ exports.verifyProductPayment = async (req, res) => {
                     amount: invoiceRecord.amount,
                     razorpayPaymentId: razorpay_payment_id,
                     fileName: invoiceData.filename,
-                    filePath: invoiceData.filepath
-                });
+                    filePath: invoiceData.filepath,
+                    createdAt: invoiceRecord.createdAt
+                }, 'product', { product });
 
                 if (emailSent) {
                     invoiceRecord.emailSent = true;
@@ -396,12 +392,17 @@ exports.verifyUpgradePayment = async (req, res) => {
                     amount: invoiceRecord.amount,
                     razorpayPaymentId: razorpay_payment_id,
                     fileName: invoiceData.filename,
-                    filePath: invoiceData.filepath
-                });
+                    filePath: invoiceData.filepath,
+                    createdAt: invoiceRecord.createdAt
+                }, 'upgrade', { upgrade: { oldStandard, newStandard, medium, stream, amount } });
 
                 if (emailSent) {
                     invoiceRecord.emailSent = true;
                     invoiceRecord.emailSentAt = new Date();
+                    await invoiceRecord.save();
+                } else {
+                    invoiceRecord.emailSent = false;
+                    invoiceRecord.emailError = 'SMTP not configured';
                     await invoiceRecord.save();
                 }
             }

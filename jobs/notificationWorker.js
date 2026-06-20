@@ -167,9 +167,13 @@ const processBirthdayNotifications = async () => {
         const todayMonth = today.getMonth();
         const todayDate = today.getDate();
 
-        // Find students with birthdays today
-        const studentProfiles = await StudentProfile.find().select('userId').lean();
+        // Find students with birthdays today with their profile data
+        const studentProfiles = await StudentProfile.find().select('userId std').lean();
         const userIds = studentProfiles.map(sp => sp.userId);
+        const studentStdMap = {};
+        studentProfiles.forEach(sp => {
+            studentStdMap[sp.userId.toString()] = sp.std;
+        });
 
         const birthdayStudents = await User.find({
             _id: { $in: userIds },
@@ -202,9 +206,12 @@ const processBirthdayNotifications = async () => {
                     const title = config.birthdayNotificationTitle;
                     const body = config.birthdayNotificationBody.replace('{{studentName}}', student.firstName);
 
+                    // Send to student-specific topic using userId
+                    const studentTopic = `user_${student._id}`;
+
                     const message = {
                         notification: { title, body },
-                        topic: 'all',
+                        topic: studentTopic,
                         android: {
                             notification: {
                                 sound: 'default',
@@ -216,7 +223,7 @@ const processBirthdayNotifications = async () => {
 
                     try {
                         const response = await admin.messaging().send(message);
-                        console.log(`✓ Birthday notification sent to ${student.firstName} (${student._id}) | FCM: ${response}`);
+                        console.log(`✓ Birthday notification sent to ${student.firstName} (${student._id}) on topic ${studentTopic} | FCM: ${response}`);
                         notificationSent = true;
                     } catch (pushErr) {
                         console.error(`✗ Failed to send push notification to ${student.firstName}:`, pushErr.message);
