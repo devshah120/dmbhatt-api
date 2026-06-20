@@ -2,6 +2,7 @@ const ExamResult = require('../models/ExamResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
 const FiveMinTestResult = require('../models/FiveMinTestResult');
 const TrueFalseExamResult = require('../models/TrueFalseExamResult');
+const MatchFollowingExamResult = require('../models/MatchFollowingExamResult');
 const StudentProfile = require('../models/StudentProfile');
 
 /**
@@ -27,11 +28,12 @@ const getDashboardData = async (req, res) => {
         }
 
         // Fetch All Results
-        const [examResults, oneLinerResults, fiveMinTestResults, trueFalseResults] = await Promise.all([
+        const [examResults, oneLinerResults, fiveMinTestResults, trueFalseResults, matchFollowingResults] = await Promise.all([
             ExamResult.find({ studentId: user._id }),
             OneLinerExamResult.find({ studentId: user._id }),
             FiveMinTestResult.find({ studentId: user._id }),
-            TrueFalseExamResult.find({ studentId: user._id })
+            TrueFalseExamResult.find({ studentId: user._id }),
+            MatchFollowingExamResult.find({ studentId: user._id })
         ]);
 
         // Merge and sort by date descending
@@ -73,6 +75,19 @@ const getDashboardData = async (req, res) => {
                 // For TrueFalseExam, type is 'TRUE_FALSE'
                 if (!obj.type) {
                     obj.type = 'TRUE_FALSE';
+                }
+                if (obj.isOnline === undefined) {
+                    obj.isOnline = true;
+                }
+                if (!obj.date && !obj.createdAt) {
+                    obj.date = obj.submittedAt || new Date();
+                }
+                return obj;
+            }),
+            ...matchFollowingResults.map(e => {
+                const obj = e.toObject();
+                if (!obj.type) {
+                    obj.type = 'MATCH_FOLLOWING';
                 }
                 if (obj.isOnline === undefined) {
                     obj.isOnline = true;
