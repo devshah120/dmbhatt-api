@@ -6,6 +6,7 @@ const PlanUpgrade = require('../models/PlanUpgrade');
 const ExamResult = require('../models/ExamResult');
 const FiveMinTestResult = require('../models/FiveMinTestResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
+const TrueFalseExamResult = require('../models/TrueFalseExamResult');
 const Session = require('../models/Session');
 
 /**
@@ -30,6 +31,7 @@ const getProfile = async (req, res) => {
             mainExam: await ExamResult.countDocuments({ studentId: user._id }),
             fiveMinTest: await FiveMinTestResult.countDocuments({ studentId: user._id }),
             oneLinerExam: await OneLinerExamResult.countDocuments({ studentId: user._id }),
+            trueFalseExam: await TrueFalseExamResult.countDocuments({ studentId: user._id }),
         };
 
         res.status(200).json({

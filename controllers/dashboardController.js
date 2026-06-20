@@ -1,6 +1,7 @@
 const ExamResult = require('../models/ExamResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
 const FiveMinTestResult = require('../models/FiveMinTestResult');
+const TrueFalseExamResult = require('../models/TrueFalseExamResult');
 const StudentProfile = require('../models/StudentProfile');
 
 /**
@@ -26,10 +27,11 @@ const getDashboardData = async (req, res) => {
         }
 
         // Fetch All Results
-        const [examResults, oneLinerResults, fiveMinTestResults] = await Promise.all([
+        const [examResults, oneLinerResults, fiveMinTestResults, trueFalseResults] = await Promise.all([
             ExamResult.find({ studentId: user._id }),
             OneLinerExamResult.find({ studentId: user._id }),
-            FiveMinTestResult.find({ studentId: user._id })
+            FiveMinTestResult.find({ studentId: user._id }),
+            TrueFalseExamResult.find({ studentId: user._id })
         ]);
 
         // Merge and sort by date descending
@@ -65,8 +67,22 @@ const getDashboardData = async (req, res) => {
                     obj.isOnline = true;
                 }
                 return obj;
+            }),
+            ...trueFalseResults.map(e => {
+                const obj = e.toObject();
+                // For TrueFalseExam, type is 'TRUE_FALSE'
+                if (!obj.type) {
+                    obj.type = 'TRUE_FALSE';
+                }
+                if (obj.isOnline === undefined) {
+                    obj.isOnline = true;
+                }
+                if (!obj.date && !obj.createdAt) {
+                    obj.date = obj.submittedAt || new Date();
+                }
+                return obj;
             })
-        ].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+        ].sort((a, b) => new Date(b.date || b.createdAt || b.submittedAt) - new Date(a.date || a.createdAt || a.submittedAt));
 
         // Consolidate points: Exam Points + Referral Points
         const totalPoints = (studentProfile.totalRewardPoints || 0) + (user.bonusPoints || 0);
@@ -81,9 +97,10 @@ const getDashboardData = async (req, res) => {
                 totalMarks: exam.totalMarks,
                 earnedPoints: exam.earnedPoints || 0,
                 isOnline: exam.isOnline,
-                date: exam.date || exam.createdAt,
+                date: exam.date || exam.createdAt || exam.submittedAt,
                 type: exam.type,
-                accuracy: exam.accuracy // Optional for One Liners
+                accuracy: exam.accuracy, // Optional for One Liners & True/False
+                answers: exam.answers // Optional for Five Min & True/False
             }))
         });
 

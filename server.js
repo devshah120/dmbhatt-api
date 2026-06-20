@@ -56,6 +56,8 @@ const mindMapRoutes = require('./routes/mindMapRoutes');
 app.use('/api/mindmap', mindMapRoutes);
 const oneLinerExamRoutes = require('./routes/oneLinerExamRoutes');
 app.use('/api/onelinerexam', oneLinerExamRoutes);
+const trueFalseExamRoutes = require('./routes/trueFalseExamRoutes');
+app.use('/api/truefalseexam', trueFalseExamRoutes);
 const superAdminRoutes = require('./routes/superAdminRoutes');
 app.use('/api/superadmin', superAdminRoutes);
 const redeemRoutes = require('./routes/redeemRoutes');
