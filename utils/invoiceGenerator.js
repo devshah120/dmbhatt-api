@@ -1,13 +1,12 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { PDFDocument: PDFLib } = require('pdf-lib');
 
 /**
- * Generate invoice by overlaying template PDF with dynamic student data
+ * Generate invoice PDF from scratch with proper formatting
  */
 const generateInvoice = async (invoiceData) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
         try {
             const {
                 invoiceNumber,
@@ -26,100 +25,156 @@ const generateInvoice = async (invoiceData) => {
                 fs.mkdirSync(invoicesDir, { recursive: true });
             }
 
-            // Path to template PDF
-            const templatePath = path.join(__dirname, '../config/invoice-template.pdf');
-
-            // Load and modify template PDF
-            const templateBytes = fs.readFileSync(templatePath);
-            const pdfDoc = await PDFLib.load(templateBytes);
-            const page = pdfDoc.getPage(0);
-            const { height } = page.getSize();
-
-            // Font setup
-            const fontSize = 10;
-            const smallFontSize = 8;
-
-            // ===== OVERLAY STUDENT INFORMATION =====
-            // BILL TO section (approximately x: 435, y: 235 from top based on template layout)
-            page.drawText(studentName || 'N/A', {
-                x: 435,
-                y: height - 235,
-                size: fontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            page.drawText(studentEmail || 'N/A', {
-                x: 435,
-                y: height - 250,
-                size: smallFontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            page.drawText(studentPhone || 'N/A', {
-                x: 435,
-                y: height - 265,
-                size: smallFontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            // ===== INVOICE TABLE =====
-            // SL Number
-            page.drawText('1', {
-                x: 80,
-                y: height - 365,
-                size: fontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            // Description (wrap text if needed)
-            page.drawText(description || 'Product/Service', {
-                x: 130,
-                y: height - 365,
-                size: fontSize,
-                color: { r: 0, g: 0, b: 0 },
-                maxWidth: 280
-            });
-
-            // Amount
-            page.drawText(`₹ ${amount.toFixed(2)}`, {
-                x: 460,
-                y: height - 365,
-                size: fontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            // ===== TOTAL AMOUNT =====
-            page.drawText(`₹ ${amount.toFixed(2)}`, {
-                x: 460,
-                y: height - 465,
-                size: 11,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            // ===== DATE FIELD =====
-            const invoiceDate = new Date(date);
-            const formattedDate = `${String(invoiceDate.getDate()).padStart(2, '0')}/${String(invoiceDate.getMonth() + 1).padStart(2, '0')}/${String(invoiceDate.getFullYear()).slice(-2)}`;
-            page.drawText(formattedDate, {
-                x: 580,
-                y: height - 65,
-                size: smallFontSize,
-                color: { r: 0, g: 0, b: 0 }
-            });
-
-            // Save modified PDF
+            // Create filename
             const filename = `invoice_${invoiceNumber}_${Date.now()}.pdf`;
             const filepath = path.join(invoicesDir, filename);
-            const pdfBytes = await pdfDoc.save();
-            fs.writeFileSync(filepath, pdfBytes);
 
-            resolve({
-                filename,
-                filepath,
-                filesize: fs.statSync(filepath).size
+            // Create a new PDF document
+            const doc = new PDFDocument({
+                size: 'A4',
+                margin: 30
+            });
+
+            // Pipe to file
+            const stream = fs.createWriteStream(filepath);
+            doc.pipe(stream);
+
+            // ===== HEADER WITH LOGO =====
+            // Add logo image
+            const logoPath = path.join(__dirname, '../config/splash_logo.png');
+            if (fs.existsSync(logoPath)) {
+                doc.image(logoPath, 50, 20, { width: 40, height: 40 });
+            }
+
+            // Company name
+            doc.fontSize(24)
+                .font('Helvetica-Bold')
+                .fillColor('#0085B3')
+                .text('PADHAKU DESK', 100, 28);
+
+            // Reset color
+            doc.fillColor('#000000');
+
+            // Invoice title in top right
+            doc.fontSize(14)
+                .font('Helvetica-Bold')
+                .text('Invoice', 450, 35);
+
+            // Date in top right
+            const invoiceDate = new Date(date);
+            const formattedDate = `${String(invoiceDate.getDate()).padStart(2, '0')}/${String(invoiceDate.getMonth() + 1).padStart(2, '0')}/${invoiceDate.getFullYear()}`;
+
+            doc.fontSize(10)
+                .font('Helvetica')
+                .text(`Date: ${formattedDate}`, 450, 55);
+
+            // ===== DIVIDER LINE =====
+            doc.moveTo(50, 80)
+                .lineTo(550, 80)
+                .stroke('#cccccc');
+
+            // ===== FROM AND BILL TO SECTION =====
+            // FROM section
+            doc.fontSize(11)
+                .font('Helvetica-Bold')
+                .fillColor('#000000')
+                .text('FROM', 50, 100);
+
+            doc.fontSize(9)
+                .font('Helvetica')
+                .text('PADHAKU DESK', 50, 120)
+                .text('409, RADHEKISHAN VILLA,', 50, 133)
+                .text('ABOVE SBI BANK, GOWINDVADI,', 50, 146)
+                .text('ISANPUR', 50, 159);
+
+            // BILL TO section
+            doc.fontSize(11)
+                .font('Helvetica-Bold')
+                .text('BILL TO', 320, 100);
+
+            doc.fontSize(9)
+                .font('Helvetica')
+                .text(studentName || 'N/A', 320, 120)
+                .text(studentEmail || 'N/A', 320, 133)
+                .text(studentPhone || 'N/A', 320, 146);
+
+            // ===== TABLE SECTION =====
+            const tableTop = 200;
+            const col1X = 50;    // SL
+            const col2X = 130;   // Description
+            const col3X = 450;   // Amount
+
+            // Table header with background
+            doc.rect(50, tableTop, 510, 25)
+                .fillAndStroke('#f5f5f5', '#cccccc');
+
+            doc.fillColor('#000000')
+                .fontSize(10)
+                .font('Helvetica-Bold')
+                .text('SL', col1X + 5, tableTop + 7)
+                .text('Description', col2X + 5, tableTop + 7)
+                .text('Amount', col3X + 5, tableTop + 7);
+
+            // Table body - Item row
+            const rowHeight = 70;
+            const rowY = tableTop + 25;
+
+            // Row border
+            doc.rect(50, rowY, 510, rowHeight)
+                .stroke('#cccccc');
+
+            // Row content
+            doc.fontSize(9)
+                .font('Helvetica')
+                .fillColor('#000000')
+                .text('1', col1X + 5, rowY + 5)
+                .text(description || 'Product/Service', col2X + 5, rowY + 5, { width: 300 })
+                .text(`Rs. ${amount.toFixed(2)}`, col3X + 5, rowY + 5);
+
+            // Total row
+            const totalY = rowY + rowHeight;
+            doc.rect(50, totalY, 510, 35)
+                .stroke('#cccccc');
+
+            doc.fontSize(11)
+                .font('Helvetica-Bold')
+                .text('Total', col1X + 5, totalY + 8)
+                .text(`Rs. ${amount.toFixed(2)}`, col3X + 5, totalY + 8);
+
+            // ===== INVOICE DETAILS SECTION =====
+            const detailsY = totalY + 50;
+            doc.fontSize(8)
+                .font('Helvetica')
+                .fillColor('#666666')
+                .text(`Invoice #: ${invoiceNumber}`, 50, detailsY)
+                .text(`Payment ID: ${paymentId}`, 50, detailsY + 12)
+                .text(`Generated: ${new Date().toLocaleString('en-IN')}`, 50, detailsY + 24);
+
+            // ===== FOOTER =====
+            doc.fontSize(8)
+                .font('Helvetica')
+                .fillColor('#999999')
+                .text('Thank you for your purchase!', 50, 700)
+                .text('This is an automatically generated invoice. No signature required.', 50, 713)
+                .text('© 2024 Padhaku Desk. All rights reserved. | 409, Radhekishan Villa, Isanpur', 50, 726);
+
+            // Finalize PDF
+            doc.end();
+
+            // Handle stream events
+            stream.on('finish', () => {
+                resolve({
+                    filename,
+                    filepath,
+                    filesize: fs.statSync(filepath).size
+                });
+            });
+
+            stream.on('error', (err) => {
+                reject(err);
             });
 
         } catch (error) {
-            console.error('Invoice generation error:', error);
             reject(error);
         }
     });
