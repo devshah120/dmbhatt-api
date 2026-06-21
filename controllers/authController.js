@@ -128,14 +128,41 @@ const registerStudent = async (req, session) => {
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
-        const secret = 'IHUC5CwHWJwCgVIuvG7ZAti6';
-        const generated_signature = crypto.createHmac('sha256', secret)
+        // Get Razorpay secret from database
+        const PaymentConfig = require('../models/PaymentConfig');
+        let razorpaySecret = null;
+
+        try {
+            const paymentConfig = await PaymentConfig.findOne().session(session);
+            if (paymentConfig && paymentConfig.razorpayKeySecret) {
+                razorpaySecret = paymentConfig.razorpayKeySecret;
+                console.log(`[PAYMENT_VERIFICATION] ✓ Razorpay secret loaded from database`);
+            } else {
+                console.error('[PAYMENT_VERIFICATION] ✗ PaymentConfig not found in database');
+                throw new Error('Payment verification failed: Razorpay configuration not found');
+            }
+        } catch (err) {
+            console.error('[PAYMENT_VERIFICATION] Error fetching PaymentConfig from database:', err.message);
+            throw new Error('Payment verification failed: Could not fetch Razorpay config');
+        }
+
+        if (!razorpaySecret) {
+            console.error('[PAYMENT_VERIFICATION] ✗ razorpayKeySecret not configured in database!');
+            throw new Error('Payment verification failed: Razorpay secret not configured');
+        }
+
+        console.log(`[PAYMENT_VERIFICATION] Verifying payment signature with order_id: ${razorpay_order_id}`);
+        const generated_signature = crypto.createHmac('sha256', razorpaySecret)
             .update(razorpay_order_id + "|" + razorpay_payment_id)
             .digest('hex');
 
         if (generated_signature !== razorpay_signature) {
+            console.error(`[PAYMENT_VERIFICATION] ✗ Signature mismatch!`);
+            console.error(`[PAYMENT_VERIFICATION] Expected: ${generated_signature}`);
+            console.error(`[PAYMENT_VERIFICATION] Received: ${razorpay_signature}`);
             throw new Error('Payment verification failed: Invalid signature');
         }
+        console.log(`[PAYMENT_VERIFICATION] ✓ Payment signature verified successfully`);
     } else {
         console.log('[DEBUG] Registration proceeding without payment details');
     }
