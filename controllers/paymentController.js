@@ -91,13 +91,18 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
             console.log(`[${timestamp}] [INVOICE_EMAIL] Database config not available, using environment variables`);
         }
 
+        console.log(`[${timestamp}] [INVOICE_EMAIL] SMTP Config check:`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL]   - emailHost: ${emailHost ? 'SET (' + emailHost + ')' : 'MISSING'}`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL]   - emailUser: ${emailUser ? 'SET (' + emailUser + ')' : 'MISSING'}`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL]   - emailPassword: ${emailPassword ? 'SET (***MASKED***)' : 'MISSING'}`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL]   - emailPort: ${emailPort ? 'SET (' + emailPort + ')' : 'MISSING'}`);
+
         if (!emailHost || !emailUser || !emailPassword) {
             console.warn(`[${timestamp}] [INVOICE_EMAIL] ⚠️ SMTP not configured - invoice email will not be sent`);
-            console.warn(`[${timestamp}] [INVOICE_EMAIL] Config check - emailHost: ${emailHost ? 'SET' : 'MISSING'}, emailUser: ${emailUser ? 'SET' : 'MISSING'}, emailPassword: ${emailPassword ? 'SET' : 'MISSING'}`);
             return false;
         }
 
-        console.log(`[${timestamp}] [INVOICE_EMAIL] SMTP Config found - Host: ${emailHost}, Port: ${emailPort}, User: ${emailUser}`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL] ✓ SMTP Config verified - Host: ${emailHost}, Port: ${emailPort}, User: ${emailUser}`);
 
         const transporter = nodemailer.createTransport({
             host: emailHost,

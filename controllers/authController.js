@@ -188,6 +188,7 @@ const registerStudent = async (req, session) => {
     }).session(session);
 
     let savedUser;
+    let isNewUser = false; // Track if this is a new user for welcome email
 
     if (existingUser) {
         // Check if account was previously deleted
@@ -265,6 +266,7 @@ const registerStudent = async (req, session) => {
         savedUser = await existingUser.save({ session });
     }
     else {
+        isNewUser = true; // Mark as new user for welcome email
         const user = new User({
             role: 'student',
             firstName,
@@ -342,16 +344,18 @@ const registerStudent = async (req, session) => {
         { upsert: true, session }
     );
 
-    // Send welcome email if email exists
-    if (email) {
+    // Send welcome email only for NEW users (not for existing users making a payment upgrade)
+    if (isNewUser && email) {
         try {
-            console.log(`[REGISTRATION_FLOW] Attempting to send welcome email to student: ${email}`);
+            console.log(`[REGISTRATION_FLOW] Attempting to send welcome email to NEW student: ${email}`);
             await sendWelcomeEmail(email, firstName);
             console.log(`[REGISTRATION_FLOW] ✓ Welcome email sent successfully to: ${email}`);
         } catch (error) {
             console.error(`[REGISTRATION_FLOW] ✗ Failed to send welcome email to student: ${email}`);
             console.error(`[REGISTRATION_FLOW] Error: ${error.message}`);
         }
+    } else if (!isNewUser && email) {
+        console.log(`[REGISTRATION_FLOW] ⚠ Existing student (${email}) - welcome email skipped. Invoice email will be sent by payment flow.`);
     } else {
         console.log(`[REGISTRATION_FLOW] ⚠ No email provided for student registration - welcome email skipped`);
     }
