@@ -358,14 +358,42 @@ exports.verifyUpgradePayment = async (req, res) => {
             stream
         } = req.body;
 
+        // Get Razorpay secret from database (NotificationConfig) or environment
+        let razorpaySecret = null;
+
+        try {
+            const config = await NotificationConfig.findOne();
+            if (config && config.razorpayKeySecret) {
+                razorpaySecret = config.razorpayKeySecret;
+                console.log(`[PAYMENT_VERIFICATION] ✓ Using razorpayKeySecret from database`);
+            } else {
+                razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+                if (razorpaySecret) {
+                    console.log(`[PAYMENT_VERIFICATION] ✓ Using razorpayKeySecret from environment`);
+                }
+            }
+        } catch (err) {
+            console.error(`[PAYMENT_VERIFICATION] Error fetching config:`, err.message);
+            razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+        }
+
+        if (!razorpaySecret) {
+            console.error(`[PAYMENT_VERIFICATION] ✗ razorpayKeySecret not configured!`);
+            return res.status(500).json({ message: 'Payment configuration error' });
+        }
+
         // Verify signature
-        const shasum = crypto.createHmac('sha256', 'IHUC5CwHWJwCgVIuvG7ZAti6');
+        const shasum = crypto.createHmac('sha256', razorpaySecret);
         shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
         const digest = shasum.digest('hex');
 
         if (digest !== razorpay_signature) {
+            console.error(`[PAYMENT_VERIFICATION] ✗ Signature mismatch for upgrade payment`);
+            console.error(`[PAYMENT_VERIFICATION] Expected: ${digest}`);
+            console.error(`[PAYMENT_VERIFICATION] Received: ${razorpay_signature}`);
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
+        console.log(`[PAYMENT_VERIFICATION] ✓ Upgrade payment signature verified`);
 
         // Get user and find current standard
         const user = await User.findById(req.user.id);
