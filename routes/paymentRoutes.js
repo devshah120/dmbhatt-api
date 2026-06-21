@@ -3,32 +3,52 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
+const NotificationConfig = require('../models/NotificationConfig');
 
-const fs = require('fs');
-const path = require('path');
-
-const getRazorpayConfig = () => {
+const getRazorpayConfig = async () => {
     try {
-        const configPath = path.join(__dirname, '../config/payment.json');
-        if (fs.existsSync(configPath)) {
-            return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        // Try to get from database first (NotificationConfig)
+        const config = await NotificationConfig.findOne();
+        if (config && config.razorpayKeyId && config.razorpayKeySecret) {
+            console.log('[RAZORPAY_CONFIG] ✓ Config loaded from database (NotificationConfig)');
+            return {
+                razorpayKeyId: config.razorpayKeyId,
+                razorpayKeySecret: config.razorpayKeySecret
+            };
         }
     } catch (err) {
-        console.error('Error reading Razorpay config:', err);
+        console.error('[RAZORPAY_CONFIG] Error reading from database:', err.message);
     }
+
+    // Fallback to environment variables
+    console.log('[RAZORPAY_CONFIG] ✓ Using environment variables as fallback');
     return {
         razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
         razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || ''
     };
 };
 
-const getRazorpayInstance = () => {
-    const config = getRazorpayConfig();
+const getRazorpayInstance = async () => {
+    const config = await getRazorpayConfig();
     return new Razorpay({
         key_id: config.razorpayKeyId,
         key_secret: config.razorpayKeySecret
     });
 };
+
+// Get Payment Config endpoint (for app to fetch Razorpay Key ID)
+router.get('/config/payment', async (req, res) => {
+    try {
+        const config = await getRazorpayConfig();
+        // Only return the Key ID, not the secret
+        res.json({
+            razorpayKeyId: config.razorpayKeyId
+        });
+    } catch (error) {
+        console.error('Error fetching payment config:', error);
+        res.status(500).json({ message: 'Error fetching payment config', error: error.message });
+    }
+});
 
 router.post('/create-order', async (req, res) => {
     // ... existing generic order logic
@@ -45,7 +65,7 @@ router.post('/create-order', async (req, res) => {
             receipt
         };
 
-        const razorpay = getRazorpayInstance();
+        const razorpay = await getRazorpayInstance();
         const order = await razorpay.orders.create(options);
         res.json(order);
     } catch (error) {

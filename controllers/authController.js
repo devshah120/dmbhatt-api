@@ -128,26 +128,32 @@ const registerStudent = async (req, session) => {
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
-        // Get Razorpay secret from database
-        const PaymentConfig = require('../models/PaymentConfig');
+        // Get Razorpay secret from database (NotificationConfig)
+        const NotificationConfig = require('../models/NotificationConfig');
         let razorpaySecret = null;
 
         try {
-            const paymentConfig = await PaymentConfig.findOne().session(session);
-            if (paymentConfig && paymentConfig.razorpayKeySecret) {
-                razorpaySecret = paymentConfig.razorpayKeySecret;
-                console.log(`[PAYMENT_VERIFICATION] ✓ Razorpay secret loaded from database`);
+            const config = await NotificationConfig.findOne().session(session);
+            if (config && config.razorpayKeySecret) {
+                razorpaySecret = config.razorpayKeySecret;
+                console.log(`[PAYMENT_VERIFICATION] ✓ Razorpay secret loaded from database (NotificationConfig)`);
             } else {
-                console.error('[PAYMENT_VERIFICATION] ✗ PaymentConfig not found in database');
-                throw new Error('Payment verification failed: Razorpay configuration not found');
+                console.error('[PAYMENT_VERIFICATION] ✗ NotificationConfig not found or razorpayKeySecret missing');
+                // Fallback to environment variable
+                razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+                if (razorpaySecret) {
+                    console.log(`[PAYMENT_VERIFICATION] ✓ Using RAZORPAY_KEY_SECRET from environment variable`);
+                } else {
+                    throw new Error('Payment configuration not found in database or environment');
+                }
             }
         } catch (err) {
-            console.error('[PAYMENT_VERIFICATION] Error fetching PaymentConfig from database:', err.message);
+            console.error('[PAYMENT_VERIFICATION] Error fetching config:', err.message);
             throw new Error('Payment verification failed: Could not fetch Razorpay config');
         }
 
         if (!razorpaySecret) {
-            console.error('[PAYMENT_VERIFICATION] ✗ razorpayKeySecret not configured in database!');
+            console.error('[PAYMENT_VERIFICATION] ✗ razorpayKeySecret not configured!');
             throw new Error('Payment verification failed: Razorpay secret not configured');
         }
 
