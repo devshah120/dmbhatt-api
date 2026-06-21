@@ -61,16 +61,25 @@ const invoiceSchema = new mongoose.Schema({
 
 // Auto-increment invoice number
 invoiceSchema.pre('save', async function (next) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [INVOICE_HOOK] Pre-save hook triggered - isNew: ${this.isNew}, invoiceNumber: ${this.invoiceNumber}`);
+
     if (this.isNew && !this.invoiceNumber) {
         try {
+            console.log(`[${timestamp}] [INVOICE_HOOK] Generating new invoice number...`);
             const count = await mongoose.model('Invoice').countDocuments();
             const date = new Date();
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             this.invoiceNumber = `INV-${year}-${month}-${String(count + 1).padStart(4, '0')}`;
+            console.log(`[${timestamp}] [INVOICE_HOOK] ✓ Invoice number generated: ${this.invoiceNumber}`);
         } catch (error) {
-            next(error);
+            console.error(`[${timestamp}] [INVOICE_HOOK] ✗ Failed to generate invoice number`);
+            console.error(`[${timestamp}] [INVOICE_HOOK] Error:`, error.message);
+            return next(error);
         }
+    } else if (this.isNew) {
+        console.log(`[${timestamp}] [INVOICE_HOOK] Invoice number already provided: ${this.invoiceNumber}`);
     }
     next();
 });

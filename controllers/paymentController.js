@@ -207,6 +207,9 @@ exports.verifyProductPayment = async (req, res) => {
         // Generate Invoice
         let invoiceRecord = null;
         try {
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] [PRODUCT_INVOICE] Starting invoice generation for product purchase...`);
+
             const invoiceData = await generateInvoice({
                 invoiceNumber: `${Date.now()}`, // Temporary, will be replaced by model
                 date: new Date(),
@@ -218,7 +221,10 @@ exports.verifyProductPayment = async (req, res) => {
                 paymentId: razorpay_payment_id
             });
 
+            console.log(`[${timestamp}] [PRODUCT_INVOICE] ✓ PDF invoice generated: ${invoiceData.filename}`);
+
             // Save invoice record to database
+            console.log(`[${timestamp}] [PRODUCT_INVOICE] Creating invoice database record...`);
             invoiceRecord = new Invoice({
                 userId: req.user.id,
                 paymentType: 'product',
@@ -230,7 +236,10 @@ exports.verifyProductPayment = async (req, res) => {
                 filePath: invoiceData.filepath,
                 fileName: invoiceData.filename
             });
+
+            console.log(`[${timestamp}] [PRODUCT_INVOICE] Saving invoice record to database...`);
             await invoiceRecord.save();
+            console.log(`[${timestamp}] [PRODUCT_INVOICE] ✓ Invoice saved with ID: ${invoiceRecord._id}, Number: ${invoiceRecord.invoiceNumber}`);
 
             // Link invoice to product purchase
             purchase.invoiceId = invoiceRecord._id;
@@ -264,7 +273,13 @@ exports.verifyProductPayment = async (req, res) => {
                 }
             }
         } catch (invoiceError) {
-            console.error('Invoice generation failed:', invoiceError.message);
+            const timestamp = new Date().toISOString();
+            console.error(`[${timestamp}] [PRODUCT_INVOICE] ✗ Invoice generation/email failed`);
+            console.error(`[${timestamp}] [PRODUCT_INVOICE] Error Message: ${invoiceError.message}`);
+            console.error(`[${timestamp}] [PRODUCT_INVOICE] Full Error:`, {
+                message: invoiceError.message,
+                stack: invoiceError.stack
+            });
             // Continue with payment success even if invoice fails
         }
 
@@ -374,7 +389,10 @@ exports.verifyUpgradePayment = async (req, res) => {
         // Generate Invoice for subscription upgrade
         let invoiceRecord = null;
         try {
+            const timestamp = new Date().toISOString();
             const description = `Plan Upgrade: ${oldStandard} → ${newStandard}`;
+            console.log(`[${timestamp}] [UPGRADE_INVOICE] Starting invoice generation for subscription upgrade...`);
+
             const invoiceData = await generateInvoice({
                 invoiceNumber: `${Date.now()}`,
                 date: new Date(),
@@ -386,6 +404,10 @@ exports.verifyUpgradePayment = async (req, res) => {
                 paymentId: razorpay_payment_id
             });
 
+            console.log(`[${timestamp}] [UPGRADE_INVOICE] ✓ PDF invoice generated: ${invoiceData.filename}`);
+
+            // Save invoice record to database
+            console.log(`[${timestamp}] [UPGRADE_INVOICE] Creating invoice database record...`);
             invoiceRecord = new Invoice({
                 userId: req.user.id,
                 paymentType: 'subscription',
@@ -396,13 +418,14 @@ exports.verifyUpgradePayment = async (req, res) => {
                 filePath: invoiceData.filepath,
                 fileName: invoiceData.filename
             });
+
+            console.log(`[${timestamp}] [UPGRADE_INVOICE] Saving invoice record to database...`);
             await invoiceRecord.save();
+            console.log(`[${timestamp}] [UPGRADE_INVOICE] ✓ Invoice saved with ID: ${invoiceRecord._id}, Number: ${invoiceRecord.invoiceNumber}`);
 
             // Link invoice to upgrade record
             upgrade.invoiceId = invoiceRecord._id;
             await upgrade.save();
-
-            console.log(`✓ Invoice generated: ${invoiceRecord.invoiceNumber}`);
 
             // Send invoice email
             if (user.email) {
@@ -432,7 +455,13 @@ exports.verifyUpgradePayment = async (req, res) => {
                 console.log(`[PAYMENT_VERIFICATION] ⚠️ No email provided for subscription upgrade - invoice email skipped`);
             }
         } catch (invoiceError) {
-            console.error('Invoice generation failed:', invoiceError.message);
+            const timestamp = new Date().toISOString();
+            console.error(`[${timestamp}] [UPGRADE_INVOICE] ✗ Invoice generation/email failed`);
+            console.error(`[${timestamp}] [UPGRADE_INVOICE] Error Message: ${invoiceError.message}`);
+            console.error(`[${timestamp}] [UPGRADE_INVOICE] Full Error:`, {
+                message: invoiceError.message,
+                stack: invoiceError.stack
+            });
         }
 
         res.status(200).json({
