@@ -56,7 +56,6 @@ const emailTemplates = {
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
           <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">409, Radhekishan Villa, Above SBI Bank, Gowindvadi, Isanpur</p>
         </div>
       </div>
     `
@@ -126,7 +125,6 @@ const emailTemplates = {
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
           <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">409, Radhekishan Villa, Above SBI Bank, Gowindvadi, Isanpur</p>
         </div>
       </div>
     `
@@ -186,7 +184,6 @@ const emailTemplates = {
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
           <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
-          <p style="margin: 5px 0 0 0;">409, Radhekishan Villa, Above SBI Bank, Gowindvadi, Isanpur</p>
         </div>
       </div>
     `

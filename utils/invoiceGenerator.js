@@ -82,10 +82,7 @@ const generateInvoice = async (invoiceData) => {
 
             doc.fontSize(9)
                 .font('Helvetica')
-                .text('PADHAKU DESK', 50, 120)
-                .text('409, RADHEKISHAN VILLA,', 50, 133)
-                .text('ABOVE SBI BANK, GOWINDVADI,', 50, 146)
-                .text('ISANPUR', 50, 159);
+                .text('PADHAKU DESK', 50, 120);
 
             // BILL TO section
             doc.fontSize(11)
@@ -156,7 +153,7 @@ const generateInvoice = async (invoiceData) => {
                 .fillColor('#999999')
                 .text('Thank you for your purchase!', 50, 700)
                 .text('This is an automatically generated invoice. No signature required.', 50, 713)
-                .text('© 2024 Padhaku Desk. All rights reserved. | 409, Radhekishan Villa, Isanpur', 50, 726);
+                .text('© 2024 Padhaku Desk. All rights reserved.', 50, 726);
 
             // Finalize PDF
             doc.end();
