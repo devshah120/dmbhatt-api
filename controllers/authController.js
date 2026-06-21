@@ -356,6 +356,13 @@ const registerStudent = async (req, session) => {
             const numAmount = typeof amount === 'string' ? parseFloat(amount) : (amount || 0);
             console.log(`[REGISTRATION_FLOW] Payment amount: ${numAmount}`);
 
+            // Determine if this is an upgrade (existing student with old standard) or initial subscription (new student)
+            const studentProfile = await StudentProfile.findOne({ userId: savedUser._id }).session(session);
+            const oldStd = studentProfile?.std || null;
+            const descriptionText = oldStd
+                ? `Standard ${oldStd} to Standard ${std}`
+                : `Subscription - Standard ${std}`;
+
             // Generate invoice PDF
             const invoiceData = await generateInvoice({
                 invoiceNumber: `${Date.now()}`,
@@ -363,7 +370,7 @@ const registerStudent = async (req, session) => {
                 studentName: savedUser.firstName,
                 studentEmail: savedUser.email,
                 studentPhone: savedUser.phoneNum,
-                description: `Subscription Payment`,
+                description: descriptionText,
                 amount: numAmount,
                 paymentId: razorpay_payment_id
             });
@@ -372,7 +379,7 @@ const registerStudent = async (req, session) => {
             const invoiceRecord = new Invoice({
                 userId: savedUser._id,
                 paymentType: 'subscription',
-                description: `Subscription Payment`,
+                description: descriptionText,
                 amount: numAmount,
                 razorpayPaymentId: razorpay_payment_id,
                 razorpayOrderId: razorpay_order_id,
@@ -415,20 +422,77 @@ const registerStudent = async (req, session) => {
                     }
                 });
 
+                // Determine header color and message based on subscription type
+                const isUpgrade = oldStd !== null;
+                const headerColor = isUpgrade ? '#27AE60' : '#0085B3';
+                const headerText = isUpgrade ? 'Plan Upgrade Successful!' : 'Subscription Activated!';
+                const mainMessage = isUpgrade
+                    ? 'Congratulations! Your plan upgrade has been processed successfully. You now have access to all the premium features.'
+                    : 'Thank you for subscribing to Padhaku Desk! Your subscription is now active and you can access all premium materials.';
+
                 const mailOptions = {
                     from: `"${emailFromName}" <${emailUser}>`,
                     to: email,
-                    subject: `Invoice #${invoiceRecord.invoiceNumber} - Subscription Payment`,
+                    subject: `Subscription Confirmation - Invoice #${invoiceRecord.invoiceNumber}`,
                     html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
-                            <h2>Payment Received</h2>
-                            <p>Dear ${savedUser.firstName},</p>
-                            <p>Thank you for your subscription payment. Your invoice is attached.</p>
-                            <p><strong>Invoice Number:</strong> ${invoiceRecord.invoiceNumber}</p>
-                            <p><strong>Amount:</strong> ₹${amount}</p>
-                            <p><strong>Payment ID:</strong> ${razorpay_payment_id}</p>
-                            <hr>
-                            <p>Best regards,<br>Padhaku Desk Team</p>
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background-color: ${headerColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                                <h1 style="margin: 0; font-size: 24px;">Padhaku Desk</h1>
+                                <p style="margin: 5px 0 0 0;">${headerText}</p>
+                            </div>
+
+                            <div style="padding: 30px; background-color: #f9f9f9; border: 1px solid #ddd;">
+                                <p>Dear ${savedUser.firstName},</p>
+
+                                <p>${mainMessage}</p>
+
+                                <div style="background-color: white; border: 2px solid ${headerColor}; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                                    <h3 style="color: ${headerColor}; margin-top: 0;">Subscription Details</h3>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr style="border-bottom: 1px solid #eee;">
+                                            <td style="padding: 10px 0; font-weight: bold; color: #666;">Standard:</td>
+                                            <td style="padding: 10px 0; text-align: right; font-weight: bold; color: ${headerColor};">${std}</td>
+                                        </tr>
+                                        ${medium ? `
+                                        <tr style="border-bottom: 1px solid #eee;">
+                                            <td style="padding: 10px 0; font-weight: bold; color: #666;">Medium:</td>
+                                            <td style="padding: 10px 0; text-align: right;">${medium}</td>
+                                        </tr>
+                                        ` : ''}
+                                        ${board ? `
+                                        <tr style="border-bottom: 1px solid #eee;">
+                                            <td style="padding: 10px 0; font-weight: bold; color: #666;">Board:</td>
+                                            <td style="padding: 10px 0; text-align: right;">${board}</td>
+                                        </tr>
+                                        ` : ''}
+                                        <tr style="border-bottom: 1px solid #eee;">
+                                            <td style="padding: 10px 0; font-weight: bold; color: #666;">Amount Paid:</td>
+                                            <td style="padding: 10px 0; text-align: right; font-size: 18px; color: ${headerColor}; font-weight: bold;">₹${numAmount.toFixed(2)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 10px 0; font-weight: bold; color: #666;">Invoice Number:</td>
+                                            <td style="padding: 10px 0; text-align: right;">${invoiceRecord.invoiceNumber}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+
+                                <div style="background-color: ${isUpgrade ? '#e8f8f0' : '#e8f4f8'}; border-left: 4px solid ${headerColor}; padding: 15px; border-radius: 3px; margin: 20px 0;">
+                                    <p style="margin: 0; color: ${headerColor};">
+                                        <strong>📎 Your invoice is attached:</strong> Please keep it for your records and reference.
+                                    </p>
+                                </div>
+
+                                <p style="margin-top: 20px; color: #666;">If you have any questions or need assistance, feel free to reach out to our support team.</p>
+
+                                <p style="margin-top: 30px; color: #666;">
+                                    Best regards,<br>
+                                    <strong style="color: ${headerColor};">Padhaku Desk Team</strong>
+                                </p>
+                            </div>
+
+                            <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
+                                <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
+                            </div>
                         </div>
                     `,
                     attachments: [

@@ -443,7 +443,7 @@ exports.verifyUpgradePayment = async (req, res) => {
         let invoiceRecord = null;
         try {
             const timestamp = new Date().toISOString();
-            const description = `Plan Upgrade: ${oldStandard} → ${newStandard}`;
+            const description = `Plan Upgrade: Standard ${oldStandard} to Standard ${newStandard}`;
             console.log(`[${timestamp}] [UPGRADE_INVOICE] Starting invoice generation for subscription upgrade...`);
 
             const invoiceData = await generateInvoice({
