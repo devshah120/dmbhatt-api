@@ -352,6 +352,10 @@ const registerStudent = async (req, session) => {
             const Invoice = require('../models/Invoice');
             const NotificationConfig = require('../models/NotificationConfig');
 
+            // Ensure amount is a number
+            const numAmount = typeof amount === 'string' ? parseFloat(amount) : (amount || 0);
+            console.log(`[REGISTRATION_FLOW] Payment amount: ${numAmount}`);
+
             // Generate invoice PDF
             const invoiceData = await generateInvoice({
                 invoiceNumber: `${Date.now()}`,
@@ -359,8 +363,8 @@ const registerStudent = async (req, session) => {
                 studentName: savedUser.firstName,
                 studentEmail: savedUser.email,
                 studentPhone: savedUser.phoneNum,
-                description: `Plan Upgrade: ${amount}`,
-                amount: amount,
+                description: `Subscription Payment`,
+                amount: numAmount,
                 paymentId: razorpay_payment_id
             });
 
@@ -369,7 +373,7 @@ const registerStudent = async (req, session) => {
                 userId: savedUser._id,
                 paymentType: 'subscription',
                 description: `Subscription Payment`,
-                amount: amount,
+                amount: numAmount,
                 razorpayPaymentId: razorpay_payment_id,
                 razorpayOrderId: razorpay_order_id,
                 filePath: invoiceData.filepath,
