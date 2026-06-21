@@ -69,23 +69,43 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
     console.log(`[${timestamp}] [INVOICE_EMAIL] Starting invoice email send to: ${user.email} (Type: ${emailType})`);
 
     try {
-        const config = await NotificationConfig.findOne();
+        // Try to get config from database first, then fall back to environment variables
+        let emailHost = process.env.SMTP_HOST;
+        let emailPort = process.env.SMTP_PORT;
+        let emailUser = process.env.SMTP_USER;
+        let emailPassword = process.env.SMTP_PASS;
+        let emailFromName = process.env.SMTP_FROM_NAME || 'Padhaku Desk';
 
-        if (!config?.emailHost || !config?.emailUser || !config?.emailPassword) {
+        // Try to get from database if available
+        try {
+            const config = await NotificationConfig.findOne();
+            if (config?.emailHost && config?.emailUser && config?.emailPassword) {
+                emailHost = config.emailHost;
+                emailPort = config.emailPort;
+                emailUser = config.emailUser;
+                emailPassword = config.emailPassword;
+                emailFromName = config.emailFromName || emailFromName;
+                console.log(`[${timestamp}] [INVOICE_EMAIL] Using SMTP config from database`);
+            }
+        } catch (dbError) {
+            console.log(`[${timestamp}] [INVOICE_EMAIL] Database config not available, using environment variables`);
+        }
+
+        if (!emailHost || !emailUser || !emailPassword) {
             console.warn(`[${timestamp}] [INVOICE_EMAIL] ⚠️ SMTP not configured - invoice email will not be sent`);
-            console.warn(`[${timestamp}] [INVOICE_EMAIL] Config check - emailHost: ${config?.emailHost ? 'SET' : 'MISSING'}, emailUser: ${config?.emailUser ? 'SET' : 'MISSING'}, emailPassword: ${config?.emailPassword ? 'SET' : 'MISSING'}`);
+            console.warn(`[${timestamp}] [INVOICE_EMAIL] Config check - emailHost: ${emailHost ? 'SET' : 'MISSING'}, emailUser: ${emailUser ? 'SET' : 'MISSING'}, emailPassword: ${emailPassword ? 'SET' : 'MISSING'}`);
             return false;
         }
 
-        console.log(`[${timestamp}] [INVOICE_EMAIL] SMTP Config found - Host: ${config.emailHost}, Port: ${config.emailPort}, User: ${config.emailUser}`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL] SMTP Config found - Host: ${emailHost}, Port: ${emailPort}, User: ${emailUser}`);
 
         const transporter = nodemailer.createTransport({
-            host: config.emailHost,
-            port: parseInt(config.emailPort) || 587,
-            secure: parseInt(config.emailPort) === 465,
+            host: emailHost,
+            port: parseInt(emailPort) || 587,
+            secure: parseInt(emailPort) === 465,
             auth: {
-                user: config.emailUser,
-                pass: config.emailPassword
+                user: emailUser,
+                pass: emailPassword
             }
         });
 
@@ -100,7 +120,7 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
         }
 
         const mailOptions = {
-            from: `"${config.emailFromName || 'Padhaku Desk'}" <${config.emailUser}>`,
+            from: `"${emailFromName}" <${emailUser}>`,
             to: user.email,
             subject: emailTemplate.subject,
             html: emailTemplate.html,
