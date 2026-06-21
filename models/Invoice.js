@@ -60,7 +60,7 @@ const invoiceSchema = new mongoose.Schema({
 });
 
 // Auto-increment invoice number - Run BEFORE validation
-invoiceSchema.pre('validate', async function (next) {
+invoiceSchema.pre('validate', async function () {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] [INVOICE_HOOK] Pre-validate hook triggered - isNew: ${this.isNew}, invoiceNumber: ${this.invoiceNumber}`);
 
@@ -76,12 +76,11 @@ invoiceSchema.pre('validate', async function (next) {
         } catch (error) {
             console.error(`[${timestamp}] [INVOICE_HOOK] ✗ Failed to generate invoice number`);
             console.error(`[${timestamp}] [INVOICE_HOOK] Error:`, error.message);
-            return next(error);
+            throw error;
         }
     } else if (this.isNew) {
         console.log(`[${timestamp}] [INVOICE_HOOK] Invoice number already provided: ${this.invoiceNumber}`);
     }
-    next();
 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);
