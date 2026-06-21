@@ -344,6 +344,111 @@ const registerStudent = async (req, session) => {
         { upsert: true, session }
     );
 
+    // Send invoice email for existing users with payment (subscription/upgrade)
+    if (!isNewUser && razorpay_payment_id && email) {
+        try {
+            console.log(`[REGISTRATION_FLOW] Existing student with payment - sending invoice email to: ${email}`);
+            const { generateInvoice } = require('../utils/invoiceGenerator');
+            const Invoice = require('../models/Invoice');
+            const NotificationConfig = require('../models/NotificationConfig');
+
+            // Generate invoice PDF
+            const invoiceData = await generateInvoice({
+                invoiceNumber: `${Date.now()}`,
+                date: new Date(),
+                studentName: savedUser.firstName,
+                studentEmail: savedUser.email,
+                studentPhone: savedUser.phoneNum,
+                description: `Plan Upgrade: ${amount}`,
+                amount: amount,
+                paymentId: razorpay_payment_id
+            });
+
+            // Save invoice record
+            const invoiceRecord = new Invoice({
+                userId: savedUser._id,
+                paymentType: 'subscription',
+                description: `Subscription Payment`,
+                amount: amount,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpayOrderId: razorpay_order_id,
+                filePath: invoiceData.filepath,
+                fileName: invoiceData.filename
+            });
+            await invoiceRecord.save({ session });
+
+            console.log(`[REGISTRATION_FLOW] Invoice saved with number: ${invoiceRecord.invoiceNumber}`);
+
+            // Send invoice email
+            const nodemailer = require('nodemailer');
+            let emailHost = process.env.SMTP_HOST;
+            let emailPort = process.env.SMTP_PORT;
+            let emailUser = process.env.SMTP_USER;
+            let emailPassword = process.env.SMTP_PASS;
+            let emailFromName = process.env.SMTP_FROM_NAME || 'Padhaku Desk';
+
+            try {
+                const config = await NotificationConfig.findOne();
+                if (config?.emailHost && config?.emailUser && config?.emailPassword) {
+                    emailHost = config.emailHost;
+                    emailPort = config.emailPort;
+                    emailUser = config.emailUser;
+                    emailPassword = config.emailPassword;
+                    emailFromName = config.emailFromName || emailFromName;
+                }
+            } catch (err) {
+                console.log(`[REGISTRATION_FLOW] Using environment variables for email config`);
+            }
+
+            if (emailHost && emailUser && emailPassword) {
+                const transporter = nodemailer.createTransport({
+                    host: emailHost,
+                    port: parseInt(emailPort) || 587,
+                    secure: parseInt(emailPort) === 465,
+                    auth: {
+                        user: emailUser,
+                        pass: emailPassword
+                    }
+                });
+
+                const mailOptions = {
+                    from: `"${emailFromName}" <${emailUser}>`,
+                    to: email,
+                    subject: `Invoice #${invoiceRecord.invoiceNumber} - Subscription Payment`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+                            <h2>Payment Received</h2>
+                            <p>Dear ${savedUser.firstName},</p>
+                            <p>Thank you for your subscription payment. Your invoice is attached.</p>
+                            <p><strong>Invoice Number:</strong> ${invoiceRecord.invoiceNumber}</p>
+                            <p><strong>Amount:</strong> ₹${amount}</p>
+                            <p><strong>Payment ID:</strong> ${razorpay_payment_id}</p>
+                            <hr>
+                            <p>Best regards,<br>Padhaku Desk Team</p>
+                        </div>
+                    `,
+                    attachments: [
+                        {
+                            filename: invoiceData.filename,
+                            path: invoiceData.filepath
+                        }
+                    ]
+                };
+
+                await transporter.sendMail(mailOptions);
+                console.log(`[REGISTRATION_FLOW] ✓ Invoice email sent successfully to: ${email}`);
+
+                invoiceRecord.emailSent = true;
+                invoiceRecord.emailSentAt = new Date();
+                await invoiceRecord.save({ session });
+            } else {
+                console.error(`[REGISTRATION_FLOW] SMTP not configured - invoice email not sent`);
+            }
+        } catch (error) {
+            console.error(`[REGISTRATION_FLOW] ✗ Failed to send invoice email: ${error.message}`);
+        }
+    }
+
     // Send welcome email only for NEW users (not for existing users making a payment upgrade)
     if (isNewUser && email) {
         try {
@@ -354,10 +459,12 @@ const registerStudent = async (req, session) => {
             console.error(`[REGISTRATION_FLOW] ✗ Failed to send welcome email to student: ${email}`);
             console.error(`[REGISTRATION_FLOW] Error: ${error.message}`);
         }
-    } else if (!isNewUser && email) {
-        console.log(`[REGISTRATION_FLOW] ⚠ Existing student (${email}) - welcome email skipped. Invoice email will be sent by payment flow.`);
+    } else if (!isNewUser && email && !razorpay_payment_id) {
+        console.log(`[REGISTRATION_FLOW] ⚠ Existing student (${email}) without payment - no email sent`);
+    } else if (!isNewUser && email && razorpay_payment_id) {
+        console.log(`[REGISTRATION_FLOW] ✓ Invoice email already sent for existing student`);
     } else {
-        console.log(`[REGISTRATION_FLOW] ⚠ No email provided for student registration - welcome email skipped`);
+        console.log(`[REGISTRATION_FLOW] ⚠ No email provided for student registration - no email sent`);
     }
 };
 
