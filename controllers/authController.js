@@ -7,7 +7,7 @@ const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const RedeemCode = require('../models/RedeemCode');
-const { sendOTPEmail } = require('../utils/emailService');
+const { sendOTPEmail, sendWelcomeEmail } = require('../utils/emailService');
 
 /**
  * Universal Registration Handler
@@ -99,6 +99,20 @@ const registerAdmin = async (req, session) => {
         { name },
         { upsert: true, session }
     );
+
+    // Send welcome email if email exists
+    if (email) {
+        try {
+            console.log(`[REGISTRATION_FLOW] Attempting to send welcome email to admin: ${email}`);
+            await sendWelcomeEmail(email, name);
+            console.log(`[REGISTRATION_FLOW] ✓ Welcome email sent successfully to: ${email}`);
+        } catch (error) {
+            console.error(`[REGISTRATION_FLOW] ✗ Failed to send welcome email to admin: ${email}`);
+            console.error(`[REGISTRATION_FLOW] Error: ${error.message}`);
+        }
+    } else {
+        console.log(`[REGISTRATION_FLOW] ⚠ No email provided for admin registration - welcome email skipped`);
+    }
 };
 
 
@@ -294,6 +308,20 @@ const registerStudent = async (req, session) => {
         },
         { upsert: true, session }
     );
+
+    // Send welcome email if email exists
+    if (email) {
+        try {
+            console.log(`[REGISTRATION_FLOW] Attempting to send welcome email to student: ${email}`);
+            await sendWelcomeEmail(email, firstName);
+            console.log(`[REGISTRATION_FLOW] ✓ Welcome email sent successfully to: ${email}`);
+        } catch (error) {
+            console.error(`[REGISTRATION_FLOW] ✗ Failed to send welcome email to student: ${email}`);
+            console.error(`[REGISTRATION_FLOW] Error: ${error.message}`);
+        }
+    } else {
+        console.log(`[REGISTRATION_FLOW] ⚠ No email provided for student registration - welcome email skipped`);
+    }
 };
 
 /**

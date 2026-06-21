@@ -65,13 +65,19 @@ const getRazorpayInstance = () => {
 
 // Helper function to send invoice email
 const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additionalData = {}) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [INVOICE_EMAIL] Starting invoice email send to: ${user.email} (Type: ${emailType})`);
+
     try {
         const config = await NotificationConfig.findOne();
 
         if (!config?.emailHost || !config?.emailUser || !config?.emailPassword) {
-            console.warn('⚠️ SMTP not configured - invoice email will not be sent');
+            console.warn(`[${timestamp}] [INVOICE_EMAIL] ⚠️ SMTP not configured - invoice email will not be sent`);
+            console.warn(`[${timestamp}] [INVOICE_EMAIL] Config check - emailHost: ${config?.emailHost ? 'SET' : 'MISSING'}, emailUser: ${config?.emailUser ? 'SET' : 'MISSING'}, emailPassword: ${config?.emailPassword ? 'SET' : 'MISSING'}`);
             return false;
         }
+
+        console.log(`[${timestamp}] [INVOICE_EMAIL] SMTP Config found - Host: ${config.emailHost}, Port: ${config.emailPort}, User: ${config.emailUser}`);
 
         const transporter = nodemailer.createTransport({
             host: config.emailHost,
@@ -106,11 +112,22 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
             ]
         };
 
+        console.log(`[${timestamp}] [INVOICE_EMAIL] Mail options prepared - From: ${mailOptions.from}, Subject: ${mailOptions.subject}, Attachments: ${mailOptions.attachments.length}`);
         await transporter.sendMail(mailOptions);
-        console.log(`✓ Invoice email sent to ${user.email} (type: ${emailType})`);
+        console.log(`[${timestamp}] [INVOICE_EMAIL] ✓ Invoice email sent successfully to ${user.email} (type: ${emailType})`);
         return true;
     } catch (error) {
-        console.error(`✗ Failed to send invoice email:`, error.message);
+        const timestamp = new Date().toISOString();
+        console.error(`[${timestamp}] [INVOICE_EMAIL] ✗ Failed to send invoice email to ${user?.email}`);
+        console.error(`[${timestamp}] [INVOICE_EMAIL] Error Message: ${error.message}`);
+        console.error(`[${timestamp}] [INVOICE_EMAIL] Error Code: ${error.code}`);
+        console.error(`[${timestamp}] [INVOICE_EMAIL] Full Error:`, {
+            message: error.message,
+            code: error.code,
+            command: error.command,
+            response: error.response,
+            stack: error.stack
+        });
         return false;
     }
 };
@@ -223,6 +240,7 @@ exports.verifyProductPayment = async (req, res) => {
 
             // Send invoice email
             if (user.email) {
+                console.log(`[PAYMENT_VERIFICATION] Attempting to send product purchase invoice email to: ${user.email}`);
                 const emailSent = await sendInvoiceEmail(user, {
                     invoiceNumber: invoiceRecord.invoiceNumber,
                     description: invoiceRecord.description,
@@ -237,10 +255,12 @@ exports.verifyProductPayment = async (req, res) => {
                     invoiceRecord.emailSent = true;
                     invoiceRecord.emailSentAt = new Date();
                     await invoiceRecord.save();
+                    console.log(`[PAYMENT_VERIFICATION] ✓ Invoice email sent and saved for product purchase`);
                 } else {
                     invoiceRecord.emailSent = false;
                     invoiceRecord.emailError = 'SMTP not configured';
                     await invoiceRecord.save();
+                    console.log(`[PAYMENT_VERIFICATION] ⚠️ Invoice email failed for product purchase`);
                 }
             }
         } catch (invoiceError) {
@@ -386,6 +406,7 @@ exports.verifyUpgradePayment = async (req, res) => {
 
             // Send invoice email
             if (user.email) {
+                console.log(`[PAYMENT_VERIFICATION] Attempting to send subscription upgrade invoice email to: ${user.email}`);
                 const emailSent = await sendInvoiceEmail(user, {
                     invoiceNumber: invoiceRecord.invoiceNumber,
                     description: invoiceRecord.description,
@@ -400,11 +421,15 @@ exports.verifyUpgradePayment = async (req, res) => {
                     invoiceRecord.emailSent = true;
                     invoiceRecord.emailSentAt = new Date();
                     await invoiceRecord.save();
+                    console.log(`[PAYMENT_VERIFICATION] ✓ Invoice email sent and saved for subscription upgrade`);
                 } else {
                     invoiceRecord.emailSent = false;
                     invoiceRecord.emailError = 'SMTP not configured';
                     await invoiceRecord.save();
+                    console.log(`[PAYMENT_VERIFICATION] ⚠️ Invoice email failed for subscription upgrade`);
                 }
+            } else {
+                console.log(`[PAYMENT_VERIFICATION] ⚠️ No email provided for subscription upgrade - invoice email skipped`);
             }
         } catch (invoiceError) {
             console.error('Invoice generation failed:', invoiceError.message);
