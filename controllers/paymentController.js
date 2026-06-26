@@ -538,6 +538,7 @@ exports.verifyUpgradePayment = async (req, res) => {
 
 const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_APP_SHARED_SECRET = process.env.APPLE_APP_SHARED_SECRET || '';
+const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.bondbyte.studentsapp';
 
 /**
  * Verify Apple receipt with Apple servers (Sandbox only)
@@ -655,12 +656,31 @@ exports.verifyAppleMembership = async (req, res) => {
             expiresDate
         });
 
-        // Validate that the productId matches what was requested
-        if (bundleId !== productId) {
+        // Validate that the receipt belongs to our app
+        if (bundleId !== APPLE_BUNDLE_ID) {
+            logEntry.steps.push({
+                step: 'Validate bundle ID',
+                success: false,
+                error: `Bundle ID (${bundleId}) does not match expected app bundle ID (${APPLE_BUNDLE_ID})`
+            });
+            console.log('[APPLE_VERIFY_MEMBERSHIP_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-membership', logEntry);
+            return res.status(400).json({ message: 'Receipt is not from this app' });
+        }
+
+        logEntry.steps.push({ step: 'Validate bundle ID', success: true });
+
+        // Validate that the requested product is actually present in the receipt
+        const purchasedProductIds = [
+            ...(receiptInfo.in_app || []),
+            ...(appleResult.latest_receipt_info || [])
+        ].map(p => p.product_id);
+
+        if (!purchasedProductIds.includes(productId)) {
             logEntry.steps.push({
                 step: 'Validate productId match',
                 success: false,
-                error: `Bundle ID (${bundleId}) does not match requested productId (${productId})`
+                error: `Requested productId (${productId}) not found in receipt products [${purchasedProductIds.join(', ')}]`
             });
             console.log('[APPLE_VERIFY_MEMBERSHIP_LOG]', JSON.stringify(logEntry, null, 2));
             writeLog('apple-membership', logEntry);
@@ -856,12 +876,31 @@ exports.verifyAppleUpgrade = async (req, res) => {
             expiresDate
         });
 
-        // Validate that the productId matches what was requested
-        if (bundleId !== productId) {
+        // Validate that the receipt belongs to our app
+        if (bundleId !== APPLE_BUNDLE_ID) {
+            logEntry.steps.push({
+                step: 'Validate bundle ID',
+                success: false,
+                error: `Bundle ID (${bundleId}) does not match expected app bundle ID (${APPLE_BUNDLE_ID})`
+            });
+            console.log('[APPLE_VERIFY_UPGRADE_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-upgrade', logEntry);
+            return res.status(400).json({ message: 'Receipt is not from this app' });
+        }
+
+        logEntry.steps.push({ step: 'Validate bundle ID', success: true });
+
+        // Validate that the requested product is actually present in the receipt
+        const purchasedProductIds = [
+            ...(receiptInfo.in_app || []),
+            ...(appleResult.latest_receipt_info || [])
+        ].map(p => p.product_id);
+
+        if (!purchasedProductIds.includes(productId)) {
             logEntry.steps.push({
                 step: 'Validate productId match',
                 success: false,
-                error: `Bundle ID (${bundleId}) does not match requested productId (${productId})`
+                error: `Requested productId (${productId}) not found in receipt products [${purchasedProductIds.join(', ')}]`
             });
             console.log('[APPLE_VERIFY_UPGRADE_LOG]', JSON.stringify(logEntry, null, 2));
             writeLog('apple-upgrade', logEntry);
@@ -1068,12 +1107,31 @@ exports.verifyAppleProductPurchase = async (req, res) => {
             expiresDate
         });
 
-        // Validate that the productId matches what was requested
-        if (bundleId !== productId) {
+        // Validate that the receipt belongs to our app
+        if (bundleId !== APPLE_BUNDLE_ID) {
+            logEntry.steps.push({
+                step: 'Validate bundle ID',
+                success: false,
+                error: `Bundle ID (${bundleId}) does not match expected app bundle ID (${APPLE_BUNDLE_ID})`
+            });
+            console.log('[APPLE_VERIFY_PRODUCT_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-product', logEntry);
+            return res.status(400).json({ message: 'Receipt is not from this app' });
+        }
+
+        logEntry.steps.push({ step: 'Validate bundle ID', success: true });
+
+        // Validate that the purchased material product is actually present in the receipt
+        const purchasedProductIds = [
+            ...(receiptInfo.in_app || []),
+            ...(appleResult.latest_receipt_info || [])
+        ].map(p => p.product_id);
+
+        if (!purchasedProductIds.includes(materialProductId)) {
             logEntry.steps.push({
                 step: 'Validate productId match',
                 success: false,
-                error: `Bundle ID (${bundleId}) does not match requested productId (${productId})`
+                error: `Requested materialProductId (${materialProductId}) not found in receipt products [${purchasedProductIds.join(', ')}]`
             });
             console.log('[APPLE_VERIFY_PRODUCT_LOG]', JSON.stringify(logEntry, null, 2));
             writeLog('apple-product', logEntry);
