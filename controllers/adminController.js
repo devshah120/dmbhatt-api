@@ -12,7 +12,7 @@ const xlsx = require('xlsx');
  * Add Student (Admin)
  */
 const addStudent = async (req, res) => {
-    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
+    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, dob, address, schoolName } = req.body;
 
     // Check required fields
     if (!name || !phone || !password) {
@@ -40,6 +40,7 @@ const addStudent = async (req, res) => {
             phoneNum: phone,
             loginCodeHash,
             photoPath: req.files?.image?.[0]?.path ? req.files.image[0].path.replace(/\\/g, '/') : undefined,
+            dob: dob ? new Date(dob) : undefined,
             address: {
                 street: address,
                 city: city,
@@ -119,7 +120,8 @@ const getAllStudents = async (req, res) => {
                     parentPhone: '$profile.parentPhone',
                     state: '$address.state',
                     city: '$address.city',
-                    address: '$address.street'
+                    address: '$address.street',
+                    dob: 1
                 }
             }
         ]);
@@ -136,7 +138,7 @@ const getAllStudents = async (req, res) => {
  */
 const editStudent = async (req, res) => {
     const { id } = req.params;
-    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, address, schoolName } = req.body;
+    const { name, email, phone, password, parentPhone, standard, medium, stream, state, city, dob, address, schoolName } = req.body;
 
     const session = await mongoose.startSession();
     try {
@@ -171,6 +173,10 @@ const editStudent = async (req, res) => {
                 city: city || user.address?.city,
                 state: state || user.address?.state
             };
+        }
+
+        if (dob !== undefined) {
+            user.dob = dob ? new Date(dob) : null;
         }
 
         await user.save({ session });
@@ -285,6 +291,33 @@ const importStudents = async (req, res) => {
         const sheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(sheet);
 
+        const normalizeDobValue = (value) => {
+            if (value === undefined || value === null || value === '') return undefined;
+            if (value instanceof Date) return value;
+            if (typeof value === 'number') {
+                return new Date((value - 25569) * 86400000);
+            }
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (!trimmed) return undefined;
+
+                const parsedDate = new Date(trimmed);
+                if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+
+                const parts = trimmed.split(/[\\/-]/);
+                if (parts.length === 3) {
+                    const [first, second, third] = parts;
+                    const day = Number(first);
+                    const month = Number(second);
+                    const year = Number(third);
+                    if (Number.isFinite(day) && Number.isFinite(month) && Number.isFinite(year)) {
+                        return new Date(year, month - 1, day);
+                    }
+                }
+            }
+            return undefined;
+        };
+
         const results = {
             success: 0,
             failed: 0,
@@ -303,6 +336,7 @@ const importStudents = async (req, res) => {
             const stream = row['Stream'] || row['stream'];
             const state = row['State'] || row['state'];
             const city = row['City'] || row['city'];
+            const dobValue = row['DOB'] || row['Date of Birth'] || row['dob'] || row['DateOfBirth'];
             const address = row['Address'] || row['address'];
             const schoolName = row['School Name'] || row['SchoolName'] || row['schoolName'];
 
@@ -328,6 +362,7 @@ const importStudents = async (req, res) => {
                 email: email,
                 phoneNum: String(phone),
                 loginCodeHash,
+                dob: normalizeDobValue(dobValue),
                 address: {
                     street: address,
                     city: city,
