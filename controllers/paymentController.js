@@ -689,29 +689,56 @@ exports.verifyAppleMembership = async (req, res) => {
 
         logEntry.steps.push({ step: 'Validate productId match', success: true });
 
-        // Save Payment record with complete verification details
-        logEntry.steps.push({ step: 'Creating Payment record', success: true });
-        const payment = new Payment({
-            userId: req.user.id,
-            razorpayOrderId: `apple_${apple_transaction_id}`,
-            razorpayPaymentId: apple_transaction_id,
-            razorpaySignature: 'apple_iap',
-            amount: 0, // Apple handles pricing
-            status: 'captured',
-            appleReceiptData: {
-                bundleId,
-                purchaseDate,
-                expiresDate,
-                originalTransactionId: receiptInfo.original_transaction_id
-            }
-        });
-        const savedPayment = await payment.save();
+        // Check whether this Apple transaction has already been processed (idempotency)
+        const appleOrderId = `apple_${apple_transaction_id}`;
+        const existingPayment = await Payment.findOne({ razorpayOrderId: appleOrderId });
 
-        logEntry.steps.push({
-            step: 'Save Payment record',
-            success: true,
-            paymentId: savedPayment._id
-        });
+        if (existingPayment && existingPayment.userId.toString() !== req.user.id.toString()) {
+            // Receipt already redeemed by a different account
+            logEntry.steps.push({
+                step: 'Check existing payment',
+                success: false,
+                error: `Apple transaction already redeemed by another user (${existingPayment.userId})`
+            });
+            console.log('[APPLE_VERIFY_MEMBERSHIP_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-membership', logEntry);
+            return res.status(409).json({ message: 'This Apple purchase has already been redeemed by another account' });
+        }
+
+        let savedPayment;
+        if (existingPayment) {
+            // Already processed for this user — reuse the record and continue (idempotent)
+            savedPayment = existingPayment;
+            logEntry.steps.push({
+                step: 'Reuse existing payment',
+                success: true,
+                paymentId: savedPayment._id
+            });
+        } else {
+            // Save Payment record with complete verification details
+            logEntry.steps.push({ step: 'Creating Payment record', success: true });
+            const payment = new Payment({
+                userId: req.user.id,
+                razorpayOrderId: appleOrderId,
+                razorpayPaymentId: apple_transaction_id,
+                razorpaySignature: 'apple_iap',
+                amount: 0, // Apple handles pricing
+                status: 'captured',
+                appleReceiptData: {
+                    bundleId,
+                    purchaseDate,
+                    expiresDate,
+                    originalTransactionId: receiptInfo.original_transaction_id
+                }
+            });
+            savedPayment = await payment.save();
+
+            logEntry.steps.push({
+                step: 'Save Payment record',
+                success: true,
+                paymentId: savedPayment._id
+            });
+        }
 
         // Update Student Profile with new standard if provided
         if (standard) {
@@ -920,31 +947,55 @@ exports.verifyAppleUpgrade = async (req, res) => {
             oldStandard
         });
 
-        // Save Upgrade record with complete verification details
-        logEntry.steps.push({ step: 'Creating PlanUpgrade record', success: true });
-        const upgrade = new PlanUpgrade({
-            userId: req.user.id,
-            oldStandard,
-            newStandard,
-            medium,
-            stream,
-            appleTransactionId: apple_transaction_id,
-            amount: amount || 0,
-            paymentMethod: 'apple',
-            appleReceiptData: {
-                bundleId,
-                purchaseDate,
-                expiresDate,
-                originalTransactionId: receiptInfo.original_transaction_id
-            }
-        });
-        const savedUpgrade = await upgrade.save();
+        // Check whether this Apple transaction has already been processed (idempotency)
+        const existingUpgrade = await PlanUpgrade.findOne({ appleTransactionId: apple_transaction_id });
 
-        logEntry.steps.push({
-            step: 'Save PlanUpgrade record',
-            success: true,
-            upgradeId: savedUpgrade._id
-        });
+        if (existingUpgrade && existingUpgrade.userId.toString() !== req.user.id.toString()) {
+            logEntry.steps.push({
+                step: 'Check existing upgrade',
+                success: false,
+                error: `Apple transaction already redeemed by another user (${existingUpgrade.userId})`
+            });
+            console.log('[APPLE_VERIFY_UPGRADE_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-upgrade', logEntry);
+            return res.status(409).json({ message: 'This Apple purchase has already been redeemed by another account' });
+        }
+
+        let savedUpgrade;
+        if (existingUpgrade) {
+            savedUpgrade = existingUpgrade;
+            logEntry.steps.push({
+                step: 'Reuse existing PlanUpgrade record',
+                success: true,
+                upgradeId: savedUpgrade._id
+            });
+        } else {
+            // Save Upgrade record with complete verification details
+            logEntry.steps.push({ step: 'Creating PlanUpgrade record', success: true });
+            const upgrade = new PlanUpgrade({
+                userId: req.user.id,
+                oldStandard,
+                newStandard,
+                medium,
+                stream,
+                appleTransactionId: apple_transaction_id,
+                amount: amount || 0,
+                paymentMethod: 'apple',
+                appleReceiptData: {
+                    bundleId,
+                    purchaseDate,
+                    expiresDate,
+                    originalTransactionId: receiptInfo.original_transaction_id
+                }
+            });
+            savedUpgrade = await upgrade.save();
+
+            logEntry.steps.push({
+                step: 'Save PlanUpgrade record',
+                success: true,
+                upgradeId: savedUpgrade._id
+            });
+        }
 
         // Update Student Profile
         if (profile) {
@@ -1140,51 +1191,86 @@ exports.verifyAppleProductPurchase = async (req, res) => {
 
         logEntry.steps.push({ step: 'Validate productId match', success: true });
 
-        // Save Payment record with complete verification details
-        logEntry.steps.push({ step: 'Creating Payment record', success: true });
-        const payment = new Payment({
-            userId: req.user.id,
-            razorpayOrderId: `apple_${apple_transaction_id}`,
-            razorpayPaymentId: apple_transaction_id,
-            razorpaySignature: 'apple_iap',
-            amount: amount || 0,
-            status: 'captured',
-            appleReceiptData: {
-                bundleId,
-                purchaseDate,
-                expiresDate,
-                originalTransactionId: receiptInfo.original_transaction_id
-            }
-        });
-        const savedPayment = await payment.save();
+        const appleOrderId = `apple_${apple_transaction_id}`;
 
-        logEntry.steps.push({
-            step: 'Save Payment record',
-            success: true,
-            paymentId: savedPayment._id
-        });
+        // Check whether this Apple transaction has already been processed (idempotency)
+        const existingPayment = await Payment.findOne({ razorpayOrderId: appleOrderId });
 
-        // Save Product Purchase record with complete verification details
-        logEntry.steps.push({ step: 'Creating ProductPurchase record', success: true });
-        const purchase = new ProductPurchase({
-            userId: req.user.id,
-            productId: materialProductId,
-            razorpayOrderId: `apple_${apple_transaction_id}`,
-            razorpayPaymentId: apple_transaction_id,
-            amount: amount || 0,
-            appleReceiptData: {
-                bundleId,
-                purchaseDate,
-                originalTransactionId: receiptInfo.original_transaction_id
-            }
-        });
-        const savedPurchase = await purchase.save();
+        if (existingPayment && existingPayment.userId.toString() !== req.user.id.toString()) {
+            logEntry.steps.push({
+                step: 'Check existing payment',
+                success: false,
+                error: `Apple transaction already redeemed by another user (${existingPayment.userId})`
+            });
+            console.log('[APPLE_VERIFY_PRODUCT_LOG]', JSON.stringify(logEntry, null, 2));
+            writeLog('apple-product', logEntry);
+            return res.status(409).json({ message: 'This Apple purchase has already been redeemed by another account' });
+        }
 
-        logEntry.steps.push({
-            step: 'Save ProductPurchase record',
-            success: true,
-            purchaseId: savedPurchase._id
-        });
+        let savedPayment;
+        if (existingPayment) {
+            savedPayment = existingPayment;
+            logEntry.steps.push({
+                step: 'Reuse existing payment',
+                success: true,
+                paymentId: savedPayment._id
+            });
+        } else {
+            // Save Payment record with complete verification details
+            logEntry.steps.push({ step: 'Creating Payment record', success: true });
+            const payment = new Payment({
+                userId: req.user.id,
+                razorpayOrderId: appleOrderId,
+                razorpayPaymentId: apple_transaction_id,
+                razorpaySignature: 'apple_iap',
+                amount: amount || 0,
+                status: 'captured',
+                appleReceiptData: {
+                    bundleId,
+                    purchaseDate,
+                    expiresDate,
+                    originalTransactionId: receiptInfo.original_transaction_id
+                }
+            });
+            savedPayment = await payment.save();
+
+            logEntry.steps.push({
+                step: 'Save Payment record',
+                success: true,
+                paymentId: savedPayment._id
+            });
+        }
+
+        // Save Product Purchase record (idempotent — reuse if it already exists)
+        let savedPurchase = await ProductPurchase.findOne({ razorpayOrderId: appleOrderId });
+        if (savedPurchase) {
+            logEntry.steps.push({
+                step: 'Reuse existing ProductPurchase record',
+                success: true,
+                purchaseId: savedPurchase._id
+            });
+        } else {
+            logEntry.steps.push({ step: 'Creating ProductPurchase record', success: true });
+            const purchase = new ProductPurchase({
+                userId: req.user.id,
+                productId: materialProductId,
+                razorpayOrderId: appleOrderId,
+                razorpayPaymentId: apple_transaction_id,
+                amount: amount || 0,
+                appleReceiptData: {
+                    bundleId,
+                    purchaseDate,
+                    originalTransactionId: receiptInfo.original_transaction_id
+                }
+            });
+            savedPurchase = await purchase.save();
+
+            logEntry.steps.push({
+                step: 'Save ProductPurchase record',
+                success: true,
+                purchaseId: savedPurchase._id
+            });
+        }
 
         // Verify that purchase was actually saved
         if (!savedPurchase || !savedPurchase._id) {
