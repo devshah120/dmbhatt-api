@@ -1,5 +1,6 @@
 const ExploreProduct = require('../models/ExploreProduct');
 const ActivityLog = require('../models/ActivityLog');
+const ProductPurchase = require('../models/ProductPurchase');
 
 exports.createProduct = async (req, res) => {
     try {
@@ -43,7 +44,22 @@ exports.createProduct = async (req, res) => {
 exports.getAllProducts = async (req, res) => {
     try {
         const products = await ExploreProduct.find().sort({ createdAt: -1 });
-        res.status(200).json(products);
+
+        let purchasedProductIds = [];
+        if (req.user && req.user._id) {
+            const purchases = await ProductPurchase.find({ userId: req.user._id });
+            purchasedProductIds = purchases.map(p => p.productId.toString());
+        }
+
+        const productsWithPurchaseStatus = products.map(product => {
+            const isPurchased = purchasedProductIds.includes(product._id.toString());
+            return {
+                ...product.toObject(),
+                isPurchased
+            };
+        });
+
+        res.status(200).json(productsWithPurchaseStatus);
     } catch (error) {
         console.error('Error fetching products:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
