@@ -9,12 +9,12 @@ const paymentSchema = new mongoose.Schema({
     razorpayOrderId: {
         type: String,
         required: true,
-        unique: true
+        index: true
     },
     razorpayPaymentId: {
         type: String,
         required: true,
-        unique: true
+        index: true
     },
     razorpaySignature: {
         type: String,
@@ -32,6 +32,13 @@ const paymentSchema = new mongoose.Schema({
         type: String,
         enum: ['captured', 'failed', 'refunded'],
         default: 'captured'
+    },
+    appleReceiptData: {
+        bundleId: { type: String },
+        purchaseDate: { type: Date },
+        expiresDate: { type: Date },
+        transactionId: { type: String },
+        originalTransactionId: { type: String }
     },
     createdAt: {
         type: Date,

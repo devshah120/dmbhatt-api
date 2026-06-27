@@ -27,6 +27,12 @@ const ProductPurchaseSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Invoice'
     },
+    appleReceiptData: {
+        bundleId: { type: String },
+        purchaseDate: { type: Date },
+        transactionId: { type: String },
+        originalTransactionId: { type: String }
+    },
     createdAt: {
         type: Date,
         default: Date.now
