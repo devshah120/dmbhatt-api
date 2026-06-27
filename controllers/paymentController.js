@@ -689,12 +689,15 @@ exports.verifyAppleMembership = async (req, res) => {
 
         logEntry.steps.push({ step: 'Validate productId match', success: true });
 
-        // Check whether this Apple transaction has already been processed (idempotency)
-        const appleOrderId = `apple_${apple_transaction_id}`;
-        const existingPayment = await Payment.findOne({ razorpayOrderId: appleOrderId });
+        // Check whether this specific Apple transaction has already been processed (idempotency)
+        // Use both transaction_id and original_transaction_id to identify unique purchases
+        const existingPayment = await Payment.findOne({
+            'appleReceiptData.transactionId': apple_transaction_id,
+            'appleReceiptData.originalTransactionId': receiptInfo.original_transaction_id
+        });
 
         if (existingPayment && existingPayment.userId.toString() !== req.user.id.toString()) {
-            // Receipt already redeemed by a different account
+            // Same transaction redeemed by a different account
             logEntry.steps.push({
                 step: 'Check existing payment',
                 success: false,
@@ -717,6 +720,7 @@ exports.verifyAppleMembership = async (req, res) => {
         } else {
             // Save Payment record with complete verification details
             logEntry.steps.push({ step: 'Creating Payment record', success: true });
+            const appleOrderId = `apple_${apple_transaction_id}_${Date.now()}`;
             const payment = new Payment({
                 userId: req.user.id,
                 razorpayOrderId: appleOrderId,
@@ -728,6 +732,7 @@ exports.verifyAppleMembership = async (req, res) => {
                     bundleId,
                     purchaseDate,
                     expiresDate,
+                    transactionId: apple_transaction_id,
                     originalTransactionId: receiptInfo.original_transaction_id
                 }
             });
@@ -947,8 +952,12 @@ exports.verifyAppleUpgrade = async (req, res) => {
             oldStandard
         });
 
-        // Check whether this Apple transaction has already been processed (idempotency)
-        const existingUpgrade = await PlanUpgrade.findOne({ appleTransactionId: apple_transaction_id });
+        // Check whether this specific Apple transaction has already been processed (idempotency)
+        // Use both transaction_id and original_transaction_id to identify unique purchases
+        const existingUpgrade = await PlanUpgrade.findOne({
+            'appleReceiptData.transactionId': apple_transaction_id,
+            'appleReceiptData.originalTransactionId': receiptInfo.original_transaction_id
+        });
 
         if (existingUpgrade && existingUpgrade.userId.toString() !== req.user.id.toString()) {
             logEntry.steps.push({
@@ -978,13 +987,13 @@ exports.verifyAppleUpgrade = async (req, res) => {
                 newStandard,
                 medium,
                 stream,
-                appleTransactionId: apple_transaction_id,
                 amount: amount || 0,
                 paymentMethod: 'apple',
                 appleReceiptData: {
                     bundleId,
                     purchaseDate,
                     expiresDate,
+                    transactionId: apple_transaction_id,
                     originalTransactionId: receiptInfo.original_transaction_id
                 }
             });
@@ -1191,10 +1200,12 @@ exports.verifyAppleProductPurchase = async (req, res) => {
 
         logEntry.steps.push({ step: 'Validate productId match', success: true });
 
-        const appleOrderId = `apple_${apple_transaction_id}`;
-
-        // Check whether this Apple transaction has already been processed (idempotency)
-        const existingPayment = await Payment.findOne({ razorpayOrderId: appleOrderId });
+        // Check whether this specific Apple transaction has already been processed (idempotency)
+        // Use both transaction_id and original_transaction_id to identify unique purchases
+        const existingPayment = await Payment.findOne({
+            'appleReceiptData.transactionId': apple_transaction_id,
+            'appleReceiptData.originalTransactionId': receiptInfo.original_transaction_id
+        });
 
         if (existingPayment && existingPayment.userId.toString() !== req.user.id.toString()) {
             logEntry.steps.push({
@@ -1218,6 +1229,7 @@ exports.verifyAppleProductPurchase = async (req, res) => {
         } else {
             // Save Payment record with complete verification details
             logEntry.steps.push({ step: 'Creating Payment record', success: true });
+            const appleOrderId = `apple_${apple_transaction_id}_${Date.now()}`;
             const payment = new Payment({
                 userId: req.user.id,
                 razorpayOrderId: appleOrderId,
@@ -1229,6 +1241,7 @@ exports.verifyAppleProductPurchase = async (req, res) => {
                     bundleId,
                     purchaseDate,
                     expiresDate,
+                    transactionId: apple_transaction_id,
                     originalTransactionId: receiptInfo.original_transaction_id
                 }
             });
@@ -1242,7 +1255,11 @@ exports.verifyAppleProductPurchase = async (req, res) => {
         }
 
         // Save Product Purchase record (idempotent — reuse if it already exists)
-        let savedPurchase = await ProductPurchase.findOne({ razorpayOrderId: appleOrderId });
+        let savedPurchase = await ProductPurchase.findOne({
+            userId: req.user.id,
+            'appleReceiptData.transactionId': apple_transaction_id,
+            'appleReceiptData.originalTransactionId': receiptInfo.original_transaction_id
+        });
         if (savedPurchase) {
             logEntry.steps.push({
                 step: 'Reuse existing ProductPurchase record',
@@ -1254,12 +1271,13 @@ exports.verifyAppleProductPurchase = async (req, res) => {
             const purchase = new ProductPurchase({
                 userId: req.user.id,
                 productId: materialProductId,
-                razorpayOrderId: appleOrderId,
+                razorpayOrderId: `apple_${apple_transaction_id}_${Date.now()}`,
                 razorpayPaymentId: apple_transaction_id,
                 amount: amount || 0,
                 appleReceiptData: {
                     bundleId,
                     purchaseDate,
+                    transactionId: apple_transaction_id,
                     originalTransactionId: receiptInfo.original_transaction_id
                 }
             });
