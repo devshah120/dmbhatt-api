@@ -66,6 +66,8 @@ const redeemRoutes = require('./routes/redeemRoutes');
 app.use('/api/redeem', redeemRoutes);
 const invoiceRoutes = require('./routes/invoiceRoutes');
 app.use('/api/invoice', invoiceRoutes);
+const supportRoutes = require('./routes/supportRoutes');
+app.use('/api/support', supportRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
