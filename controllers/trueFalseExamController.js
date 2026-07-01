@@ -145,7 +145,7 @@ const createExam = async (req, res) => {
 
 const getAllExams = async (req, res) => {
     try {
-        const { std, medium, board, stream, subject } = req.query;
+        const { std, medium, board, stream, subject, skip, limit } = req.query;
         let query = {};
         if (std) query.std = std;
         if (medium) query.medium = medium;
@@ -153,10 +153,20 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const exams = await TrueFalseExam.find(query)
-            .sort({ createdAt: -1 });
+        let dbQuery = TrueFalseExam.find(query).sort({ createdAt: -1 });
 
-        res.status(200).json(exams);
+        if (skip) dbQuery = dbQuery.skip(parseInt(skip));
+        if (limit) dbQuery = dbQuery.limit(parseInt(limit));
+
+        const exams = await dbQuery;
+
+        if (skip || limit) {
+            const total = await TrueFalseExam.countDocuments(query);
+            res.status(200).json({ data: exams, total });
+        } else {
+            // Backward compatibility for mobile apps
+            res.status(200).json(exams);
+        }
     } catch (err) {
         console.error('Get All True/False Exams Error:', err);
         res.status(500).json({ message: 'Failed to fetch exams', error: err.message });
