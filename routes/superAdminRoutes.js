@@ -26,6 +26,7 @@ router.delete('/admins/:id', ctrl.deleteAdmin);
 
 // Standards
 router.get('/standards', ctrl.getStandards);
+router.get('/standards/status/:isActive', ctrl.getStandardsByStatus);
 router.post('/standards', ctrl.createStandard);
 router.put('/standards/:id', ctrl.updateStandard);
 router.delete('/standards/:id', ctrl.deleteStandard);

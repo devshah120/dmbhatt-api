@@ -383,6 +383,17 @@ const getStandards = async (req, res) => {
     }
 };
 
+const getStandardsByStatus = async (req, res) => {
+    try {
+        const isActive = req.params.isActive === 'true';
+        const standards = await Standard.find({ isActive }).sort({ displayOrder: 1, name: 1 });
+        res.status(200).json(standards);
+    } catch (err) {
+        console.error('Get Standards By Status Error:', err);
+        res.status(500).json({ message: 'Failed to fetch standards' });
+    }
+};
+
 const createStandard = async (req, res) => {
     try {
         const { name, displayOrder } = req.body;
@@ -1448,6 +1459,7 @@ const deleteScheduledNotification = async (req, res) => {
 module.exports = {
     // Standards
     getStandards,
+    getStandardsByStatus,
     createStandard,
     updateStandard,
     deleteStandard,
