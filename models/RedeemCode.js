@@ -12,7 +12,7 @@ const redeemCodeSchema = new mongoose.Schema({
         type: Number,
         required: true,
         min: 1,
-        max: 60
+        max: 70
     },
     board: String,
     std: String,
