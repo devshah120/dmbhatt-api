@@ -68,6 +68,8 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 app.use('/api/invoice', invoiceRoutes);
 const supportRoutes = require('./routes/supportRoutes');
 app.use('/api/support', supportRoutes);
+const planRoutes = require('./routes/planRoutes');
+app.use('/api/plans', planRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
