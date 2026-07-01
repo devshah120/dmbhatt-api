@@ -1081,7 +1081,8 @@ const generateRedeemCode = async (req, res) => {
             stream,
             createdBy,
             maxUses,
-            code: customCode
+            code: customCode,
+            expiresAt
         } = req.body;
         const RedeemCode = require('../models/RedeemCode');
 
@@ -1096,6 +1097,23 @@ const generateRedeemCode = async (req, res) => {
         if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
             const parsed = Number(maxUses);
             normalizedMaxUses = Number.isFinite(parsed) ? parsed : 1;
+        }
+
+        let normalizedExpiresAt = null;
+        if (expiresAt) {
+            // Date-only input (e.g. "2026-07-15") should remain valid through the entire
+            // selected day, so treat it as end-of-day rather than midnight UTC.
+            const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(expiresAt);
+            const parsedDate = isDateOnly
+                ? new Date(`${expiresAt}T23:59:59.999`)
+                : new Date(expiresAt);
+            if (isNaN(parsedDate.getTime())) {
+                return res.status(400).json({ message: 'Invalid expiry date' });
+            }
+            if (parsedDate <= new Date()) {
+                return res.status(400).json({ message: 'Expiry date must be in the future' });
+            }
+            normalizedExpiresAt = parsedDate;
         }
 
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1135,7 +1153,8 @@ const generateRedeemCode = async (req, res) => {
             medium,
             stream,
             createdBy,
-            maxUses: normalizedMaxUses
+            maxUses: normalizedMaxUses,
+            expiresAt: normalizedExpiresAt
         });
 
         await redeemCode.save();

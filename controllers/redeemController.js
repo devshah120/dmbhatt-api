@@ -24,6 +24,10 @@ exports.validateRedeemCode = async (req, res) => {
             return res.status(400).json({ message: 'This redeem code has already been used' });
         }
 
+        if (code.isExpired()) {
+            return res.status(400).json({ message: 'This redeem code has expired' });
+        }
+
         // Fetch student profile to check eligibility
         const student = await StudentProfile.findOne({ userId: req.user._id });
         if (!student) {

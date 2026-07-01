@@ -38,6 +38,11 @@ const redeemCodeSchema = new mongoose.Schema({
         type: Number,
         default: 1
     },
+    // null/undefined = never expires
+    expiresAt: {
+        type: Date,
+        default: null
+    },
     usedCount: {
         type: Number,
         default: 0
@@ -68,6 +73,11 @@ const redeemCodeSchema = new mongoose.Schema({
 redeemCodeSchema.methods.isExhausted = function () {
     if (!this.maxUses || this.maxUses <= 0) return false; // unlimited
     return this.usedCount >= this.maxUses;
+};
+
+redeemCodeSchema.methods.isExpired = function () {
+    if (!this.expiresAt) return false; // never expires
+    return new Date() > this.expiresAt;
 };
 
 redeemCodeSchema.methods.recordUsage = function (userId) {
