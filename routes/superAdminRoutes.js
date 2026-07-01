@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/superAdminController');
 const adminController = require('../controllers/adminController');
+const planController = require('../controllers/planController');
 
 // Reports
 router.get('/reports/exams', adminController.getExamReports);
@@ -40,6 +41,13 @@ router.get('/chapters', ctrl.getChapters);
 router.post('/chapters', ctrl.createChapter);
 router.put('/chapters/:id', ctrl.updateChapter);
 router.delete('/chapters/:id', ctrl.deleteChapter);
+
+// Subscription Plans
+router.get('/plans', planController.getAllPlans);
+router.post('/plans', planController.createOrUpdatePlan);
+router.post('/plans/bulk-update', planController.bulkUpdatePlans);
+router.post('/plans/initialize-default', planController.initializeDefaultPlans);
+router.delete('/plans/:standard', planController.deletePlan);
 
 // Payment Views
 router.get('/payments', ctrl.getPayments);
