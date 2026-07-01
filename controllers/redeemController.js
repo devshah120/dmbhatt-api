@@ -20,7 +20,7 @@ exports.validateRedeemCode = async (req, res) => {
             return res.status(404).json({ message: 'Invalid redeem code' });
         }
 
-        if (code.used) {
+        if (code.isExhausted()) {
             return res.status(400).json({ message: 'This redeem code has already been used' });
         }
 
@@ -59,10 +59,16 @@ exports.validateRedeemCode = async (req, res) => {
         }
 
 
+        const discountType = code.discountType === 'flat' ? 'flat' : 'percentage';
+        const discountLabel = discountType === 'flat'
+            ? `₹${code.discount}`
+            : `${code.discount}%`;
+
         res.status(200).json({
             valid: true,
-            discount: code.discount, // Changed from redeemCode.discount to code.discount
-            message: `Success! You get a ${code.discount}% discount.`
+            discount: code.discount,
+            discountType,
+            message: `Success! You get a ${discountLabel} discount.`
         });
 
     } catch (error) {

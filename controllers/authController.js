@@ -237,7 +237,7 @@ const registerStudent = async (req, session) => {
         } else {
             const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
             if (adminCode) {
-                if (adminCode.used) throw new Error('This code has already been used');
+                if (adminCode.isExhausted()) throw new Error('This code has already been used');
                 if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);
                 if (adminCode.board && adminCode.board !== (board || 'GSEB')) throw new Error(`Code only valid for ${adminCode.board} board`);
                 appliedRedeemCode = adminCode;
@@ -300,9 +300,7 @@ const registerStudent = async (req, session) => {
 
     // Mark Admin Redeem Code as used if applied
     if (appliedRedeemCode) {
-        appliedRedeemCode.used = true;
-        appliedRedeemCode.usedBy = savedUser._id;
-        appliedRedeemCode.usedAt = new Date();
+        appliedRedeemCode.recordUsage(savedUser._id);
         await appliedRedeemCode.save({ session });
     }
 
@@ -579,7 +577,7 @@ const registerGuest = async (req, session) => {
         } else {
             const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
             if (adminCode) {
-                if (adminCode.used) throw new Error('This code has already been used');
+                if (adminCode.isExhausted()) throw new Error('This code has already been used');
                 if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);
                 if (adminCode.board && adminCode.board !== (board || 'GSEB')) throw new Error(`Code only valid for ${adminCode.board} board`);
                 appliedRedeemCode = adminCode;
@@ -605,9 +603,7 @@ const registerGuest = async (req, session) => {
     const savedUser = await user.save({ session });
 
     if (appliedRedeemCode) {
-        appliedRedeemCode.used = true;
-        appliedRedeemCode.usedBy = savedUser._id;
-        appliedRedeemCode.usedAt = new Date();
+        appliedRedeemCode.recordUsage(savedUser._id);
         await appliedRedeemCode.save({ session });
     }
 

@@ -418,14 +418,11 @@ exports.verifyUpgradePayment = async (req, res) => {
         // Mark Redeem Code as Used
         if (req.body.redeemCode) {
             const RedeemCode = require('../models/RedeemCode');
-            await RedeemCode.findOneAndUpdate(
-                { code: req.body.redeemCode.toUpperCase() },
-                {
-                    used: true,
-                    usedBy: req.user.id,
-                    usedAt: new Date()
-                }
-            );
+            const usedCode = await RedeemCode.findOne({ code: req.body.redeemCode.toUpperCase() });
+            if (usedCode && !usedCode.isExhausted()) {
+                usedCode.recordUsage(req.user.id);
+                await usedCode.save();
+            }
         }
 
         // Update Student Profile

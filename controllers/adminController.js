@@ -1072,42 +1072,77 @@ const getUpgradePlanReport = async (req, res) => {
  */
 const generateRedeemCode = async (req, res) => {
     try {
-        const { discount, board, std, medium, stream, createdBy } = req.body;
+        const {
+            discount,
+            discountType,
+            board,
+            std,
+            medium,
+            stream,
+            createdBy,
+            maxUses,
+            code: customCode
+        } = req.body;
         const RedeemCode = require('../models/RedeemCode');
 
         if (!discount || !createdBy) {
             return res.status(400).json({ message: 'Discount and Creator are required' });
         }
 
-        // Generate a random 8-character unique alphanumeric code
-        let code;
-        let isUnique = false;
+        const normalizedDiscountType = discountType === 'flat' ? 'flat' : 'percentage';
+
+        // maxUses: undefined/blank -> single-use (1); 0 or negative -> unlimited; otherwise the given cap
+        let normalizedMaxUses = 1;
+        if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
+            const parsed = Number(maxUses);
+            normalizedMaxUses = Number.isFinite(parsed) ? parsed : 1;
+        }
+
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        
-        while (!isUnique) {
-            code = '';
-            for (let i = 0; i < 8; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
+        let code;
+
+        const trimmedCustomCode = customCode?.trim().toUpperCase();
+        if (trimmedCustomCode) {
+            if (!/^[A-Z0-9]{3,20}$/.test(trimmedCustomCode)) {
+                return res.status(400).json({
+                    message: 'Custom code must be 3-20 letters/numbers only'
+                });
             }
-            const existing = await RedeemCode.findOne({ code });
-            if (!existing) isUnique = true;
+            const existing = await RedeemCode.findOne({ code: trimmedCustomCode });
+            if (existing) {
+                return res.status(400).json({ message: 'This code already exists, please choose another' });
+            }
+            code = trimmedCustomCode;
+        } else {
+            // Generate a random 8-character unique alphanumeric code
+            let isUnique = false;
+            while (!isUnique) {
+                code = '';
+                for (let i = 0; i < 8; i++) {
+                    code += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                const existing = await RedeemCode.findOne({ code });
+                if (!existing) isUnique = true;
+            }
         }
 
         const redeemCode = new RedeemCode({
             code,
             discount,
+            discountType: normalizedDiscountType,
             board,
             std,
             medium,
             stream,
-            createdBy
+            createdBy,
+            maxUses: normalizedMaxUses
         });
 
         await redeemCode.save();
         res.status(201).json(redeemCode);
     } catch (err) {
         console.error('Generate Redeem Code Error:', err);
-        res.status(500).json({ message: 'Failed to generate redeem code' });
+        res.status(400).json({ message: err.message || 'Failed to generate redeem code' });
     }
 };
 
@@ -1135,7 +1170,7 @@ const deleteRedeemCode = async (req, res) => {
         const code = await RedeemCode.findById(id);
         
         if (!code) return res.status(404).json({ message: 'Code not found' });
-        if (code.used) return res.status(400).json({ message: 'Cannot delete a used code' });
+        if (code.usedCount > 0) return res.status(400).json({ message: 'Cannot delete a code that has already been used' });
 
         await RedeemCode.findByIdAndDelete(id);
         res.status(200).json({ message: 'Code deleted successfully' });
