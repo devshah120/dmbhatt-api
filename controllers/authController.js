@@ -8,6 +8,24 @@ const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const RedeemCode = require('../models/RedeemCode');
 const { sendOTPEmail, sendWelcomeEmail } = require('../utils/emailService');
+const fs = require('fs');
+const path = require('path');
+
+const getReferralConfig = () => {
+    try {
+        const configPath = path.join(__dirname, '../config/referral.json');
+        if (fs.existsSync(configPath)) {
+            const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            return {
+                pointsPerReferral: data.pointsPerReferral !== undefined ? Number(data.pointsPerReferral) : 50,
+                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 10
+            };
+        }
+    } catch (err) {
+        console.error('Error reading referral config:', err);
+    }
+    return { pointsPerReferral: 50, maxReferralsAllowed: 10 };
+};
 
 /**
  * Universal Registration Handler
@@ -228,10 +246,11 @@ const registerStudent = async (req, session) => {
     // Handle referral code if provided
     let referrerId = null;
     if (referralCode) {
+        const config = getReferralConfig();
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
         if (referrer) {
-            if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
-                throw new Error('Referrer has reached maximum referral limit');
+            if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+                throw new Error(`Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}`);
             }
             referrerId = referrer._id;
         } else {
@@ -307,10 +326,10 @@ const registerStudent = async (req, session) => {
 
     // Update referrer's invited friends and award bonus points if referral code was used
     if (referrerId) {
-        // Calculate milestone and bonus points
+        // Calculate milestone and bonus points dynamically
         const referrer = await User.findById(referrerId).session(session);
-        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
-        const bonusPoints = milestoneNumber * 500; // 500, 1000, 1500, 2000, 2500 points
+        const config = getReferralConfig();
+        const bonusPoints = config.pointsPerReferral;
 
         await User.findByIdAndUpdate(
             referrerId,
@@ -569,10 +588,11 @@ const registerGuest = async (req, session) => {
     // Handle referral code if provided
     let referrerId = null;
     if (referralCode) {
+        const config = getReferralConfig();
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).session(session);
         if (referrer) {
-            if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
-                throw new Error('Referrer has reached maximum referral limit');
+            if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+                throw new Error(`Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}`);
             }
             referrerId = referrer._id;
         } else {
@@ -611,10 +631,10 @@ const registerGuest = async (req, session) => {
 
     // Update referrer's invited friends and award bonus points if referral code was used
     if (referrerId) {
-        // Calculate milestone and bonus points
+        // Calculate milestone and bonus points dynamically
         const referrer = await User.findById(referrerId).session(session);
-        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
-        const bonusPoints = milestoneNumber * 500; // 500, 1000, 1500, 2000, 2500 points
+        const config = getReferralConfig();
+        const bonusPoints = config.pointsPerReferral;
 
         await User.findByIdAndUpdate(
             referrerId,

@@ -1,4 +1,22 @@
 const User = require('../models/User');
+const fs = require('fs');
+const path = require('path');
+
+const getReferralConfig = () => {
+    try {
+        const configPath = path.join(__dirname, '../config/referral.json');
+        if (fs.existsSync(configPath)) {
+            const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            return {
+                pointsPerReferral: data.pointsPerReferral !== undefined ? Number(data.pointsPerReferral) : 50,
+                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 10
+            };
+        }
+    } catch (err) {
+        console.error('Error reading referral config:', err);
+    }
+    return { pointsPerReferral: 50, maxReferralsAllowed: 10 };
+};
 
 // Generate a unique 6-character referral code
 const generateReferralCode = () => {
@@ -26,21 +44,23 @@ exports.validateReferralCode = async (req, res) => {
             return res.status(404).json({ message: 'Invalid referral code' });
         }
 
-        // Check if referrer has reached max referrals (5)
-        if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
-            return res.status(400).json({ message: 'Referrer has reached maximum referral limit' });
+        const config = getReferralConfig();
+
+        // Check if referrer has reached max referrals
+        if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+            return res.status(400).json({ message: `Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}` });
         }
 
-        // Calculate milestone and discount
-        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1; // 1-5
-        const discountAmount = milestoneNumber * 10; // ₹10, ₹20, ₹30, ₹40, ₹50
+        // Calculate discount / points
+        const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1;
+        const discountAmount = config.pointsPerReferral;
 
         res.status(200).json({
             valid: true,
             referrerName: referrer.firstName,
             discountAmount: discountAmount,
             milestone: milestoneNumber,
-            message: `Valid referral code from ${referrer.firstName}. You'll get ₹${discountAmount} discount!`
+            message: `Valid referral code from ${referrer.firstName}. You'll get ${discountAmount} points/discount!`
         });
     } catch (error) {
         console.error('Error validating referral code:', error);
@@ -105,9 +125,11 @@ exports.applyReferralCode = async (req, res) => {
             return res.status(404).json({ message: 'Invalid referral code' });
         }
 
-        // Check if referrer has reached max referrals (5)
-        if (referrer.invitedFriends && referrer.invitedFriends.length >= 5) {
-            return res.status(400).json({ message: 'Referrer has reached maximum referral limit' });
+        const config = getReferralConfig();
+
+        // Check if referrer has reached max referrals
+        if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+            return res.status(400).json({ message: `Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}` });
         }
 
         // Get current user
@@ -127,12 +149,13 @@ exports.applyReferralCode = async (req, res) => {
             return res.status(400).json({ message: 'You cannot use your own referral code' });
         }
 
-        // Update referrer's invited friends (no bonus points)
+        // Update referrer's invited friends and add bonus points
         referrer.invitedFriends.push({
             userId: currentUser._id,
             name: currentUser.firstName,
             joinedAt: new Date()
         });
+        referrer.bonusPoints = (referrer.bonusPoints || 0) + config.pointsPerReferral;
         await referrer.save();
 
         // Update current user's referredBy field
