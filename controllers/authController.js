@@ -13,7 +13,7 @@ const path = require('path');
 
 const getReferralConfig = () => {
     try {
-        const configPath = path.join(__dirname, '../config/referral.json');
+        const configPath = path.join(__dirname, '../data/config/referral.json');
         if (fs.existsSync(configPath)) {
             const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
             return {
