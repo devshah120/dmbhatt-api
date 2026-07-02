@@ -88,6 +88,11 @@ app.get('/api/config/payment', (req, res, next) => {
     next();
 }, configCtrl.getPublicConfig);
 
+app.get('/api/config/referral', (req, res, next) => {
+    req.params.type = 'referral';
+    next();
+}, configCtrl.getPublicConfig);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error('SERVER ERROR:', err);
