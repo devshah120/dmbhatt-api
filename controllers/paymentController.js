@@ -13,8 +13,10 @@ const NotificationConfig = require('../models/NotificationConfig');
 const emailTemplates = require('../utils/emailTemplates');
 const fs = require('fs');
 const path = require('path');
+const { createRequestLogger, mask } = require('../utils/logger');
 
-// Logging utility
+// Structured file logging for the Apple IAP flows.
+// Writes to logs/apple-iap/<logType>_<YYYY-MM-DD>.log (path preserved for continuity).
 const LOGS_DIR = path.join(__dirname, '../logs/apple-iap');
 const ensureLogsDirectory = () => {
     if (!fs.existsSync(LOGS_DIR)) {
@@ -158,12 +160,25 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
 };
 
 exports.createProductOrder = async (req, res) => {
+    const log = createRequestLogger('payment', {
+        endpoint: 'POST /payment/product/create-order',
+        req,
+        meta: {
+            flow: 'razorpay-product-order',
+            productId: req.body?.productId,
+            amount: req.body?.amount,
+            currency: req.body?.currency || 'INR'
+        }
+    });
     try {
         const { productId, amount, currency = 'INR' } = req.body;
 
         if (!productId || !amount) {
+            log.step('Validate required fields', { success: false, error: 'Missing productId or amount' });
+            log.finish('VALIDATION_FAILED');
             return res.status(400).json({ message: 'Product ID and Amount are required' });
         }
+        log.step('Validate required fields', { success: true });
 
         const options = {
             amount: amount * 100, // paise
@@ -173,14 +188,31 @@ exports.createProductOrder = async (req, res) => {
 
         const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
+        log.step('Razorpay order created', { success: true, orderId: order.id, receipt: options.receipt });
+        log.finish('SUCCESS');
         res.json(order);
     } catch (error) {
         console.error('Error creating product order:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Error creating Razorpay order', error: error.message });
     }
 };
 
 exports.verifyProductPayment = async (req, res) => {
+    const log = createRequestLogger('payment', {
+        endpoint: 'POST /payment/product/verify',
+        req,
+        meta: {
+            flow: 'razorpay-product-verify',
+            productId: req.body?.productId,
+            amount: req.body?.amount,
+            razorpayOrderId: req.body?.razorpay_order_id,
+            razorpayPaymentId: req.body?.razorpay_payment_id,
+            razorpaySignature: mask(req.body?.razorpay_signature),
+            referralCode: req.body?.referralCode || null,
+            redeemCode: req.body?.redeemCode || null
+        }
+    });
     try {
         const {
             productId,
@@ -197,16 +229,22 @@ exports.verifyProductPayment = async (req, res) => {
         const digest = shasum.digest('hex');
 
         if (digest !== razorpay_signature) {
+            log.step('Verify signature', { success: false, error: 'Signature mismatch' });
+            log.finish('SIGNATURE_MISMATCH');
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
+        log.step('Verify signature', { success: true });
 
         // Get user and product details
         const user = await User.findById(req.user.id);
         const product = await ExploreProduct.findById(productId);
 
         if (!user) {
+            log.step('Fetch user', { success: false, error: 'User not found' });
+            log.finish('USER_NOT_FOUND');
             return res.status(404).json({ message: 'User not found' });
         }
+        log.step('Fetch user & product', { success: true, userEmail: user.email, productFound: !!product });
 
         // Save Payment record
         const payment = new Payment({
@@ -218,6 +256,7 @@ exports.verifyProductPayment = async (req, res) => {
             status: 'captured'
         });
         await payment.save();
+        log.step('Save Payment record', { success: true, paymentId: payment._id });
 
         // Save Product Purchase record (will link invoiceId after invoice creation)
         const purchase = new ProductPurchase({
@@ -228,6 +267,7 @@ exports.verifyProductPayment = async (req, res) => {
             amount: amount
         });
         await purchase.save();
+        log.step('Save ProductPurchase record', { success: true, purchaseId: purchase._id });
 
         // Generate Invoice
         let invoiceRecord = null;
@@ -308,6 +348,14 @@ exports.verifyProductPayment = async (req, res) => {
             // Continue with payment success even if invoice fails
         }
 
+        log.step('Complete', {
+            success: true,
+            invoiceId: invoiceRecord?._id || null,
+            invoiceNumber: invoiceRecord?.invoiceNumber || null,
+            emailSent: invoiceRecord?.emailSent || false
+        });
+        log.finish('SUCCESS');
+
         res.status(200).json({
             message: 'Payment verified and purchase recorded successfully',
             purchase,
@@ -319,17 +367,34 @@ exports.verifyProductPayment = async (req, res) => {
         });
     } catch (error) {
         console.error('Error verifying product payment:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Error verifying payment', error: error.message });
     }
 };
 
 exports.createUpgradeOrder = async (req, res) => {
+    const log = createRequestLogger('payment', {
+        endpoint: 'POST /payment/upgrade/create-order',
+        req,
+        meta: {
+            flow: 'razorpay-subscription-order',
+            amount: req.body?.amount,
+            newStandard: req.body?.newStandard,
+            medium: req.body?.medium,
+            stream: req.body?.stream,
+            referralCode: req.body?.referralCode || null,
+            redeemCode: req.body?.redeemCode || null
+        }
+    });
     try {
         const { amount, newStandard, medium, stream } = req.body;
 
         if (!amount || !newStandard) {
+            log.step('Validate required fields', { success: false, error: 'Missing amount or newStandard' });
+            log.finish('VALIDATION_FAILED');
             return res.status(400).json({ message: 'Amount and New Standard are required' });
         }
+        log.step('Validate required fields', { success: true });
 
         const options = {
             amount: Math.round(amount * 100), // paise
@@ -339,14 +404,33 @@ exports.createUpgradeOrder = async (req, res) => {
 
         const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
+        log.step('Razorpay order created', { success: true, orderId: order.id, receipt: options.receipt });
+        log.finish('SUCCESS');
         res.json(order);
     } catch (error) {
         console.error('Error creating upgrade order:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Error creating Razorpay order', error: error.message });
     }
 };
 
 exports.verifyUpgradePayment = async (req, res) => {
+    const log = createRequestLogger('payment', {
+        endpoint: 'POST /payment/upgrade/verify',
+        req,
+        meta: {
+            flow: 'razorpay-subscription-verify',
+            amount: req.body?.amount,
+            newStandard: req.body?.newStandard,
+            medium: req.body?.medium,
+            stream: req.body?.stream,
+            razorpayOrderId: req.body?.razorpay_order_id,
+            razorpayPaymentId: req.body?.razorpay_payment_id,
+            razorpaySignature: mask(req.body?.razorpay_signature),
+            referralCode: req.body?.referralCode || null,
+            redeemCode: req.body?.redeemCode || null
+        }
+    });
     try {
         const {
             razorpay_payment_id,
@@ -391,9 +475,12 @@ exports.verifyUpgradePayment = async (req, res) => {
             console.error(`[PAYMENT_VERIFICATION] ✗ Signature mismatch for upgrade payment`);
             console.error(`[PAYMENT_VERIFICATION] Expected: ${digest}`);
             console.error(`[PAYMENT_VERIFICATION] Received: ${razorpay_signature}`);
+            log.step('Verify signature', { success: false, error: 'Signature mismatch' });
+            log.finish('SIGNATURE_MISMATCH');
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
         console.log(`[PAYMENT_VERIFICATION] ✓ Upgrade payment signature verified`);
+        log.step('Verify signature', { success: true });
 
         // Get user and find current standard
         const user = await User.findById(req.user.id);
@@ -414,6 +501,7 @@ exports.verifyUpgradePayment = async (req, res) => {
             redeemCode: req.body.redeemCode
         });
         await upgrade.save();
+        log.step('Save PlanUpgrade record', { success: true, upgradeId: upgrade._id, oldStandard, newStandard });
 
         // Mark Redeem Code as Used
         if (req.body.redeemCode) {
@@ -422,6 +510,9 @@ exports.verifyUpgradePayment = async (req, res) => {
             if (usedCode && !usedCode.isExhausted()) {
                 usedCode.recordUsage(req.user.id);
                 await usedCode.save();
+                log.step('Apply redeem code', { success: true, code: req.body.redeemCode.toUpperCase(), discount: usedCode.discount, discountType: usedCode.discountType });
+            } else {
+                log.step('Apply redeem code', { success: false, code: req.body.redeemCode.toUpperCase(), error: usedCode ? 'Code exhausted' : 'Code not found' });
             }
         }
 
@@ -514,6 +605,14 @@ exports.verifyUpgradePayment = async (req, res) => {
             });
         }
 
+        log.step('Complete', {
+            success: true,
+            invoiceId: invoiceRecord?._id || null,
+            invoiceNumber: invoiceRecord?.invoiceNumber || null,
+            emailSent: invoiceRecord?.emailSent || false
+        });
+        log.finish('SUCCESS');
+
         res.status(200).json({
             message: 'Plan upgraded successfully',
             upgrade,
@@ -525,6 +624,7 @@ exports.verifyUpgradePayment = async (req, res) => {
         });
     } catch (error) {
         console.error('Error verifying upgrade payment:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Error verifying payment', error: error.message });
     }
 };
