@@ -194,7 +194,7 @@ exports.getAllMaterials = async (req, res) => {
         const materials = await Material.find(filter)
             .populate('createdBy', 'firstName email phoneNum')
             .populate('updatedBy', 'firstName email phoneNum')
-            .sort({ createdAt: -1 });
+            .sort({ orderIndex: 1, createdAt: -1 });
 
         res.status(200).json(materials);
     } catch (error) {

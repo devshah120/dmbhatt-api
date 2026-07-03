@@ -23,7 +23,7 @@ const getAllExams = async (req, res) => {
         if (subject) query.subject = subject;
 
         const exams = await OneLinerExam.find(query)
-            .sort({ createdAt: -1 });
+            .sort({ orderIndex: 1, createdAt: -1 });
 
         // Ensure totalMarks is explicitly included for older records
         const processedExams = exams.map(exam => {

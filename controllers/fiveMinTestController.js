@@ -170,7 +170,7 @@ const getAllTests = async (req, res) => {
         if (subject) query.subject = subject;
 
         const tests = await FiveMinTest.find(query)
-            .sort({ createdAt: -1 });
+            .sort({ orderIndex: 1, createdAt: -1 });
 
         res.status(200).json(tests);
     } catch (err) {

@@ -153,7 +153,7 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        let dbQuery = TrueFalseExam.find(query).sort({ createdAt: -1 });
+        let dbQuery = TrueFalseExam.find(query).sort({ orderIndex: 1, createdAt: -1 });
 
         if (skip) dbQuery = dbQuery.skip(parseInt(skip));
         if (limit) dbQuery = dbQuery.limit(parseInt(limit));

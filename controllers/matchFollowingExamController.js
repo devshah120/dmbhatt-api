@@ -27,7 +27,7 @@ const getAllExams = async (req, res) => {
         if (stream) query.stream = stream;
         if (subject) query.subject = subject;
 
-        const exams = await MatchFollowingExam.find(query).sort({ createdAt: -1 });
+        const exams = await MatchFollowingExam.find(query).sort({ orderIndex: 1, createdAt: -1 });
         res.status(200).json(exams);
     } catch (error) {
         console.error('Error fetching match following exams:', error);

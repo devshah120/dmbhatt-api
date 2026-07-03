@@ -10,6 +10,7 @@ const MaterialSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    orderIndex: { type: Number, default: 1 },
     subject: {
         type: String,
         required: true

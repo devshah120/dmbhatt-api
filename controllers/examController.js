@@ -241,7 +241,7 @@ const parseQuestionsErrors = (text) => {
  * Save Exam
  */
 const saveExam = async (req, res) => {
-    const { title, subject, std, medium, board, stream, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, board, stream, unit, totalMarks, questions, orderIndex } = req.body;
 
     console.log('[DEBUG] Schema Paths:', Object.keys(Exam.schema.paths));
     console.log('[DEBUG] Name Required:', Exam.schema.path('name')?.options?.required);
@@ -262,6 +262,7 @@ const saveExam = async (req, res) => {
             stream: stream || 'None',
             unit,
             totalMarks,
+            orderIndex: orderIndex || 0,
             createdBy: req.user._id
         });
 
@@ -316,7 +317,7 @@ const getAllExams = async (req, res) => {
         const exams = await Exam.find(query)
             .populate('createdBy', 'firstName email phoneNum')
             .populate('updatedBy', 'firstName email phoneNum')
-            .sort({ createdAt: -1 });
+            .sort({ orderIndex: 1, createdAt: -1 });
 
         res.status(200).json(exams);
     } catch (err) {

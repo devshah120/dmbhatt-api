@@ -5,6 +5,7 @@ const trueFalseExamSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    orderIndex: { type: Number, default: 1 },
     std: {
         type: String,
         required: true

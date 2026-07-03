@@ -13,6 +13,7 @@ const examSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    orderIndex: { type: Number, default: 1 },
     totalMarks: {
         type: Number,
         required: true
