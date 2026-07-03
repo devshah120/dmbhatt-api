@@ -3,7 +3,7 @@ const ActivityLog = require('../models/ActivityLog');
 
 exports.uploadBoardPaper = async (req, res) => {
     try {
-        const { title, medium, standard, stream, year, subject } = req.body;
+        const { title, medium, standard, stream, year, subject, orderIndex } = req.body;
 
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
@@ -21,6 +21,7 @@ exports.uploadBoardPaper = async (req, res) => {
             year,
             subject,
             file: fileUrl,
+            orderIndex: orderIndex || 1,
             createdBy: req.user?._id
         });
 
@@ -43,7 +44,7 @@ exports.uploadBoardPaper = async (req, res) => {
 
 exports.uploadSchoolPaper = async (req, res) => {
     try {
-        const { title, subject, medium, standard, year, schoolName } = req.body;
+        const { title, subject, medium, standard, year, schoolName, orderIndex } = req.body;
 
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
@@ -62,6 +63,7 @@ exports.uploadSchoolPaper = async (req, res) => {
             year,
             schoolName,
             file: fileUrl,
+            orderIndex: orderIndex || 1,
             createdBy: req.user?._id
         });
 
@@ -84,7 +86,7 @@ exports.uploadSchoolPaper = async (req, res) => {
 
 exports.uploadNotes = async (req, res) => {
     try {
-        const { title, board, standard, medium, stream, subject, year } = req.body;
+        const { title, board, standard, medium, stream, subject, year, orderIndex } = req.body;
 
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
@@ -102,6 +104,7 @@ exports.uploadNotes = async (req, res) => {
             subject,
             year,
             file: fileUrl,
+            orderIndex: orderIndex || 1,
             createdBy: req.user?._id
         });
 
@@ -124,7 +127,7 @@ exports.uploadNotes = async (req, res) => {
 
 exports.uploadImageMaterial = async (req, res) => {
     try {
-        const { title, subject, unit, medium, standard, year, schoolName } = req.body;
+        const { title, subject, unit, medium, standard, year, schoolName, orderIndex } = req.body;
 
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
@@ -144,6 +147,7 @@ exports.uploadImageMaterial = async (req, res) => {
             year,
             schoolName,
             file: fileUrl,
+            orderIndex: orderIndex || 1,
             createdBy: req.user?._id
         });
 
@@ -237,7 +241,7 @@ exports.deleteMaterial = async (req, res) => {
 exports.updateMaterial = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, subject, medium, standard, board, stream, year, schoolName, unit, type } = req.body;
+        const { title, subject, medium, standard, board, stream, year, schoolName, unit, type, orderIndex } = req.body;
 
         let updateData = {
             title,
@@ -249,6 +253,7 @@ exports.updateMaterial = async (req, res) => {
             year,
             schoolName,
             unit,
+            orderIndex: orderIndex || 1,
             updatedBy: req.user._id,
             updatedAt: Date.now()
         };

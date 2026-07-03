@@ -5,9 +5,10 @@ const StudentProfile = require('../models/StudentProfile');
 // Create Exam
 const createExam = async (req, res) => {
     try {
-        const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks } = req.body;
+        const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks, orderIndex } = req.body;
         const newExam = new MatchFollowingExam({
-            title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks: totalMarks || pairs.length
+            title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks: totalMarks || pairs.length,
+            orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
         res.status(201).json(savedExam);
@@ -50,10 +51,13 @@ const getExamById = async (req, res) => {
 
 const updateExam = async (req, res) => {
     try {
-        const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks } = req.body;
+        const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks, orderIndex } = req.body;
         const updatedExam = await MatchFollowingExam.findByIdAndUpdate(
             req.params.id,
-            { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks },
+            { 
+                title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks,
+                orderIndex: orderIndex || 1
+            },
             { new: true }
         );
         if (!updatedExam) {

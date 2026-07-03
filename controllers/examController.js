@@ -262,7 +262,7 @@ const saveExam = async (req, res) => {
             stream: stream || 'None',
             unit,
             totalMarks,
-            orderIndex: orderIndex || 0,
+            orderIndex: orderIndex || 1,
             createdBy: req.user._id
         });
 
@@ -386,7 +386,7 @@ const getExamById = async (req, res) => {
  */
 const updateExam = async (req, res) => {
     const { id } = req.params;
-    const { title, subject, std, medium, board, stream, unit, totalMarks, questions } = req.body;
+    const { title, subject, std, medium, board, stream, unit, totalMarks, questions, orderIndex } = req.body;
 
     try {
         // 1. Update Exam Metadata
@@ -402,6 +402,7 @@ const updateExam = async (req, res) => {
                 stream: stream || 'None',
                 unit,
                 totalMarks,
+                orderIndex: orderIndex || 1,
                 updatedBy: req.user._id,
                 updatedAt: Date.now()
             },
