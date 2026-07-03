@@ -134,7 +134,7 @@ const createExam = async (req, res) => {
         console.log('[BACKEND][trueFalseExamController][createExam] Received Payload:', JSON.stringify(req.body, null, 2));
         const { title, std, medium, stream, board, subject, unit, overview, questions, totalMarks, orderIndex } = req.body;
         const newExam = new TrueFalseExam({
-            title, std, medium, stream, board, subject, unit, overview, questions, totalMarks: totalMarks || 20,
+            title, std, medium, stream, board, subject, unit, overview: overview || " ", questions, totalMarks: totalMarks || 20,
             orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
@@ -182,13 +182,13 @@ const updateExam = async (req, res) => {
         console.log(`[BACKEND][trueFalseExamController][updateExam] ID: ${id}, Received Payload:`, JSON.stringify(req.body, null, 2));
         const { title, std, medium, stream, board, subject, unit, overview, questions, totalMarks, orderIndex } = req.body;
         const exam = await TrueFalseExam.findByIdAndUpdate(
-            id, 
-            { 
-                title, std, medium, stream, board, subject, unit, overview, questions, 
+             id, 
+             { 
+                title, std, medium, stream, board, subject, unit, overview: overview || " ", questions, 
                 totalMarks: totalMarks || 20, 
                 orderIndex: orderIndex || 1 
-            }, 
-            { new: true }
+             }, 
+             { new: true }
         );
         if (!exam) {
             return res.status(404).json({ message: 'Exam not found' });

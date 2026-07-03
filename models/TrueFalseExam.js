@@ -40,6 +40,7 @@ const trueFalseExamSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+
     questions: [{
         question: { type: String },
         questionImage: String,
