@@ -1,0 +1,10 @@
+{
+  "maxReferralsAllowed": 3,
+  "pointsPerReferral": [
+    50,
+    150,
+    250
+  ],
+  "performedBy": "Super Admin",
+  "performedByImg": ""
+}

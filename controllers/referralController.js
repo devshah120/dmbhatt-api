@@ -8,15 +8,23 @@ const getReferralConfig = () => {
         const configPath = path.join(__dirname, '../config/referral.json');
         if (fs.existsSync(configPath)) {
             const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            let points = data.pointsPerReferral;
+            if (Array.isArray(points)) {
+                points = points.map(Number);
+            } else if (points !== undefined) {
+                points = Number(points);
+            } else {
+                points = 50;
+            }
             return {
-                pointsPerReferral: data.pointsPerReferral !== undefined ? Number(data.pointsPerReferral) : 50,
-                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 10
+                pointsPerReferral: points,
+                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 5
             };
         }
     } catch (err) {
         console.error('Error reading referral config:', err);
     }
-    return { pointsPerReferral: 50, maxReferralsAllowed: 10 };
+    return { pointsPerReferral: 50, maxReferralsAllowed: 5 };
 };
 
 // Generate a unique 6-character referral code
@@ -65,7 +73,13 @@ exports.validateReferralCode = async (req, res) => {
 
         // Calculate discount / points
         const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1;
-        const discountAmount = config.pointsPerReferral;
+        let discountAmount = 50;
+        if (Array.isArray(config.pointsPerReferral)) {
+            const idx = Math.min(milestoneNumber - 1, config.pointsPerReferral.length - 1);
+            discountAmount = config.pointsPerReferral[idx] || 0;
+        } else {
+            discountAmount = Number(config.pointsPerReferral);
+        }
 
         log.step('Referral code valid', { success: true, referrerId: referrer._id, referrerName: referrer.firstName, discountAmount, milestone: milestoneNumber });
         log.finish('SUCCESS');
@@ -188,7 +202,15 @@ exports.applyReferralCode = async (req, res) => {
             name: currentUser.firstName,
             joinedAt: new Date()
         });
-        referrer.bonusPoints = (referrer.bonusPoints || 0) + config.pointsPerReferral;
+        const milestoneNumber = referrer.invitedFriends.length; // Already pushed new user, so length is current milestone number
+        let pointsAwarded = 50;
+        if (Array.isArray(config.pointsPerReferral)) {
+            const idx = Math.min(milestoneNumber - 1, config.pointsPerReferral.length - 1);
+            pointsAwarded = config.pointsPerReferral[idx] || 0;
+        } else {
+            pointsAwarded = Number(config.pointsPerReferral);
+        }
+        referrer.bonusPoints = (referrer.bonusPoints || 0) + pointsAwarded;
         await referrer.save();
 
         // Update current user's referredBy field

@@ -13,18 +13,30 @@ const path = require('path');
 
 const getReferralConfig = () => {
     try {
-        const configPath = path.join(__dirname, '../data/config/referral.json');
+        // Support both potential config directories
+        let configPath = path.join(__dirname, '../data/config/referral.json');
+        if (!fs.existsSync(configPath)) {
+            configPath = path.join(__dirname, '../config/referral.json');
+        }
         if (fs.existsSync(configPath)) {
             const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            let points = data.pointsPerReferral;
+            if (Array.isArray(points)) {
+                points = points.map(Number);
+            } else if (points !== undefined) {
+                points = Number(points);
+            } else {
+                points = 50;
+            }
             return {
-                pointsPerReferral: data.pointsPerReferral !== undefined ? Number(data.pointsPerReferral) : 50,
-                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 10
+                pointsPerReferral: points,
+                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 5
             };
         }
     } catch (err) {
         console.error('Error reading referral config:', err);
     }
-    return { pointsPerReferral: 50, maxReferralsAllowed: 10 };
+    return { pointsPerReferral: 50, maxReferralsAllowed: 5 };
 };
 
 /**
@@ -329,7 +341,14 @@ const registerStudent = async (req, session) => {
         // Calculate milestone and bonus points dynamically
         const referrer = await User.findById(referrerId).session(session);
         const config = getReferralConfig();
-        const bonusPoints = config.pointsPerReferral;
+        const currentMilestoneLength = (referrer.invitedFriends?.length || 0) + 1;
+        let bonusPoints = 50;
+        if (Array.isArray(config.pointsPerReferral)) {
+            const idx = Math.min(currentMilestoneLength - 1, config.pointsPerReferral.length - 1);
+            bonusPoints = config.pointsPerReferral[idx] || 0;
+        } else {
+            bonusPoints = Number(config.pointsPerReferral);
+        }
 
         await User.findByIdAndUpdate(
             referrerId,
@@ -634,7 +653,14 @@ const registerGuest = async (req, session) => {
         // Calculate milestone and bonus points dynamically
         const referrer = await User.findById(referrerId).session(session);
         const config = getReferralConfig();
-        const bonusPoints = config.pointsPerReferral;
+        const currentMilestoneLength = (referrer.invitedFriends?.length || 0) + 1;
+        let bonusPoints = 50;
+        if (Array.isArray(config.pointsPerReferral)) {
+            const idx = Math.min(currentMilestoneLength - 1, config.pointsPerReferral.length - 1);
+            bonusPoints = config.pointsPerReferral[idx] || 0;
+        } else {
+            bonusPoints = Number(config.pointsPerReferral);
+        }
 
         await User.findByIdAndUpdate(
             referrerId,
