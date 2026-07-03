@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
+const { createRequestLogger } = require('../utils/logger');
 
 const getReferralConfig = () => {
     try {
@@ -30,10 +31,17 @@ const generateReferralCode = () => {
 
 // POST /api/referral/validate - Validate a referral code (public endpoint)
 exports.validateReferralCode = async (req, res) => {
+    const log = createRequestLogger('referral', {
+        endpoint: 'POST /referral/validate',
+        req,
+        meta: { flow: 'referral-validate', referralCode: req.body?.referralCode || null }
+    });
     try {
         const { referralCode } = req.body;
 
         if (!referralCode) {
+            log.step('Validate input', { success: false, error: 'Referral code missing' });
+            log.finish('VALIDATION_FAILED');
             return res.status(400).json({ message: 'Referral code is required' });
         }
 
@@ -41,6 +49,8 @@ exports.validateReferralCode = async (req, res) => {
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() }).select('firstName referralCode invitedFriends');
 
         if (!referrer) {
+            log.step('Lookup referrer', { success: false, error: 'Invalid referral code' });
+            log.finish('INVALID_CODE');
             return res.status(404).json({ message: 'Invalid referral code' });
         }
 
@@ -48,12 +58,17 @@ exports.validateReferralCode = async (req, res) => {
 
         // Check if referrer has reached max referrals
         if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+            log.step('Check referral limit', { success: false, referrerId: referrer._id, used: referrer.invitedFriends.length, max: config.maxReferralsAllowed });
+            log.finish('LIMIT_REACHED');
             return res.status(400).json({ message: `Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}` });
         }
 
         // Calculate discount / points
         const milestoneNumber = (referrer.invitedFriends?.length || 0) + 1;
         const discountAmount = config.pointsPerReferral;
+
+        log.step('Referral code valid', { success: true, referrerId: referrer._id, referrerName: referrer.firstName, discountAmount, milestone: milestoneNumber });
+        log.finish('SUCCESS');
 
         res.status(200).json({
             valid: true,
@@ -64,6 +79,7 @@ exports.validateReferralCode = async (req, res) => {
         });
     } catch (error) {
         console.error('Error validating referral code:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -110,11 +126,18 @@ exports.getReferralData = async (req, res) => {
 
 // POST /api/referral/apply - Apply a referral code during registration
 exports.applyReferralCode = async (req, res) => {
+    const log = createRequestLogger('referral', {
+        endpoint: 'POST /referral/apply',
+        req,
+        meta: { flow: 'referral-apply', referralCode: req.body?.referralCode || null }
+    });
     try {
         const { referralCode } = req.body;
         const userId = req.user.id;
 
         if (!referralCode) {
+            log.step('Validate input', { success: false, error: 'Referral code missing' });
+            log.finish('VALIDATION_FAILED');
             return res.status(400).json({ message: 'Referral code is required' });
         }
 
@@ -122,6 +145,8 @@ exports.applyReferralCode = async (req, res) => {
         const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
 
         if (!referrer) {
+            log.step('Lookup referrer', { success: false, error: 'Invalid referral code' });
+            log.finish('INVALID_CODE');
             return res.status(404).json({ message: 'Invalid referral code' });
         }
 
@@ -129,6 +154,8 @@ exports.applyReferralCode = async (req, res) => {
 
         // Check if referrer has reached max referrals
         if (referrer.invitedFriends && referrer.invitedFriends.length >= config.maxReferralsAllowed) {
+            log.step('Check referral limit', { success: false, referrerId: referrer._id, used: referrer.invitedFriends.length, max: config.maxReferralsAllowed });
+            log.finish('LIMIT_REACHED');
             return res.status(400).json({ message: `Referrer has reached maximum referral limit of ${config.maxReferralsAllowed}` });
         }
 
@@ -136,16 +163,22 @@ exports.applyReferralCode = async (req, res) => {
         const currentUser = await User.findById(userId);
 
         if (!currentUser) {
+            log.step('Fetch current user', { success: false, error: 'User not found' });
+            log.finish('USER_NOT_FOUND');
             return res.status(404).json({ message: 'User not found' });
         }
 
         // Check if user already used a referral code
         if (currentUser.referredBy) {
+            log.step('Check already referred', { success: false, error: 'User already used a referral code', referredBy: currentUser.referredBy });
+            log.finish('ALREADY_REFERRED');
             return res.status(400).json({ message: 'You have already used a referral code' });
         }
 
         // Check if user is trying to refer themselves
         if (referrer._id.toString() === userId) {
+            log.step('Check self-referral', { success: false, error: 'User attempted self-referral' });
+            log.finish('SELF_REFERRAL');
             return res.status(400).json({ message: 'You cannot use your own referral code' });
         }
 
@@ -162,11 +195,21 @@ exports.applyReferralCode = async (req, res) => {
         currentUser.referredBy = referrer._id;
         await currentUser.save();
 
+        log.step('Referral code applied', {
+            success: true,
+            referrerId: referrer._id,
+            referrerName: referrer.firstName,
+            pointsAwarded: config.pointsPerReferral,
+            referrerNewBalance: referrer.bonusPoints
+        });
+        log.finish('SUCCESS');
+
         res.status(200).json({
             message: 'Referral code applied successfully'
         });
     } catch (error) {
         console.error('Error applying referral code:', error);
+        log.fail('EXCEPTION', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
