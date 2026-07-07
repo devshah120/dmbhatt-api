@@ -366,18 +366,23 @@ const registerStudent = async (req, session) => {
         );
     }
 
-    // Create or update student profile
+    // Create or update student profile.
+    // IMPORTANT: only set fields that actually have a value so that renewals /
+    // re-subscriptions (which may not resend every field, e.g. parentPhone) do
+    // not overwrite existing data with empty strings.
+    const profileUpdate = {
+        std,
+        medium,
+        board: board || 'GSEB',
+        stream: stream || 'None',
+    };
+    if (school) profileUpdate.school = school;
+    if (rollNo) profileUpdate.rollNo = rollNo;
+    if (parentPhone) profileUpdate.parentPhone = parentPhone;
+
     await StudentProfile.findOneAndUpdate(
         { userId: savedUser._id },
-        {
-            std,
-            medium,
-            board: board || 'GSEB',
-            stream: stream || 'None',
-            school,
-            rollNo,
-            parentPhone
-        },
+        { $set: profileUpdate },
         { upsert: true, session }
     );
 
