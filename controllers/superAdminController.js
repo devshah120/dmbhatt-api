@@ -86,17 +86,90 @@ const getStudents = async (req, res) => {
             },
             { $unwind: '$user' },
             {
+                $lookup: {
+                    from: 'users',
+                    localField: 'user.referredBy',
+                    foreignField: '_id',
+                    as: 'referrer'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'redeemcodes',
+                    let: { studentUserId: '$userId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $or: [
+                                        { $eq: ['$usedBy', '$$studentUserId'] },
+                                        { $in: ['$$studentUserId', { $ifNull: ['$usageHistory.usedBy', []] }] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'redeemCodeInfo'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'payments',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'userPayments'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'planupgrades',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'userUpgrades'
+                }
+            },
+            {
+                $addFields: {
+                    computedPaidAmount: {
+                        $add: [
+                            {
+                                $sum: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: '$userPayments',
+                                                as: 'p',
+                                                cond: { $eq: ['$$p.status', 'captured'] }
+                                            }
+                                        },
+                                        as: 'p',
+                                        in: '$$p.amount'
+                                    }
+                                }
+                            },
+                            { $sum: '$userUpgrades.amount' }
+                        ]
+                    }
+                }
+            },
+            {
                 $project: {
                     _id: 1,
                     userId: 1,
                     firstName: '$user.firstName',
                     email: '$user.email',
                     phoneNum: '$user.phoneNum',
+                    isPaid: { $ifNull: ['$user.isPaid', false] },
+                    paidAmount: { $ifNull: ['$computedPaidAmount', 0] },
                     std: 1,
                     medium: 1,
                     stream: 1,
                     totalRewardPoints: 1,
-                    createdAt: 1
+                    createdAt: 1,
+                    referrerName: { $arrayElemAt: ['$referrer.firstName', 0] },
+                    referrerCode: { $arrayElemAt: ['$referrer.referralCode', 0] },
+                    redeemCode: { $arrayElemAt: ['$redeemCodeInfo.code', 0] },
+                    redeemCodeCreatedBy: { $arrayElemAt: ['$redeemCodeInfo.createdBy', 0] }
                 }
             },
             { $sort: { createdAt: -1 } }
@@ -124,22 +197,95 @@ const getStudentsExport = async (req, res) => {
             },
             { $unwind: '$user' },
             {
+                $lookup: {
+                    from: 'users',
+                    localField: 'user.referredBy',
+                    foreignField: '_id',
+                    as: 'referrer'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'redeemcodes',
+                    let: { studentUserId: '$userId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $or: [
+                                        { $eq: ['$usedBy', '$$studentUserId'] },
+                                        { $in: ['$$studentUserId', { $ifNull: ['$usageHistory.usedBy', []] }] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'redeemCodeInfo'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'payments',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'userPayments'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'planupgrades',
+                    localField: 'userId',
+                    foreignField: 'userId',
+                    as: 'userUpgrades'
+                }
+            },
+            {
+                $addFields: {
+                    computedPaidAmount: {
+                        $add: [
+                            {
+                                $sum: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: '$userPayments',
+                                                as: 'p',
+                                                cond: { $eq: ['$$p.status', 'captured'] }
+                                            }
+                                        },
+                                        as: 'p',
+                                        in: '$$p.amount'
+                                    }
+                                }
+                            },
+                            { $sum: '$userUpgrades.amount' }
+                        ]
+                    }
+                }
+            },
+            {
                 $project: {
                     _id: 1,
                     firstName: '$user.firstName',
                     email: '$user.email',
                     phoneNum: '$user.phoneNum',
+                    isPaid: { $ifNull: ['$user.isPaid', false] },
+                    paidAmount: { $ifNull: ['$computedPaidAmount', 0] },
                     std: 1,
                     medium: 1,
                     stream: 1,
                     totalRewardPoints: 1,
-                    createdAt: 1
+                    createdAt: 1,
+                    referrerName: { $arrayElemAt: ['$referrer.firstName', 0] },
+                    referrerCode: { $arrayElemAt: ['$referrer.referralCode', 0] },
+                    redeemCode: { $arrayElemAt: ['$redeemCodeInfo.code', 0] },
+                    redeemCodeCreatedBy: { $arrayElemAt: ['$redeemCodeInfo.createdBy', 0] }
                 }
             },
             { $sort: { createdAt: -1 } }
         ]);
 
-        let csv = 'Name,Email,Phone,Standard,Stream,Medium,Reward Points,Joined Date\n';
+        let csv = 'Name,Email,Phone,Standard,Stream,Medium,Reward Points,Is Paid,Amount Paid,Referral/Redeem Code,Referrer/Generated By,Joined Date\n';
 
         students.forEach(s => {
             const name = `"${(s.firstName || '').replace(/"/g, '""')}"`;
@@ -149,9 +295,24 @@ const getStudentsExport = async (req, res) => {
             const stream = `"${(s.stream || '').replace(/"/g, '""')}"`;
             const medium = `"${(s.medium || '').replace(/"/g, '""')}"`;
             const points = s.totalRewardPoints || 0;
+            const isPaid = s.isPaid ? 'Paid' : 'Unpaid';
+            const paidAmount = s.paidAmount || 0;
+            
+            let refCode = '';
+            let refOwner = '';
+            if (s.referrerCode) {
+                refCode = s.referrerCode;
+                refOwner = s.referrerName || '';
+            } else if (s.redeemCode) {
+                refCode = s.redeemCode;
+                refOwner = s.redeemCodeCreatedBy || '';
+            }
+            
+            const refCodeEscaped = `"${refCode.replace(/"/g, '""')}"`;
+            const refOwnerEscaped = `"${refOwner.replace(/"/g, '""')}"`;
             const date = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '';
 
-            csv += `${name},${email},${phone},${std},${stream},${medium},${points},${date}\n`;
+            csv += `${name},${email},${phone},${std},${stream},${medium},${points},${isPaid},${paidAmount},${refCodeEscaped},${refOwnerEscaped},${date}\n`;
         });
 
         res.status(200).json({ csv });
