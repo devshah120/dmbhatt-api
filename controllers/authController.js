@@ -728,6 +728,13 @@ const login = async (req, res) => {
         });
         await session.save();
 
+        // Include student profile fields (std/medium/board/stream/parentPhone) so
+        // the client can cache them — the app reads these off the login response.
+        let studentProfile = null;
+        if (user.role === 'student') {
+            studentProfile = await StudentProfile.findOne({ userId: user._id });
+        }
+
         res.status(200).json({
             message: 'Login successful',
             token,
@@ -737,7 +744,12 @@ const login = async (req, res) => {
                 firstName: user.firstName,
                 // lastName: user.lastName, // Removed as per request
                 email: user.email,
-                phoneNum: user.phoneNum
+                phoneNum: user.phoneNum,
+                std: studentProfile?.std,
+                medium: studentProfile?.medium,
+                board: studentProfile?.board,
+                stream: studentProfile?.stream,
+                parentPhone: studentProfile?.parentPhone
             }
         });
 
