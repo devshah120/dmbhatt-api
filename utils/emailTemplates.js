@@ -55,7 +55,7 @@ const emailTemplates = {
         </div>
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
-          <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 Padhaku Desk. All rights reserved.</p>
         </div>
       </div>
     `
@@ -124,7 +124,7 @@ const emailTemplates = {
         </div>
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
-          <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 Padhaku Desk. All rights reserved.</p>
         </div>
       </div>
     `
@@ -183,7 +183,7 @@ const emailTemplates = {
         </div>
 
         <div style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #999; border-radius: 0 0 8px 8px;">
-          <p style="margin: 0;">© 2024 Padhaku Desk. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 Padhaku Desk. All rights reserved.</p>
         </div>
       </div>
     `

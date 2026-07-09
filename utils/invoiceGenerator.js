@@ -153,7 +153,7 @@ const generateInvoice = async (invoiceData) => {
                 .fillColor('#999999')
                 .text('Thank you for your purchase!', 50, 700)
                 .text('This is an automatically generated invoice. No signature required.', 50, 713)
-                .text('© 2024 Padhaku Desk. All rights reserved.', 50, 726);
+                .text('© 2026 Padhaku Desk. All rights reserved.', 50, 726);
 
             // Finalize PDF
             doc.end();
