@@ -89,10 +89,11 @@ const submitResult = async (req, res) => {
         const title = req.body.title || 'Untitled Exam';
         
         // Ensure student has not already submitted this exam
-        const existingResult = await MatchFollowingExamResult.findOne({ studentId: req.user._id, examId });
-        if (existingResult) {
-            return res.status(400).json({ message: 'Exam already submitted' });
-        }
+        // DISABLED: students may now retake an exam any number of times
+        // const existingResult = await MatchFollowingExamResult.findOne({ studentId: req.user._id, examId });
+        // if (existingResult) {
+        //     return res.status(400).json({ message: 'Exam already submitted' });
+        // }
 
         const newResult = new MatchFollowingExamResult({
             studentId: req.user._id,

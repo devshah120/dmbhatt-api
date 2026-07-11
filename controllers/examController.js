@@ -473,21 +473,25 @@ const submitExam = async (req, res) => {
 
     try {
         // 1. Check if student already gave this exam
-        const existingResult = await ExamResult.findOne({ studentId, examId });
-        if (existingResult) {
-            return res.status(400).json({ message: 'You have already submitted this exam once.' });
-        }
+        // DISABLED: students may now retake an exam any number of times
+        // const existingResult = await ExamResult.findOne({ studentId, examId });
+        // if (existingResult) {
+        //     return res.status(400).json({ message: 'You have already submitted this exam once.' });
+        // }
 
         // 2. Calculate Reward Points (1 point per 10 marks)
-        const earnedPoints = Math.floor(obtainedMarks / 10);
+        // DISABLED: reward points are no longer awarded for exams
+        // const earnedPoints = Math.floor(obtainedMarks / 10);
+        const earnedPoints = 0;
 
         // 3. Update Student Profile
-        const StudentProfile = require('../models/StudentProfile');
-        const profile = await StudentProfile.findOne({ userId: studentId });
-        if (profile) {
-            profile.totalRewardPoints = (profile.totalRewardPoints || 0) + earnedPoints;
-            await profile.save();
-        }
+        // DISABLED: reward points are no longer accumulated on the profile
+        // const StudentProfile = require('../models/StudentProfile');
+        // const profile = await StudentProfile.findOne({ userId: studentId });
+        // if (profile) {
+        //     profile.totalRewardPoints = (profile.totalRewardPoints || 0) + earnedPoints;
+        //     await profile.save();
+        // }
 
         // 4. Save Result
         const finalIsOnline = isOnline === true || isOnline === 'true';
