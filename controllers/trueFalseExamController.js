@@ -1,6 +1,7 @@
 const TrueFalseExam = require('../models/TrueFalseExam');
 const TrueFalseExamResult = require('../models/TrueFalseExamResult');
 const StudentProfile = require('../models/StudentProfile');
+const ActivityLog = require('../models/ActivityLog');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const { PDFParse } = require('pdf-parse');
@@ -138,6 +139,15 @@ const createExam = async (req, res) => {
             orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Added',
+            targetName: savedExam.title,
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+        });
+
         res.status(201).json(savedExam);
     } catch (error) {
         console.error('Error creating exam:', error);
@@ -193,6 +203,15 @@ const updateExam = async (req, res) => {
         if (!exam) {
             return res.status(404).json({ message: 'Exam not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Updated',
+            targetName: exam.title,
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+        });
+
         res.status(200).json(exam);
     } catch (err) {
         console.error('Update True/False Exam Error:', err);
@@ -204,7 +223,18 @@ const updateExam = async (req, res) => {
 const deleteExam = async (req, res) => {
     const { id } = req.params;
     try {
-        await TrueFalseExam.findByIdAndDelete(id);
+        const deleted = await TrueFalseExam.findByIdAndDelete(id);
+
+        if (deleted) {
+            await ActivityLog.create({
+                entityType: 'Exam',
+                action: 'Deleted',
+                targetName: deleted.title,
+                performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+                performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+            });
+        }
+
         res.status(200).json({ message: 'Exam deleted successfully' });
     } catch (err) {
         console.error('Delete True/False Exam Error:', err);

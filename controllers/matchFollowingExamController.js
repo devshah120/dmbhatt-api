@@ -1,6 +1,7 @@
 const MatchFollowingExam = require('../models/MatchFollowingExam');
 const MatchFollowingExamResult = require('../models/MatchFollowingExamResult');
 const StudentProfile = require('../models/StudentProfile');
+const ActivityLog = require('../models/ActivityLog');
 
 // Create Exam
 const createExam = async (req, res) => {
@@ -11,6 +12,15 @@ const createExam = async (req, res) => {
             orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Added',
+            targetName: savedExam.title,
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+        });
+
         res.status(201).json(savedExam);
     } catch (error) {
         console.error('Error creating match following exam:', error);
@@ -63,6 +73,15 @@ const updateExam = async (req, res) => {
         if (!updatedExam) {
             return res.status(404).json({ error: 'Exam not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Updated',
+            targetName: updatedExam.title,
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+        });
+
         res.status(200).json(updatedExam);
     } catch (error) {
         console.error('Error updating match following exam:', error);
@@ -76,6 +95,15 @@ const deleteExam = async (req, res) => {
         if (!deletedExam) {
             return res.status(404).json({ error: 'Exam not found' });
         }
+
+        await ActivityLog.create({
+            entityType: 'Exam',
+            action: 'Deleted',
+            targetName: deletedExam.title,
+            performedBy: req.performedBy || req.query.performedBy || req.body.performedBy || 'Admin App',
+            performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
+        });
+
         res.status(200).json({ message: 'Exam deleted successfully' });
     } catch (error) {
         console.error('Error deleting match following exam:', error);
