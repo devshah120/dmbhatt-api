@@ -29,6 +29,7 @@ const User = require('../models/User');
 const ExploreProduct = require('../models/ExploreProduct');
 const ActivityLog = require('../models/ActivityLog');
 const NotificationConfig = require('../models/NotificationConfig');
+const { deleteStudentRelatedData } = require('../utils/studentCleanup');
 
 // ==========================================
 //  STUDENTS CRUD
@@ -384,13 +385,17 @@ const deleteStudent = async (req, res) => {
 
         const profile = await StudentProfile.findById(id).session(session);
         if (!profile) throw new Error('Student not found');
-        
+
         const user = await User.findById(profile.userId).session(session);
         const targetName = user ? user.firstName : 'Unknown';
 
+        // Remove purchases, payments, invoices, exam results, sessions, etc. before
+        // dropping the user, so nothing is left pointing at a deleted student.
+        const removed = await deleteStudentRelatedData(profile.userId, id, session);
+        console.log(`Deleted student ${targetName} (${profile.userId}) related data:`, removed);
+
         await User.findByIdAndDelete(profile.userId).session(session);
-        await StudentProfile.findByIdAndDelete(id).session(session);
-        
+
         const ActivityLog = require('../models/ActivityLog');
         const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
         const performedByImg = req.performedByImg || req.query.performedByImg || '';

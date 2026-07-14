@@ -6,6 +6,7 @@ const PlanUpgrade = require('../models/PlanUpgrade');
 const ExploreProduct = require('../models/ExploreProduct');
 const Payment = require('../models/Payment');
 const { hashLoginCode, parseAddress } = require('../utils/helpers');
+const { deleteStudentRelatedData } = require('../utils/studentCleanup');
 const xlsx = require('xlsx');
 
 /**
@@ -244,11 +245,13 @@ const deleteStudent = async (req, res) => {
         const user = await User.findById(id).session(session);
         const targetName = user ? user.firstName : 'Unknown';
 
+        // Remove profile, purchases, payments, invoices, exam results, sessions, etc.
+        // before dropping the user, so nothing is left pointing at a deleted student.
+        const removed = await deleteStudentRelatedData(id, null, session);
+        console.log(`Deleted student ${targetName} (${id}) related data:`, removed);
+
         // Delete User
         await User.findByIdAndDelete(id).session(session);
-
-        // Delete Profile
-        await StudentProfile.findOneAndDelete({ userId: id }).session(session);
 
         const ActivityLog = require('../models/ActivityLog');
         const performedBy = req.performedBy || req.query.performedBy || 'Admin App';
