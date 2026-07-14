@@ -268,6 +268,7 @@ const registerStudent = async (req, session) => {
         } else {
             const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
             if (adminCode) {
+                if (adminCode.isRevoked()) throw new Error('This code is no longer valid');
                 if (adminCode.isExhausted()) throw new Error('This code has already been used');
                 if (adminCode.isExpired()) throw new Error('This code has expired');
                 if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);
@@ -622,6 +623,7 @@ const registerGuest = async (req, session) => {
         } else {
             const adminCode = await RedeemCode.findOne({ code: referralCode.toUpperCase() }).session(session);
             if (adminCode) {
+                if (adminCode.isRevoked()) throw new Error('This code is no longer valid');
                 if (adminCode.isExhausted()) throw new Error('This code has already been used');
                 if (adminCode.isExpired()) throw new Error('This code has expired');
                 if (adminCode.std && adminCode.std !== std) throw new Error(`Code only valid for standard ${adminCode.std}`);

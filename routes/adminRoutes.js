@@ -38,6 +38,7 @@ router.get('/upgrade-plan-report', adminController.getUpgradePlanReport);
 router.post('/generate-redeem-code', adminController.generateRedeemCode);
 router.get('/redeem-codes', adminController.getRedeemCodes);
 router.delete('/delete-redeem-code/:id', adminController.deleteRedeemCode);
+router.put('/revoke-redeem-code/:id', adminController.revokeRedeemCode);
 
 // Leaderboard
 router.get('/leaderboard', adminController.getAdminLeaderboard);

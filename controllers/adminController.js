@@ -1203,6 +1203,31 @@ const deleteRedeemCode = async (req, res) => {
 };
 
 /**
+ * Revoke Redeem Code (Admin)
+ * Keeps the record and its usage history, but the code can never be redeemed again.
+ */
+const revokeRedeemCode = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const RedeemCode = require('../models/RedeemCode');
+        const code = await RedeemCode.findById(id);
+
+        if (!code) return res.status(404).json({ message: 'Code not found' });
+        if (code.revoked) return res.status(400).json({ message: 'This code is already revoked' });
+
+        code.revoked = true;
+        code.revokedAt = new Date();
+        code.revokedBy = req.query.performedBy || req.body?.revokedBy || 'Admin';
+        await code.save();
+
+        res.status(200).json(code);
+    } catch (err) {
+        console.error('Revoke Redeem Code Error:', err);
+        res.status(500).json({ message: 'Failed to revoke redeem code' });
+    }
+};
+
+/**
  * Get Admin Leaderboard (Top 5)
  */
 const getAdminLeaderboard = async (req, res) => {
@@ -1285,6 +1310,7 @@ module.exports = {
     generateRedeemCode,
     getRedeemCodes,
     deleteRedeemCode,
+    revokeRedeemCode,
     getAdminLeaderboard,
     toggleStudentGiftStatus
 };

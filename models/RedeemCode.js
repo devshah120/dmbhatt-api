@@ -47,6 +47,19 @@ const redeemCodeSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // A revoked code keeps its record and usage history but can never be redeemed again
+    revoked: {
+        type: Boolean,
+        default: false
+    },
+    revokedAt: {
+        type: Date,
+        default: null
+    },
+    revokedBy: {
+        type: String,
+        default: null
+    },
     // Legacy single-use fields, kept for backward compatibility with existing records/queries
     used: {
         type: Boolean,
@@ -70,7 +83,12 @@ const redeemCodeSchema = new mongoose.Schema({
     }
 });
 
+redeemCodeSchema.methods.isRevoked = function () {
+    return this.revoked === true;
+};
+
 redeemCodeSchema.methods.isExhausted = function () {
+    if (this.revoked) return true; // a revoked code is never redeemable again
     if (!this.maxUses || this.maxUses <= 0) return false; // unlimited
     return this.usedCount >= this.maxUses;
 };

@@ -20,6 +20,10 @@ exports.validateRedeemCode = async (req, res) => {
             return res.status(404).json({ message: 'Invalid redeem code' });
         }
 
+        if (code.isRevoked()) {
+            return res.status(400).json({ message: 'This redeem code is no longer valid' });
+        }
+
         if (code.isExhausted()) {
             return res.status(400).json({ message: 'This redeem code has already been used' });
         }

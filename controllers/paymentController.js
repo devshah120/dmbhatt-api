@@ -512,7 +512,10 @@ exports.verifyUpgradePayment = async (req, res) => {
                 await usedCode.save();
                 log.step('Apply redeem code', { success: true, code: req.body.redeemCode.toUpperCase(), discount: usedCode.discount, discountType: usedCode.discountType });
             } else {
-                log.step('Apply redeem code', { success: false, code: req.body.redeemCode.toUpperCase(), error: usedCode ? 'Code exhausted' : 'Code not found' });
+                const failureReason = !usedCode
+                    ? 'Code not found'
+                    : usedCode.isRevoked() ? 'Code revoked' : 'Code exhausted';
+                log.step('Apply redeem code', { success: false, code: req.body.redeemCode.toUpperCase(), error: failureReason });
             }
         }
 
