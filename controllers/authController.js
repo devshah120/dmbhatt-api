@@ -60,6 +60,10 @@ const register = async (req, res) => {
     // }
 
     const session = await mongoose.startSession();
+    // Once the commit lands the registration is durable, so anything that throws
+    // afterwards must not abort (the session is closed) or report failure (the
+    // student is registered and, if they paid, already charged).
+    let committed = false;
 
     try {
         session.startTransaction();
@@ -79,15 +83,26 @@ const register = async (req, res) => {
         }
 
         await session.commitTransaction();
+        committed = true;
         res.status(201).json({ message: 'User registered successfully' });
 
     } catch (err) {
-        await session.abortTransaction();
-        console.error('Registration Error:', err);
-        res.status(500).json({
-            message: 'Registration failed',
-            error: err.message
-        });
+        if (!committed) {
+            await session.abortTransaction();
+            console.error('Registration Error:', err);
+            return res.status(500).json({
+                message: 'Registration failed',
+                error: err.message
+            });
+        }
+
+        // Post-commit failure: the account exists. Reporting an error here would
+        // send the student back to re-register, which then rejects them as a
+        // duplicate or takes a second payment.
+        console.error('Post-commit registration error (registration succeeded):', err);
+        if (!res.headersSent) {
+            res.status(201).json({ message: 'User registered successfully' });
+        }
     } finally {
         session.endSession();
     }
@@ -367,6 +382,11 @@ const registerStudent = async (req, session) => {
         );
     }
 
+    // Read the previous standard before the update below overwrites it, so the
+    // invoice can describe the upgrade accurately.
+    const previousProfile = await StudentProfile.findOne({ userId: savedUser._id }).session(session);
+    const previousStd = previousProfile?.std || null;
+
     // Create or update student profile.
     // IMPORTANT: only set fields that actually have a value so that renewals /
     // re-subscriptions (which may not resend every field, e.g. parentPhone) do
@@ -400,8 +420,7 @@ const registerStudent = async (req, session) => {
             console.log(`[REGISTRATION_FLOW] Payment amount: ${numAmount}`);
 
             // Determine if this is an upgrade (existing student with old standard) or initial subscription (new student)
-            const studentProfile = await StudentProfile.findOne({ userId: savedUser._id }).session(session);
-            const oldStd = studentProfile?.std || null;
+            const oldStd = previousStd;
             const descriptionText = oldStd
                 ? `Standard ${oldStd} to Standard ${std}`
                 : `Subscription - Standard ${std}`;
@@ -429,7 +448,10 @@ const registerStudent = async (req, session) => {
                 filePath: invoiceData.filepath,
                 fileName: invoiceData.filename
             });
-            await invoiceRecord.save({ session });
+            // Saved outside the transaction: the invoice stands on its own, and
+            // keeping it here would hold the transaction open across the PDF and
+            // SMTP work below until it times out.
+            await invoiceRecord.save();
 
             console.log(`[REGISTRATION_FLOW] Invoice saved with number: ${invoiceRecord.invoiceNumber}`);
 
@@ -549,9 +571,13 @@ const registerStudent = async (req, session) => {
                 await transporter.sendMail(mailOptions);
                 console.log(`[REGISTRATION_FLOW] ✓ Invoice email sent successfully to: ${email}`);
 
-                invoiceRecord.emailSent = true;
-                invoiceRecord.emailSentAt = new Date();
-                await invoiceRecord.save({ session });
+                // Deliberately outside the transaction: sending the mail above can
+                // outlast the 60s transaction timeout, and this bookkeeping flag is
+                // not worth failing a paid registration over.
+                await Invoice.updateOne(
+                    { _id: invoiceRecord._id },
+                    { $set: { emailSent: true, emailSentAt: new Date() } }
+                );
             } else {
                 console.error(`[REGISTRATION_FLOW] SMTP not configured - invoice email not sent`);
             }
