@@ -15,7 +15,12 @@ startWorker(parseInt(process.env.NOTIFICATION_CHECK_INTERVAL) || 60000);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// The Razorpay webhook verifies an HMAC over the exact bytes it was sent, so its
+// body must stay unparsed; that route applies express.raw itself.
+app.use((req, res, next) => {
+    if (req.originalUrl === '/api/payment/webhook/razorpay') return next();
+    express.json()(req, res, next);
+});
 app.use(optionalProtect);
 app.use('/uploads', express.static('uploads'));
 

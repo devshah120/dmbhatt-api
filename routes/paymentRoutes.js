@@ -2,8 +2,20 @@ const express = require('express');
 const router = express.Router();
 const Razorpay = require('razorpay');
 const paymentController = require('../controllers/paymentController');
+const razorpayWebhookController = require('../controllers/razorpayWebhookController');
 const { protect } = require('../middleware/authMiddleware');
 const NotificationConfig = require('../models/NotificationConfig');
+
+// --- Razorpay Webhook ---
+// Unauthenticated by design: Razorpay calls this directly and authenticates via
+// the x-razorpay-signature HMAC, not a user token. express.raw is required
+// because that signature is computed over the exact bytes sent — the global
+// express.json() would reparse the body and invalidate it.
+router.post(
+    '/webhook/razorpay',
+    express.raw({ type: 'application/json' }),
+    razorpayWebhookController.handleRazorpayWebhook
+);
 
 const getRazorpayConfig = async () => {
     try {
