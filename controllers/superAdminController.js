@@ -131,24 +131,47 @@ const getStudents = async (req, res) => {
             },
             {
                 $addFields: {
+                    // A plan purchase writes BOTH a Payment and a PlanUpgrade for the
+                    // same razorpayPaymentId. Summing both collections double-counts it
+                    // (e.g. one ₹149 buy shows as ₹298). So count all captured Payments,
+                    // then add only upgrades whose payment isn't already a Payment row.
+                    // Genuine repeat payments (distinct payment ids) still add up.
+                    capturedPayments: {
+                        $filter: {
+                            input: '$userPayments',
+                            as: 'p',
+                            cond: { $eq: ['$$p.status', 'captured'] }
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    capturedPaymentIds: {
+                        $map: { input: '$capturedPayments', as: 'p', in: '$$p.razorpayPaymentId' }
+                    }
+                }
+            },
+            {
+                $addFields: {
                     computedPaidAmount: {
                         $add: [
+                            { $sum: { $map: { input: '$capturedPayments', as: 'p', in: '$$p.amount' } } },
                             {
                                 $sum: {
                                     $map: {
                                         input: {
                                             $filter: {
-                                                input: '$userPayments',
-                                                as: 'p',
-                                                cond: { $eq: ['$$p.status', 'captured'] }
+                                                input: '$userUpgrades',
+                                                as: 'u',
+                                                cond: { $not: [{ $in: ['$$u.razorpayPaymentId', '$capturedPaymentIds'] }] }
                                             }
                                         },
-                                        as: 'p',
-                                        in: '$$p.amount'
+                                        as: 'u',
+                                        in: '$$u.amount'
                                     }
                                 }
-                            },
-                            { $sum: '$userUpgrades.amount' }
+                            }
                         ]
                     }
                 }
@@ -242,24 +265,47 @@ const getStudentsExport = async (req, res) => {
             },
             {
                 $addFields: {
+                    // A plan purchase writes BOTH a Payment and a PlanUpgrade for the
+                    // same razorpayPaymentId. Summing both collections double-counts it
+                    // (e.g. one ₹149 buy shows as ₹298). So count all captured Payments,
+                    // then add only upgrades whose payment isn't already a Payment row.
+                    // Genuine repeat payments (distinct payment ids) still add up.
+                    capturedPayments: {
+                        $filter: {
+                            input: '$userPayments',
+                            as: 'p',
+                            cond: { $eq: ['$$p.status', 'captured'] }
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    capturedPaymentIds: {
+                        $map: { input: '$capturedPayments', as: 'p', in: '$$p.razorpayPaymentId' }
+                    }
+                }
+            },
+            {
+                $addFields: {
                     computedPaidAmount: {
                         $add: [
+                            { $sum: { $map: { input: '$capturedPayments', as: 'p', in: '$$p.amount' } } },
                             {
                                 $sum: {
                                     $map: {
                                         input: {
                                             $filter: {
-                                                input: '$userPayments',
-                                                as: 'p',
-                                                cond: { $eq: ['$$p.status', 'captured'] }
+                                                input: '$userUpgrades',
+                                                as: 'u',
+                                                cond: { $not: [{ $in: ['$$u.razorpayPaymentId', '$capturedPaymentIds'] }] }
                                             }
                                         },
-                                        as: 'p',
-                                        in: '$$p.amount'
+                                        as: 'u',
+                                        in: '$$u.amount'
                                     }
                                 }
-                            },
-                            { $sum: '$userUpgrades.amount' }
+                            }
                         ]
                     }
                 }
