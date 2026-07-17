@@ -736,18 +736,19 @@ const registerGuest = async (req, session) => {
  * Handles login for all roles: admin, assistant, student, guest
  */
 const login = async (req, res) => {
-    const { role, loginCode, phoneNum } = req.body;
+    const { role, loginCode, phoneNum, email, identifier } = req.body;
 
     try {
         let user;
 
-        // Unified login logic: Require phoneNum for all roles
-        if (!phoneNum) {
-            return res.status(400).json({ message: 'Phone number is required' });
+        // Accept phone number or email as the login identifier
+        const loginIdentifier = identifier || phoneNum || email;
+        if (!loginIdentifier) {
+            return res.status(400).json({ message: 'Phone number or email is required' });
         }
 
-        // Find user by phone number ONLY (ignores role sent by client for lookup)
-        user = await loginUserByPhone(role, phoneNum, loginCode);
+        // Find user by phone number or email (ignores role sent by client for lookup)
+        user = await loginUserByIdentifier(role, loginIdentifier, loginCode);
 
         // Generate JWT token
         const token = generateToken(user._id, user.role);
@@ -884,11 +885,13 @@ const resetPassword = async (req, res) => {
 };
 
 /**
- * Generic Login by Phone (Student, Guest, Assistant)
+ * Generic Login by Phone or Email (Student, Guest, Assistant)
  */
-const loginUserByPhone = async (role, phoneNum, loginCode) => {
-    // Normal DB Lookup
-    const user = await User.findOne({ phoneNum });
+const loginUserByIdentifier = async (role, identifier, loginCode) => {
+    // Normal DB Lookup - match by phone number or email
+    const user = await User.findOne({
+        $or: [{ phoneNum: identifier }, { email: identifier }]
+    });
 
     if (!user) {
         throw new Error('User not found');
