@@ -1243,6 +1243,15 @@ const getSuperAdminDashboard = async (req, res) => {
                 StudentProfile.countDocuments()
             ]);
 
+        // A plan purchase writes BOTH a Payment and a PlanUpgrade for the same
+        // razorpayPaymentId, so summing both collections double-counts revenue.
+        // Count every Payment, then count only upgrades whose payment isn't already
+        // a Payment row. This match excludes those overlapping upgrades everywhere.
+        const paymentIdsFromPayments = await Payment.distinct('razorpayPaymentId');
+        const nonDuplicateUpgradeMatch = {
+            razorpayPaymentId: { $nin: paymentIdsFromPayments }
+        };
+
         // Sum amounts
         const paymentSum = await Payment.aggregate([
             { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -1251,6 +1260,7 @@ const getSuperAdminDashboard = async (req, res) => {
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
         const upgradeSum = await PlanUpgrade.aggregate([
+            { $match: nonDuplicateUpgradeMatch },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
@@ -1258,9 +1268,9 @@ const getSuperAdminDashboard = async (req, res) => {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const revenueAggregation = async (Model) => {
+        const revenueAggregation = async (Model, extraMatch = {}) => {
             return await Model.aggregate([
-                { $match: { createdAt: { $gte: sixMonthsAgo } } },
+                { $match: { createdAt: { $gte: sixMonthsAgo }, ...extraMatch } },
                 {
                     $group: {
                         _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
@@ -1273,7 +1283,8 @@ const getSuperAdminDashboard = async (req, res) => {
 
         const [paymentRev, upgradeRev] = await Promise.all([
             revenueAggregation(Payment),
-            revenueAggregation(PlanUpgrade)
+            // Same de-duplication: skip upgrades already counted as a Payment.
+            revenueAggregation(PlanUpgrade, nonDuplicateUpgradeMatch)
         ]);
 
         // Merge revenue by month
