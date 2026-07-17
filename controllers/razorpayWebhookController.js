@@ -126,17 +126,25 @@ exports.handleRazorpayWebhook = async (req, res) => {
             return res.status(200).json({ message: 'Acknowledged; no matching user', paymentId: entity.id });
         }
 
-        await Payment.create({
-            userId: user._id,
-            razorpayOrderId: entity.order_id || `webhook_${entity.id}`,
-            razorpayPaymentId: entity.id,
-            // Verified by webhook HMAC over the raw body, not a client checkout callback.
-            razorpaySignature: 'verified_via_webhook',
-            amount: entity.amount / 100, // paise -> rupees
-            currency: entity.currency || 'INR',
-            status: 'captured',
-            createdAt: entity.created_at ? new Date(entity.created_at * 1000) : new Date()
-        });
+        try {
+            await Payment.create({
+                userId: user._id,
+                razorpayOrderId: entity.order_id || `webhook_${entity.id}`,
+                razorpayPaymentId: entity.id,
+                // Verified by webhook HMAC over the raw body, not a client checkout callback.
+                razorpaySignature: 'verified_via_webhook',
+                amount: entity.amount / 100, // paise -> rupees
+                currency: entity.currency || 'INR',
+                status: 'captured',
+                createdAt: entity.created_at ? new Date(entity.created_at * 1000) : new Date()
+            });
+        } catch (err) {
+            // Duplicate key: the client verify call inserted this same payment in
+            // the window between our existence check above and this insert. The
+            // payment is recorded — fall through to ensure isPaid and ack.
+            if (err.code !== 11000) throw err;
+            console.log(`[RAZORPAY_WEBHOOK] Payment ${entity.id} recorded concurrently by client — no duplicate created`);
+        }
 
         if (!user.isPaid) {
             await User.updateOne({ _id: user._id }, { $set: { isPaid: true } });

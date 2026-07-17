@@ -14,7 +14,10 @@ const paymentSchema = new mongoose.Schema({
     razorpayPaymentId: {
         type: String,
         required: true,
-        index: true
+        // Unique so the client verify call and the webhook can never both persist
+        // the same payment — whichever loses the race hits a duplicate-key error
+        // that callers treat as "already recorded".
+        unique: true
     },
     razorpaySignature: {
         type: String,

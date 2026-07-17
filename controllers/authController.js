@@ -333,17 +333,25 @@ const registerStudent = async (req, session) => {
         savedUser = await user.save({ session });
     }
 
-    // Save Payment Record
+    // Save Payment Record. Deliberately outside the transaction/session: the
+    // Razorpay webhook records payments non-transactionally, so its insert would
+    // be invisible to a transactional read here. The unique index on
+    // razorpayPaymentId is the real guard — a duplicate-key error means the
+    // webhook already saved it, which must not roll back this registration.
     if (razorpay_payment_id) {
-        const payment = new Payment({
-            userId: savedUser._id,
-            razorpayOrderId: razorpay_order_id,
-            razorpayPaymentId: razorpay_payment_id,
-            razorpaySignature: razorpay_signature,
-            amount: amount,
-            status: 'captured'
-        });
-        await payment.save({ session });
+        try {
+            await Payment.create({
+                userId: savedUser._id,
+                razorpayOrderId: razorpay_order_id,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpaySignature: razorpay_signature,
+                amount: amount,
+                status: 'captured'
+            });
+        } catch (err) {
+            if (err.code !== 11000) throw err;
+            console.log(`[REGISTRATION_FLOW] Payment ${razorpay_payment_id} already recorded (webhook) — skipping`);
+        }
     }
 
     // Mark Admin Redeem Code as used if applied

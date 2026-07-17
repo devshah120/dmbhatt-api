@@ -25,7 +25,9 @@ const PlanUpgradeSchema = new mongoose.Schema({
         type: String
     },
     razorpayPaymentId: {
-        type: String
+        type: String,
+        unique: true,
+        sparse: true
     },
     appleTransactionId: {
         type: String

@@ -1067,8 +1067,24 @@ const getPlanUpgrades = async (req, res) => {
             }
         ]);
 
-        // 4. Merge and Sort
-        let combined = [...initialPayments, ...upgrades];
+        // 4. Merge, de-duplicating by razorpayPaymentId.
+        // A plan purchase writes BOTH a Payment and a PlanUpgrade for the same
+        // razorpayPaymentId, so the same transaction surfaces in both lists above
+        // (e.g. "None -> 10" from the payment and "10 -> 10" from the upgrade).
+        // The PlanUpgrade carries the real old/new standard, so it wins; the
+        // payment-derived row is kept only when no upgrade references that payment.
+        const byPaymentId = new Map();
+        // Seed with initial payments first, then let upgrades overwrite on collision.
+        for (const row of initialPayments) {
+            const key = row.razorpayPaymentId || `pay_${row._id}`;
+            byPaymentId.set(key, row);
+        }
+        for (const row of upgrades) {
+            const key = row.razorpayPaymentId || `upg_${row._id}`;
+            byPaymentId.set(key, row);
+        }
+
+        const combined = [...byPaymentId.values()];
         combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         res.status(200).json(combined);

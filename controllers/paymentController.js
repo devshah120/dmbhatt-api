@@ -235,6 +235,17 @@ exports.verifyProductPayment = async (req, res) => {
         }
         log.step('Verify signature', { success: true });
 
+        // Check whether this payment has already been recorded (idempotency)
+        const existingPurchase = await ProductPurchase.findOne({ razorpayPaymentId: razorpay_payment_id });
+        if (existingPurchase) {
+            log.step('Check existing purchase', { success: true, alreadyRecorded: true, purchaseId: existingPurchase._id });
+            log.finish('ALREADY_RECORDED');
+            return res.status(200).json({
+                message: 'Purchase already recorded',
+                purchase: existingPurchase
+            });
+        }
+
         // Get user and product details
         const user = await User.findById(req.user.id);
         const product = await ExploreProduct.findById(productId);
@@ -246,17 +257,24 @@ exports.verifyProductPayment = async (req, res) => {
         }
         log.step('Fetch user & product', { success: true, userEmail: user.email, productFound: !!product });
 
-        // Save Payment record
-        const payment = new Payment({
-            userId: req.user.id,
-            razorpayOrderId: razorpay_order_id,
-            razorpayPaymentId: razorpay_payment_id,
-            razorpaySignature: razorpay_signature,
-            amount: amount,
-            status: 'captured'
-        });
-        await payment.save();
-        log.step('Save Payment record', { success: true, paymentId: payment._id });
+        // Save Payment record. The webhook may have already recorded this same
+        // payment; razorpayPaymentId is unique, so a duplicate-key error here just
+        // means it's already saved and we can safely proceed.
+        try {
+            const payment = new Payment({
+                userId: req.user.id,
+                razorpayOrderId: razorpay_order_id,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpaySignature: razorpay_signature,
+                amount: amount,
+                status: 'captured'
+            });
+            await payment.save();
+            log.step('Save Payment record', { success: true, paymentId: payment._id });
+        } catch (err) {
+            if (err.code !== 11000) throw err;
+            log.step('Save Payment record', { success: true, note: 'already recorded (webhook)' });
+        }
 
         // Save Product Purchase record (will link invoiceId after invoice creation)
         const purchase = new ProductPurchase({
@@ -266,7 +284,20 @@ exports.verifyProductPayment = async (req, res) => {
             razorpayPaymentId: razorpay_payment_id,
             amount: amount
         });
-        await purchase.save();
+        try {
+            await purchase.save();
+        } catch (saveError) {
+            if (saveError.code === 11000) {
+                const racePurchase = await ProductPurchase.findOne({ razorpayPaymentId: razorpay_payment_id });
+                log.step('Save ProductPurchase record', { success: true, alreadyRecorded: true, purchaseId: racePurchase?._id });
+                log.finish('ALREADY_RECORDED');
+                return res.status(200).json({
+                    message: 'Purchase already recorded',
+                    purchase: racePurchase
+                });
+            }
+            throw saveError;
+        }
         log.step('Save ProductPurchase record', { success: true, purchaseId: purchase._id });
 
         // Generate Invoice
@@ -482,6 +513,17 @@ exports.verifyUpgradePayment = async (req, res) => {
         console.log(`[PAYMENT_VERIFICATION] ✓ Upgrade payment signature verified`);
         log.step('Verify signature', { success: true });
 
+        // Check whether this payment has already been recorded (idempotency)
+        const existingUpgrade = await PlanUpgrade.findOne({ razorpayPaymentId: razorpay_payment_id });
+        if (existingUpgrade) {
+            log.step('Check existing upgrade', { success: true, alreadyRecorded: true, upgradeId: existingUpgrade._id });
+            log.finish('ALREADY_RECORDED');
+            return res.status(200).json({
+                message: 'Plan upgrade already recorded',
+                upgrade: existingUpgrade
+            });
+        }
+
         // Get user and find current standard
         const user = await User.findById(req.user.id);
         const profile = await StudentProfile.findOne({ userId: req.user.id });
@@ -500,7 +542,20 @@ exports.verifyUpgradePayment = async (req, res) => {
             paymentMethod: 'razorpay',
             redeemCode: req.body.redeemCode
         });
-        await upgrade.save();
+        try {
+            await upgrade.save();
+        } catch (saveError) {
+            if (saveError.code === 11000) {
+                const raceUpgrade = await PlanUpgrade.findOne({ razorpayPaymentId: razorpay_payment_id });
+                log.step('Save PlanUpgrade record', { success: true, alreadyRecorded: true, upgradeId: raceUpgrade?._id });
+                log.finish('ALREADY_RECORDED');
+                return res.status(200).json({
+                    message: 'Plan upgrade already recorded',
+                    upgrade: raceUpgrade
+                });
+            }
+            throw saveError;
+        }
         log.step('Save PlanUpgrade record', { success: true, upgradeId: upgrade._id, oldStandard, newStandard });
 
         // Mark Redeem Code as Used
