@@ -170,11 +170,12 @@ exports.uploadImageMaterial = async (req, res) => {
 
 exports.getAllMaterials = async (req, res) => {
     try {
-        const { type, standard, std, medium, board, stream, subject, year, skip = 0, limit = 10 } = req.query;
+        const { type, standard, std, medium, board, stream, subject, unit, year, skip = 0, limit = 10 } = req.query;
         let filter = { isDeleted: { $ne: true } };
 
         if (type) filter.type = type;
         if (standard || std) filter.standard = standard || std;
+        if (unit) filter.unit = unit;
 
         // If medium is not provided explicitly, use the logged-in user's medium
         let userMedium = medium;
