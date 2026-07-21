@@ -5,6 +5,8 @@ const ActivityLog = require('../models/ActivityLog');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const { PDFParse } = require('pdf-parse');
+const { shuffleQuestions } = require('../utils/examShuffleService');
+const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
 // Helper to parse the specialized format for True/False Exam
 const parseTrueFalseExamFormat = (text) => {
@@ -250,7 +252,29 @@ const getExamById = async (req, res) => {
         if (!exam) {
             return res.status(404).json({ message: 'Exam not found' });
         }
-        res.status(200).json(exam);
+
+        // Attempt 1 shows the admin's order; retakes get a reshuffled paper.
+        // Only the question order moves - swapping the True/False options
+        // themselves would change nothing for the student.
+        const studentId = req.user?._id;
+        const attemptNumber = await getNextAttemptNumber({
+            studentId,
+            examId: id,
+            examType: 'TRUE_FALSE',
+            ResultModel: TrueFalseExamResult,
+            skipShuffle: !shouldShuffleFor(req)
+        });
+
+        const payload = exam.toObject();
+        payload.questions = shuffleQuestions(payload.questions, {
+            attemptNumber,
+            studentId,
+            examId: id
+        });
+        payload.attemptNumber = attemptNumber;
+        payload.isShuffled = attemptNumber > 1;
+
+        res.status(200).json(payload);
     } catch (err) {
         console.error('Get True/False Exam By ID Error:', err);
         res.status(500).json({ message: 'Failed to fetch exam', error: err.message });
@@ -296,7 +320,26 @@ const submitResult = async (req, res) => {
         });
 
         await result.save();
-        res.status(201).json({ message: 'Exam result submitted successfully', result, earnedPoints });
+
+        const attemptInfo = await recordAttempt({
+            studentId,
+            examId,
+            examType: 'TRUE_FALSE',
+            title,
+            obtainedMarks,
+            totalMarks,
+            accuracy,
+            violationCount
+        });
+
+        res.status(201).json({
+            message: 'Exam result submitted successfully',
+            result,
+            earnedPoints,
+            attemptNumber: attemptInfo?.attemptNumber,
+            totalAttempts: attemptInfo?.totalAttempts,
+            bestMarks: attemptInfo?.bestMarks
+        });
     } catch (err) {
         console.error('Submit True/False Exam Result Error:', err);
         res.status(500).json({ message: 'Failed to submit exam result', error: err.message });

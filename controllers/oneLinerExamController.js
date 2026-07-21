@@ -1,6 +1,8 @@
 const OneLinerExam = require('../models/OneLinerExam');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
 const StudentProfile = require('../models/StudentProfile');
+const { shuffleQuestions } = require('../utils/examShuffleService');
+const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
 const createExam = async (req, res) => {
     try {
@@ -49,6 +51,24 @@ const getExamById = async (req, res) => {
         if (obj.totalMarks === undefined || obj.totalMarks === null) {
             obj.totalMarks = obj.questions ? obj.questions.length : 20;
         }
+
+        // Attempt 1 shows the admin's order; retakes get a reshuffled paper.
+        const studentId = req.user?._id;
+        const attemptNumber = await getNextAttemptNumber({
+            studentId,
+            examId: req.params.id,
+            examType: 'ONELINER',
+            ResultModel: OneLinerExamResult,
+            skipShuffle: !shouldShuffleFor(req)
+        });
+
+        obj.questions = shuffleQuestions(obj.questions, {
+            attemptNumber,
+            studentId,
+            examId: req.params.id
+        });
+        obj.attemptNumber = attemptNumber;
+        obj.isShuffled = attemptNumber > 1;
 
         res.status(200).json(obj);
     } catch (err) {
@@ -110,7 +130,25 @@ const submitResult = async (req, res) => {
         });
 
         await result.save();
-        res.status(201).json({ success: true, result, earnedPoints });
+
+        const attemptInfo = await recordAttempt({
+            studentId,
+            examId,
+            examType: 'ONELINER',
+            title,
+            obtainedMarks,
+            totalMarks,
+            accuracy
+        });
+
+        res.status(201).json({
+            success: true,
+            result,
+            earnedPoints,
+            attemptNumber: attemptInfo?.attemptNumber,
+            totalAttempts: attemptInfo?.totalAttempts,
+            bestMarks: attemptInfo?.bestMarks
+        });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

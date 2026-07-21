@@ -2,6 +2,8 @@ const MatchFollowingExam = require('../models/MatchFollowingExam');
 const MatchFollowingExamResult = require('../models/MatchFollowingExamResult');
 const StudentProfile = require('../models/StudentProfile');
 const ActivityLog = require('../models/ActivityLog');
+const { shuffleQuestions } = require('../utils/examShuffleService');
+const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
 // Create Exam
 const createExam = async (req, res) => {
@@ -39,7 +41,35 @@ const getAllExams = async (req, res) => {
         if (subject) query.subject = subject;
 
         const exams = await MatchFollowingExam.find(query).sort({ orderIndex: 1, createdAt: -1 });
-        res.status(200).json(exams);
+
+        // The student app starts an exercise straight from this list payload
+        // rather than re-fetching by id, so the per-attempt shuffle has to
+        // happen here too. ?original=true (admin app / review) opts out.
+        if (!shouldShuffleFor(req)) {
+            return res.status(200).json(exams);
+        }
+        const studentId = req.user._id;
+
+        const payload = await Promise.all(exams.map(async (exam) => {
+            const obj = exam.toObject();
+            const attemptNumber = await getNextAttemptNumber({
+                studentId,
+                examId: obj._id,
+                examType: 'MATCH_FOLLOWING',
+                ResultModel: MatchFollowingExamResult
+            });
+
+            obj.pairs = shuffleQuestions(obj.pairs, {
+                attemptNumber,
+                studentId,
+                examId: obj._id
+            });
+            obj.attemptNumber = attemptNumber;
+            obj.isShuffled = attemptNumber > 1;
+            return obj;
+        }));
+
+        res.status(200).json(payload);
     } catch (error) {
         console.error('Error fetching match following exams:', error);
         res.status(500).json({ error: 'Failed to fetch match following exams' });
@@ -52,7 +82,28 @@ const getExamById = async (req, res) => {
         if (!exam) {
             return res.status(404).json({ error: 'Exam not found' });
         }
-        res.status(200).json(exam);
+
+        // Attempt 1 shows the admin's order; retakes reorder the pairs so the
+        // student cannot rely on remembering row positions.
+        const studentId = req.user?._id;
+        const attemptNumber = await getNextAttemptNumber({
+            studentId,
+            examId: req.params.id,
+            examType: 'MATCH_FOLLOWING',
+            ResultModel: MatchFollowingExamResult,
+            skipShuffle: !shouldShuffleFor(req)
+        });
+
+        const payload = exam.toObject();
+        payload.pairs = shuffleQuestions(payload.pairs, {
+            attemptNumber,
+            studentId,
+            examId: req.params.id
+        });
+        payload.attemptNumber = attemptNumber;
+        payload.isShuffled = attemptNumber > 1;
+
+        res.status(200).json(payload);
     } catch (error) {
         console.error('Error fetching match following exam by id:', error);
         res.status(500).json({ error: 'Failed to fetch exam' });
@@ -153,7 +204,23 @@ const submitResult = async (req, res) => {
             }
         });
 
-        res.status(201).json({ message: 'Exam result submitted successfully' });
+        const attemptInfo = await recordAttempt({
+            studentId: req.user._id,
+            examId,
+            examType: 'MATCH_FOLLOWING',
+            title,
+            obtainedMarks,
+            totalMarks,
+            accuracy,
+            violationCount
+        });
+
+        res.status(201).json({
+            message: 'Exam result submitted successfully',
+            attemptNumber: attemptInfo?.attemptNumber,
+            totalAttempts: attemptInfo?.totalAttempts,
+            bestMarks: attemptInfo?.bestMarks
+        });
     } catch (error) {
         console.error('Error submitting match following exam result:', error);
         res.status(500).json({ message: 'Server error while submitting exam' });

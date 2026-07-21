@@ -4,6 +4,8 @@ const StudentProfile = require('../models/StudentProfile');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const { PDFParse } = require('pdf-parse'); // Check if this is the correct import based on examController.js
+const { shuffleQuestions, shuffleFlatOptions } = require('../utils/examShuffleService');
+const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
 // Helper to parse the specialized 5 Min Test format
 const parseFiveMinTestFormat = (text) => {
@@ -172,7 +174,35 @@ const getAllTests = async (req, res) => {
         const tests = await FiveMinTest.find(query)
             .sort({ orderIndex: 1, createdAt: -1 });
 
-        res.status(200).json(tests);
+        // The student app starts a quiz straight from this list payload rather
+        // than re-fetching by id, so the per-attempt shuffle has to happen here
+        // too. ?original=true (admin app / review screens) opts out.
+        if (!shouldShuffleFor(req)) {
+            return res.status(200).json(tests);
+        }
+        const studentId = req.user._id;
+
+        const payload = await Promise.all(tests.map(async (test) => {
+            const obj = test.toObject();
+            const attemptNumber = await getNextAttemptNumber({
+                studentId,
+                examId: obj._id,
+                examType: 'FIVE_MIN',
+                ResultModel: FiveMinTestResult
+            });
+
+            obj.questions = shuffleQuestions(obj.questions, {
+                attemptNumber,
+                studentId,
+                examId: obj._id,
+                shuffleOptions: shuffleFlatOptions
+            });
+            obj.attemptNumber = attemptNumber;
+            obj.isShuffled = attemptNumber > 1;
+            return obj;
+        }));
+
+        res.status(200).json(payload);
     } catch (err) {
         console.error('Get All 5 Min Tests Error:', err);
         res.status(500).json({ message: 'Failed to fetch tests', error: err.message });
@@ -214,7 +244,28 @@ const getTestById = async (req, res) => {
         if (!test) {
             return res.status(404).json({ message: 'Test not found' });
         }
-        res.status(200).json(test);
+
+        // Attempt 1 shows the admin's order; retakes get a reshuffled paper.
+        const studentId = req.user?._id;
+        const attemptNumber = await getNextAttemptNumber({
+            studentId,
+            examId: id,
+            examType: 'FIVE_MIN',
+            ResultModel: FiveMinTestResult,
+            skipShuffle: !shouldShuffleFor(req)
+        });
+
+        const payload = test.toObject();
+        payload.questions = shuffleQuestions(payload.questions, {
+            attemptNumber,
+            studentId,
+            examId: id,
+            shuffleOptions: shuffleFlatOptions
+        });
+        payload.attemptNumber = attemptNumber;
+        payload.isShuffled = attemptNumber > 1;
+
+        res.status(200).json(payload);
     } catch (err) {
         console.error('Get 5 Min Test By ID Error:', err);
         res.status(500).json({ message: 'Failed to fetch test', error: err.message });
@@ -259,7 +310,25 @@ const submitResult = async (req, res) => {
         });
 
         await result.save();
-        res.status(201).json({ message: 'Test result submitted successfully', result, earnedPoints });
+
+        const attemptInfo = await recordAttempt({
+            studentId,
+            examId,
+            examType: 'FIVE_MIN',
+            title,
+            obtainedMarks,
+            totalMarks,
+            violationCount: req.body.violationCount
+        });
+
+        res.status(201).json({
+            message: 'Test result submitted successfully',
+            result,
+            earnedPoints,
+            attemptNumber: attemptInfo?.attemptNumber,
+            totalAttempts: attemptInfo?.totalAttempts,
+            bestMarks: attemptInfo?.bestMarks
+        });
     } catch (err) {
         console.error('Submit 5 Min Test Result Error:', err);
         res.status(500).json({ message: 'Failed to submit test result', error: err.message });

@@ -2,6 +2,8 @@ const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const ExamResult = require('../models/ExamResult');
 const ActivityLog = require('../models/ActivityLog');
+const { shuffleQuestions, shuffleMcqOptions } = require('../utils/examShuffleService');
+const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const fs = require('fs');
@@ -374,7 +376,28 @@ const getExamById = async (req, res) => {
         if (!exam) {
             return res.status(404).json({ message: 'Exam not found' });
         }
-        res.status(200).json(exam);
+
+        // Attempt 1 shows the admin's order; retakes get a reshuffled paper.
+        const studentId = req.user?._id;
+        const attemptNumber = await getNextAttemptNumber({
+            studentId,
+            examId: id,
+            examType: 'REGULAR',
+            ResultModel: ExamResult,
+            skipShuffle: !shouldShuffleFor(req)
+        });
+
+        const payload = exam.toObject();
+        payload.questions = shuffleQuestions(payload.questions, {
+            attemptNumber,
+            studentId,
+            examId: id,
+            shuffleOptions: shuffleMcqOptions
+        });
+        payload.attemptNumber = attemptNumber;
+        payload.isShuffled = attemptNumber > 1;
+
+        res.status(200).json(payload);
     } catch (err) {
         console.error('Get Exam By ID Error:', err);
         res.status(500).json({ message: 'Failed to fetch exam', error: err.message });
@@ -508,10 +531,25 @@ const submitExam = async (req, res) => {
         });
 
         await result.save();
+
+        // 5. Record this attempt in the student's rolling history for this exam
+        const attemptInfo = await recordAttempt({
+            studentId,
+            examId,
+            examType: 'REGULAR',
+            title,
+            obtainedMarks,
+            totalMarks,
+            violationCount
+        });
+
         res.status(201).json({
             message: 'Exam result submitted successfully',
             result,
-            earnedPoints
+            earnedPoints,
+            attemptNumber: attemptInfo?.attemptNumber,
+            totalAttempts: attemptInfo?.totalAttempts,
+            bestMarks: attemptInfo?.bestMarks
         });
 
     } catch (err) {
@@ -553,8 +591,57 @@ const updateViolation = async (req, res) => {
     }
 };
 
+/**
+ * Attempt history for the logged-in student.
+ *
+ * GET /exam/attempts            -> every exam they have attempted
+ * GET /exam/attempts/:examId    -> per-attempt scores for one exam
+ */
+const getMyAttempts = async (req, res) => {
+    try {
+        const ExamAttempt = require('../models/ExamAttempt');
+        const { examId } = req.params;
+
+        const query = { studentId: req.user._id };
+        if (examId) query.examId = examId;
+
+        const records = await ExamAttempt.find(query).sort({ updatedAt: -1 });
+
+        if (examId) {
+            const record = records[0];
+            if (!record) {
+                // Never attempted: the next run is attempt 1, admin order.
+                return res.status(200).json({
+                    examId,
+                    totalAttempts: 0,
+                    bestMarks: 0,
+                    nextAttemptNumber: 1,
+                    attempts: []
+                });
+            }
+
+            return res.status(200).json({
+                examId: record.examId,
+                examType: record.examType,
+                title: record.title,
+                totalAttempts: record.totalAttempts,
+                bestMarks: record.bestMarks,
+                lastMarks: record.lastMarks,
+                nextAttemptNumber: record.totalAttempts + 1,
+                attempts: record.attempts
+            });
+        }
+
+        res.status(200).json(records);
+    } catch (err) {
+        console.error('Get Exam Attempts Error:', err);
+        res.status(500).json({ message: 'Failed to fetch attempts', error: err.message });
+    }
+};
+
 module.exports = {
     uploadExamPdf,
+    getMyAttempts,
     saveExam,
     getAllExams,
     deleteExam,
