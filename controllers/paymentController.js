@@ -14,7 +14,7 @@ const emailTemplates = require('../utils/emailTemplates');
 const fs = require('fs');
 const path = require('path');
 const { createRequestLogger, mask } = require('../utils/logger');
-const { getPointsConfig, calculateRedemption } = require('../utils/pointsService');
+const { getPointsConfig, calculateRedemption, getSpendableBalance, debitPoints } = require('../utils/pointsService');
 
 // Structured file logging for the Apple IAP flows.
 // Writes to logs/apple-iap/<logType>_<YYYY-MM-DD>.log (path preserved for continuity).
@@ -171,22 +171,22 @@ exports.getProductQuote = async (req, res) => {
         const { productId } = req.params;
         const requestedPoints = req.query.points;
 
-        const [product, user] = await Promise.all([
+        const [product, balance] = await Promise.all([
             ExploreProduct.findById(productId),
-            User.findById(req.user.id).select('bonusPoints')
+            getSpendableBalance(req.user.id)
         ]);
 
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
-        if (!user) {
+        if (!balance.userExists) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         const config = getPointsConfig();
         const quote = calculateRedemption(
             product.price,
-            user.bonusPoints,
+            balance.total,
             requestedPoints !== undefined ? requestedPoints : 0,
             config
         );
@@ -221,9 +221,9 @@ exports.createProductOrder = async (req, res) => {
 
         // Price and discount are derived server-side from the product record and the
         // user's real balance. Any amount sent by the client is ignored.
-        const [product, user] = await Promise.all([
+        const [product, balance] = await Promise.all([
             ExploreProduct.findById(productId),
-            User.findById(req.user.id).select('bonusPoints')
+            getSpendableBalance(req.user.id)
         ]);
 
         if (!product) {
@@ -231,14 +231,14 @@ exports.createProductOrder = async (req, res) => {
             log.finish('PRODUCT_NOT_FOUND');
             return res.status(404).json({ message: 'Product not found' });
         }
-        if (!user) {
+        if (!balance.userExists) {
             log.step('Fetch user', { success: false, error: 'User not found' });
             log.finish('USER_NOT_FOUND');
             return res.status(404).json({ message: 'User not found' });
         }
 
         const config = getPointsConfig();
-        const quote = calculateRedemption(product.price, user.bonusPoints, pointsToUse, config);
+        const quote = calculateRedemption(product.price, balance.total, pointsToUse, config);
         log.step('Calculate redemption', {
             success: true,
             productPrice: quote.productPrice,
@@ -407,13 +407,16 @@ exports.verifyProductPayment = async (req, res) => {
         // The balance guard makes a concurrent debit elsewhere fail closed rather than
         // pushing the student negative.
         if (pointsUsed > 0) {
-            const debitResult = await User.updateOne(
-                { _id: req.user.id, bonusPoints: { $gte: pointsUsed } },
-                { $inc: { bonusPoints: -pointsUsed } }
-            );
+            const debitResult = await debitPoints(req.user.id, pointsUsed);
 
-            if (debitResult.modifiedCount === 1) {
-                log.step('Debit redeemed points', { success: true, pointsUsed, pointsDiscount });
+            if (debitResult.success) {
+                log.step('Debit redeemed points', {
+                    success: true,
+                    pointsUsed,
+                    pointsDiscount,
+                    spentFromBonus: debitResult.spentFromBonus,
+                    spentFromRewards: debitResult.spentFromRewards
+                });
             } else {
                 // The purchase stands — the student paid and must get their material.
                 // Flag it loudly so the shortfall can be reconciled manually.

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { createRequestLogger } = require('../utils/logger');
 
-const { getPointsConfig, pointsToRupees } = require('../utils/pointsService');
+const { getPointsConfig, pointsToRupees, getSpendableBalance } = require('../utils/pointsService');
 
 const getReferralConfig = getPointsConfig;
 
@@ -111,13 +111,17 @@ exports.getReferralData = async (req, res) => {
         }
 
         const config = getReferralConfig();
+        // bonusPoints is referral earnings alone; spendablePoints is what checkout
+        // will actually let them use (referral + exam points).
+        const balance = await getSpendableBalance(userId);
 
         res.status(200).json({
             referralCode: user.referralCode,
             bonusPoints: user.bonusPoints || 0,
             invitedFriends: user.invitedFriends || [],
             pointsPerRupee: config.pointsPerRupee,
-            rupeeValue: pointsToRupees(user.bonusPoints, config.pointsPerRupee)
+            spendablePoints: balance.total,
+            rupeeValue: pointsToRupees(balance.total, config.pointsPerRupee)
         });
     } catch (error) {
         console.error('Error fetching referral data:', error);

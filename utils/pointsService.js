@@ -106,9 +106,91 @@ const calculateRedemption = (price, balance, requestedPoints, config) => {
     };
 };
 
+/**
+ * A student's spendable points live in two places: referral points on the User
+ * (bonusPoints) and exam points on their StudentProfile (totalRewardPoints). The
+ * dashboard shows the sum, so checkout must spend against that same total —
+ * otherwise a student sees points they cannot use.
+ *
+ * Returns the combined balance plus the two parts, which the debit needs in order
+ * to know how much to take from each.
+ */
+const getSpendableBalance = async (userId) => {
+    const User = require('../models/User');
+    const StudentProfile = require('../models/StudentProfile');
+
+    const [user, profile] = await Promise.all([
+        User.findById(userId).select('bonusPoints'),
+        StudentProfile.findOne({ userId }).select('totalRewardPoints')
+    ]);
+
+    const bonusPoints = Math.max(0, Math.floor(Number(user?.bonusPoints) || 0));
+    const rewardPoints = Math.max(0, Math.floor(Number(profile?.totalRewardPoints) || 0));
+
+    return {
+        userExists: !!user,
+        bonusPoints,
+        rewardPoints,
+        total: bonusPoints + rewardPoints
+    };
+};
+
+/**
+ * Spend [pointsToSpend] across the two balances, taking referral points first and
+ * exam points for the remainder. Each update is guarded on sufficient funds so a
+ * concurrent spend fails closed instead of driving a balance negative.
+ *
+ * Returns { success, spentFromBonus, spentFromRewards }. A false success means the
+ * balance moved underneath us and the caller must reconcile.
+ */
+const debitPoints = async (userId, pointsToSpend) => {
+    const User = require('../models/User');
+    const StudentProfile = require('../models/StudentProfile');
+
+    const amount = Math.max(0, Math.floor(Number(pointsToSpend) || 0));
+    if (amount === 0) return { success: true, spentFromBonus: 0, spentFromRewards: 0 };
+
+    const balance = await getSpendableBalance(userId);
+    if (balance.total < amount) {
+        return { success: false, spentFromBonus: 0, spentFromRewards: 0 };
+    }
+
+    const spentFromBonus = Math.min(balance.bonusPoints, amount);
+    const spentFromRewards = amount - spentFromBonus;
+
+    if (spentFromBonus > 0) {
+        const res = await User.updateOne(
+            { _id: userId, bonusPoints: { $gte: spentFromBonus } },
+            { $inc: { bonusPoints: -spentFromBonus } }
+        );
+        if (res.modifiedCount !== 1) {
+            return { success: false, spentFromBonus: 0, spentFromRewards: 0 };
+        }
+    }
+
+    if (spentFromRewards > 0) {
+        const res = await StudentProfile.updateOne(
+            { userId, totalRewardPoints: { $gte: spentFromRewards } },
+            { $inc: { totalRewardPoints: -spentFromRewards } }
+        );
+        if (res.modifiedCount !== 1) {
+            // Put back the referral points already taken so the student is not
+            // charged points for a discount that only partly applied.
+            if (spentFromBonus > 0) {
+                await User.updateOne({ _id: userId }, { $inc: { bonusPoints: spentFromBonus } });
+            }
+            return { success: false, spentFromBonus: 0, spentFromRewards: 0 };
+        }
+    }
+
+    return { success: true, spentFromBonus, spentFromRewards };
+};
+
 module.exports = {
     getPointsConfig,
     pointsToRupees,
     rupeesToPoints,
-    calculateRedemption
+    calculateRedemption,
+    getSpendableBalance,
+    debitPoints
 };
