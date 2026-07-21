@@ -4,6 +4,7 @@ const FiveMinTestResult = require('../models/FiveMinTestResult');
 const TrueFalseExamResult = require('../models/TrueFalseExamResult');
 const MatchFollowingExamResult = require('../models/MatchFollowingExamResult');
 const StudentProfile = require('../models/StudentProfile');
+const { getReferralConfig, pointsToRupees } = require('./referralController');
 
 /**
  * Get Student Dashboard Data
@@ -102,8 +103,13 @@ const getDashboardData = async (req, res) => {
         // Consolidate points: Exam Points + Referral Points
         const totalPoints = (studentProfile.totalRewardPoints || 0) + (user.bonusPoints || 0);
 
+        // Rupee value of the points balance, using the Super Admin configured rate
+        const referralConfig = getReferralConfig();
+
         res.status(200).json({
             totalRewardPoints: totalPoints,
+            pointsPerRupee: referralConfig.pointsPerRupee,
+            rupeeValue: pointsToRupees(totalPoints, referralConfig.pointsPerRupee),
             examResults: allResults.map(exam => ({
                 id: exam._id,
                 examId: exam.examId,

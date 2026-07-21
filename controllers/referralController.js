@@ -18,14 +18,24 @@ const getReferralConfig = () => {
             }
             return {
                 pointsPerReferral: points,
-                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 5
+                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 5,
+                pointsPerRupee: data.pointsPerRupee !== undefined && Number(data.pointsPerRupee) > 0 ? Number(data.pointsPerRupee) : 10
             };
         }
     } catch (err) {
         console.error('Error reading referral config:', err);
     }
-    return { pointsPerReferral: 50, maxReferralsAllowed: 5 };
+    return { pointsPerReferral: 50, maxReferralsAllowed: 5, pointsPerRupee: 10 };
 };
+
+// Convert a points balance into its rupee value using the configured rate
+const pointsToRupees = (points, pointsPerRupee) => {
+    const rate = Number(pointsPerRupee) > 0 ? Number(pointsPerRupee) : 10;
+    return Math.floor((Number(points) || 0) / rate);
+};
+
+exports.getReferralConfig = getReferralConfig;
+exports.pointsToRupees = pointsToRupees;
 
 // Generate a unique 6-character referral code
 const generateReferralCode = () => {
@@ -127,10 +137,14 @@ exports.getReferralData = async (req, res) => {
             await user.save();
         }
 
+        const config = getReferralConfig();
+
         res.status(200).json({
             referralCode: user.referralCode,
             bonusPoints: user.bonusPoints || 0,
-            invitedFriends: user.invitedFriends || []
+            invitedFriends: user.invitedFriends || [],
+            pointsPerRupee: config.pointsPerRupee,
+            rupeeValue: pointsToRupees(user.bonusPoints, config.pointsPerRupee)
         });
     } catch (error) {
         console.error('Error fetching referral data:', error);
