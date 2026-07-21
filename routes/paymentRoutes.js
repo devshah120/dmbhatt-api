@@ -87,6 +87,7 @@ router.post('/create-order', async (req, res) => {
 });
 
 // --- Product Purchase Routes ---
+router.get('/product/:productId/quote', protect, paymentController.getProductQuote);
 router.post('/product/create-order', protect, paymentController.createProductOrder);
 router.post('/product/verify', protect, paymentController.verifyProductPayment);
 

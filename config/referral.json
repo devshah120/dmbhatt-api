@@ -6,6 +6,7 @@
     250
   ],
   "pointsPerRupee": 10,
+  "maxPointsDiscountPercent": 50,
   "performedBy": "Super Admin",
   "performedByImg": ""
 }

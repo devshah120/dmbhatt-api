@@ -14,6 +14,7 @@ const emailTemplates = require('../utils/emailTemplates');
 const fs = require('fs');
 const path = require('path');
 const { createRequestLogger, mask } = require('../utils/logger');
+const { getPointsConfig, calculateRedemption } = require('../utils/pointsService');
 
 // Structured file logging for the Apple IAP flows.
 // Writes to logs/apple-iap/<logType>_<YYYY-MM-DD>.log (path preserved for continuity).
@@ -159,6 +160,44 @@ const sendInvoiceEmail = async (user, invoiceData, emailType = 'general', additi
     }
 };
 
+/**
+ * GET /payment/product/:productId/quote
+ * Tells the app what this product costs for this student right now: the price, their
+ * points balance, the most they may redeem, and the resulting payable amount.
+ * Read-only — it never debits points.
+ */
+exports.getProductQuote = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const requestedPoints = req.query.points;
+
+        const [product, user] = await Promise.all([
+            ExploreProduct.findById(productId),
+            User.findById(req.user.id).select('bonusPoints')
+        ]);
+
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const config = getPointsConfig();
+        const quote = calculateRedemption(
+            product.price,
+            user.bonusPoints,
+            requestedPoints !== undefined ? requestedPoints : 0,
+            config
+        );
+
+        res.status(200).json(quote);
+    } catch (error) {
+        console.error('Error building product quote:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 exports.createProductOrder = async (req, res) => {
     const log = createRequestLogger('payment', {
         endpoint: 'POST /payment/product/create-order',
@@ -166,31 +205,75 @@ exports.createProductOrder = async (req, res) => {
         meta: {
             flow: 'razorpay-product-order',
             productId: req.body?.productId,
-            amount: req.body?.amount,
+            pointsToUse: req.body?.pointsToUse,
             currency: req.body?.currency || 'INR'
         }
     });
     try {
-        const { productId, amount, currency = 'INR' } = req.body;
+        const { productId, pointsToUse = 0, currency = 'INR' } = req.body;
 
-        if (!productId || !amount) {
-            log.step('Validate required fields', { success: false, error: 'Missing productId or amount' });
+        if (!productId) {
+            log.step('Validate required fields', { success: false, error: 'Missing productId' });
             log.finish('VALIDATION_FAILED');
-            return res.status(400).json({ message: 'Product ID and Amount are required' });
+            return res.status(400).json({ message: 'Product ID is required' });
         }
         log.step('Validate required fields', { success: true });
 
+        // Price and discount are derived server-side from the product record and the
+        // user's real balance. Any amount sent by the client is ignored.
+        const [product, user] = await Promise.all([
+            ExploreProduct.findById(productId),
+            User.findById(req.user.id).select('bonusPoints')
+        ]);
+
+        if (!product) {
+            log.step('Fetch product', { success: false, error: 'Product not found' });
+            log.finish('PRODUCT_NOT_FOUND');
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        if (!user) {
+            log.step('Fetch user', { success: false, error: 'User not found' });
+            log.finish('USER_NOT_FOUND');
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const config = getPointsConfig();
+        const quote = calculateRedemption(product.price, user.bonusPoints, pointsToUse, config);
+        log.step('Calculate redemption', {
+            success: true,
+            productPrice: quote.productPrice,
+            pointsRequested: pointsToUse,
+            pointsUsed: quote.pointsUsed,
+            discount: quote.discount,
+            payableAmount: quote.payableAmount
+        });
+
+        if (quote.payableAmount <= 0) {
+            log.step('Validate payable amount', { success: false, error: 'Amount must be greater than zero' });
+            log.finish('INVALID_AMOUNT');
+            return res.status(400).json({
+                message: 'Payable amount must be greater than zero. Please reduce the points applied.'
+            });
+        }
+
         const options = {
-            amount: amount * 100, // paise
+            amount: Math.round(quote.payableAmount * 100), // paise
             currency,
-            receipt: `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+            receipt: `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            // Carried through so verification can reconstruct the exact same deal.
+            notes: {
+                productId: String(productId),
+                userId: String(req.user.id),
+                pointsUsed: String(quote.pointsUsed),
+                discount: String(quote.discount)
+            }
         };
 
         const razorpay = getRazorpayInstance();
         const order = await razorpay.orders.create(options);
         log.step('Razorpay order created', { success: true, orderId: order.id, receipt: options.receipt });
         log.finish('SUCCESS');
-        res.json(order);
+        res.json({ ...order, quote });
     } catch (error) {
         console.error('Error creating product order:', error);
         log.fail('EXCEPTION', error);
@@ -218,8 +301,7 @@ exports.verifyProductPayment = async (req, res) => {
             productId,
             razorpay_payment_id,
             razorpay_order_id,
-            razorpay_signature,
-            amount
+            razorpay_signature
         } = req.body;
 
         // Verify signature
@@ -234,6 +316,23 @@ exports.verifyProductPayment = async (req, res) => {
             return res.status(400).json({ message: 'Transaction not legitimate!' });
         }
         log.step('Verify signature', { success: true });
+
+        // The order we created is the source of truth for what was actually charged
+        // and how many points were promised against it. The client's numbers are
+        // never trusted here.
+        const razorpayOrder = await getRazorpayInstance().orders.fetch(razorpay_order_id);
+        const amount = (Number(razorpayOrder.amount_paid ?? razorpayOrder.amount) || 0) / 100;
+        const orderNotes = razorpayOrder.notes || {};
+        const pointsUsed = Math.max(0, Math.floor(Number(orderNotes.pointsUsed) || 0));
+        const pointsDiscount = Math.max(0, Number(orderNotes.discount) || 0);
+
+        // The order was created for a specific user; refuse to settle it for anyone else.
+        if (orderNotes.userId && String(orderNotes.userId) !== String(req.user.id)) {
+            log.step('Verify order ownership', { success: false, orderUserId: orderNotes.userId, requestUserId: req.user.id });
+            log.finish('ORDER_USER_MISMATCH');
+            return res.status(403).json({ message: 'This order does not belong to the current user' });
+        }
+        log.step('Fetch Razorpay order', { success: true, amount, pointsUsed, pointsDiscount });
 
         // Check whether this payment has already been recorded (idempotency)
         const existingPurchase = await ProductPurchase.findOne({ razorpayPaymentId: razorpay_payment_id });
@@ -282,7 +381,9 @@ exports.verifyProductPayment = async (req, res) => {
             productId: productId,
             razorpayOrderId: razorpay_order_id,
             razorpayPaymentId: razorpay_payment_id,
-            amount: amount
+            amount: amount,
+            pointsUsed: pointsUsed,
+            pointsDiscount: pointsDiscount
         });
         try {
             await purchase.save();
@@ -299,6 +400,34 @@ exports.verifyProductPayment = async (req, res) => {
             throw saveError;
         }
         log.step('Save ProductPurchase record', { success: true, purchaseId: purchase._id });
+
+        // Debit the redeemed points. The unique razorpayPaymentId on the purchase above
+        // is the idempotency gate — reaching this line means this payment had not been
+        // settled before, so the balance can only be reduced once per payment.
+        // The balance guard makes a concurrent debit elsewhere fail closed rather than
+        // pushing the student negative.
+        if (pointsUsed > 0) {
+            const debitResult = await User.updateOne(
+                { _id: req.user.id, bonusPoints: { $gte: pointsUsed } },
+                { $inc: { bonusPoints: -pointsUsed } }
+            );
+
+            if (debitResult.modifiedCount === 1) {
+                log.step('Debit redeemed points', { success: true, pointsUsed, pointsDiscount });
+            } else {
+                // The purchase stands — the student paid and must get their material.
+                // Flag it loudly so the shortfall can be reconciled manually.
+                console.error(
+                    `[POINTS_DEBIT_FAILED] userId=${req.user.id} purchaseId=${purchase._id} ` +
+                    `pointsUsed=${pointsUsed} — balance was insufficient at settlement time`
+                );
+                log.step('Debit redeemed points', {
+                    success: false,
+                    pointsUsed,
+                    error: 'Insufficient balance at settlement; purchase honoured, needs reconciliation'
+                });
+            }
+        }
 
         // Generate Invoice
         let invoiceRecord = null;

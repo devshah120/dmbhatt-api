@@ -23,6 +23,16 @@ const ProductPurchaseSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    // Points redeemed against this purchase, and the rupee discount they bought.
+    // amount above is what was actually charged, i.e. price - pointsDiscount.
+    pointsUsed: {
+        type: Number,
+        default: 0
+    },
+    pointsDiscount: {
+        type: Number,
+        default: 0
+    },
     invoiceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Invoice'

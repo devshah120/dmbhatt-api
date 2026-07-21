@@ -3,36 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const { createRequestLogger } = require('../utils/logger');
 
-const getReferralConfig = () => {
-    try {
-        const configPath = path.join(__dirname, '../config/referral.json');
-        if (fs.existsSync(configPath)) {
-            const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            let points = data.pointsPerReferral;
-            if (Array.isArray(points)) {
-                points = points.map(Number);
-            } else if (points !== undefined) {
-                points = Number(points);
-            } else {
-                points = 50;
-            }
-            return {
-                pointsPerReferral: points,
-                maxReferralsAllowed: data.maxReferralsAllowed !== undefined ? Number(data.maxReferralsAllowed) : 5,
-                pointsPerRupee: data.pointsPerRupee !== undefined && Number(data.pointsPerRupee) > 0 ? Number(data.pointsPerRupee) : 10
-            };
-        }
-    } catch (err) {
-        console.error('Error reading referral config:', err);
-    }
-    return { pointsPerReferral: 50, maxReferralsAllowed: 5, pointsPerRupee: 10 };
-};
+const { getPointsConfig, pointsToRupees } = require('../utils/pointsService');
 
-// Convert a points balance into its rupee value using the configured rate
-const pointsToRupees = (points, pointsPerRupee) => {
-    const rate = Number(pointsPerRupee) > 0 ? Number(pointsPerRupee) : 10;
-    return Math.floor((Number(points) || 0) / rate);
-};
+const getReferralConfig = getPointsConfig;
 
 exports.getReferralConfig = getReferralConfig;
 exports.pointsToRupees = pointsToRupees;
