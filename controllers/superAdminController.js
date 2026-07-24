@@ -196,6 +196,7 @@ const getStudents = async (req, res) => {
                     redeemCodeCreatedBy: { $arrayElemAt: ['$redeemCodeInfo.createdBy', 0] }
                 }
             },
+            { $match: { $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] } },
             { $sort: { createdAt: -1 } }
         ]);
 
@@ -462,6 +463,85 @@ const deleteStudent = async (req, res) => {
         res.status(500).json({ message: err.message || 'Failed to delete student' });
     } finally {
         session.endSession();
+    }
+};
+
+const restoreStudent = async (req, res) => {
+    try {
+        const { id } = req.params; // StudentProfile _id
+        const StudentProfile = require('../models/StudentProfile');
+        const User = require('../models/User');
+        const Session = require('../models/Session');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+
+        const user = await User.findById(profile.userId);
+        if (!user) return res.status(404).json({ message: 'User record not found' });
+
+        if (!user.deletedAt) {
+            return res.status(400).json({ message: 'This account is not deleted' });
+        }
+
+        // Restore the account
+        user.deletedAt = null;
+        user.isActive = true;
+        await user.save();
+
+        const ActivityLog = require('../models/ActivityLog');
+        const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
+        const performedByImg = req.performedByImg || req.query.performedByImg || '';
+
+        await ActivityLog.create({
+            entityType: 'Student',
+            action: 'Restored',
+            targetName: user.firstName,
+            performedBy: performedBy,
+            performedByImg: performedByImg
+        });
+
+        console.log(`[RESTORE ACCOUNT] User ${user._id} (${user.phoneNum}) restored by ${performedBy}`);
+        res.status(200).json({ message: 'Student account restored successfully' });
+    } catch (err) {
+        console.error('Restore Student Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to restore student' });
+    }
+};
+
+const getDeletedStudents = async (req, res) => {
+    try {
+        const StudentProfile = require('../models/StudentProfile');
+        const students = await StudentProfile.aggregate([
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            { $match: { 'user.deletedAt': { $ne: null } } },
+            {
+                $project: {
+                    _id: 1,
+                    userId: 1,
+                    firstName: '$user.firstName',
+                    email: '$user.email',
+                    phoneNum: '$user.phoneNum',
+                    std: 1,
+                    medium: 1,
+                    stream: 1,
+                    deletedAt: '$user.deletedAt',
+                    createdAt: 1
+                }
+            },
+            { $sort: { deletedAt: -1 } }
+        ]);
+        res.status(200).json(students);
+    } catch (err) {
+        console.error('Get Deleted Students Error:', err);
+        res.status(500).json({ message: 'Failed to fetch deleted students' });
     }
 };
 
@@ -1722,6 +1802,8 @@ module.exports = {
     getStudentsExport,
     updateStudent,
     deleteStudent,
+    restoreStudent,
+    getDeletedStudents,
     // Admins
     getAdmins,
     createAdmin,

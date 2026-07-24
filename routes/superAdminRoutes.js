@@ -13,9 +13,11 @@ router.get('/dashboard', ctrl.getSuperAdminDashboard);
 
 // Students
 router.get('/students/export', ctrl.getStudentsExport);
+router.get('/students/deleted', ctrl.getDeletedStudents);
 router.get('/students', ctrl.getStudents);
 router.post('/students', ctrl.createStudent);
 router.put('/students/:id', ctrl.updateStudent);
+router.put('/students/:id/restore', ctrl.restoreStudent);
 router.delete('/students/:id', ctrl.deleteStudent);
 
 // Admins
