@@ -164,7 +164,12 @@ const getStudents = async (req, res) => {
                                             $filter: {
                                                 input: '$userUpgrades',
                                                 as: 'u',
-                                                cond: { $not: [{ $in: ['$$u.razorpayPaymentId', '$capturedPaymentIds'] }] }
+                                                cond: {
+                                                    $and: [
+                                                        { $not: [{ $in: ['$$u.razorpayPaymentId', '$capturedPaymentIds'] }] },
+                                                        { $ne: ['$$u.status', 'refunded'] }
+                                                    ]
+                                                }
                                             }
                                         },
                                         as: 'u',
@@ -507,6 +512,133 @@ const restoreStudent = async (req, res) => {
         res.status(500).json({ message: err.message || 'Failed to restore student' });
     }
 };
+
+/**
+ * GET /students/:id/payments
+ * Returns all captured payments (Payment + PlanUpgrade) for a student.
+ */
+const getStudentPayments = async (req, res) => {
+    try {
+        const { id } = req.params; // StudentProfile _id
+        const StudentProfile = require('../models/StudentProfile');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+
+        const userId = profile.userId;
+
+        // All payments (any status)
+        const payments = await Payment.find({ userId }).sort({ createdAt: -1 }).lean();
+
+        // All plan upgrades
+        const upgrades = await PlanUpgrade.find({ userId }).sort({ createdAt: -1 }).lean();
+
+        // Captured payment razorpayPaymentIds (for dedup)
+        const capturedPaymentIds = payments
+            .filter(p => p.status === 'captured')
+            .map(p => p.razorpayPaymentId);
+
+        // Non-duplicate upgrades (not already counted in payments)
+        const nonDupUpgrades = upgrades.filter(
+            u => !capturedPaymentIds.includes(u.razorpayPaymentId)
+        );
+
+        res.status(200).json({
+            payments: payments.map(p => ({
+                _id: p._id,
+                source: 'payment',
+                razorpayPaymentId: p.razorpayPaymentId,
+                amount: p.amount,
+                status: p.status,
+                createdAt: p.createdAt
+            })),
+            upgrades: nonDupUpgrades.map(u => ({
+                _id: u._id,
+                source: 'upgrade',
+                razorpayPaymentId: u.razorpayPaymentId,
+                amount: u.amount,
+                fromStandard: u.fromStandard,
+                toStandard: u.newStandard,
+                createdAt: u.createdAt
+            }))
+        });
+    } catch (err) {
+        console.error('Get Student Payments Error:', err);
+        res.status(500).json({ message: 'Failed to fetch student payments' });
+    }
+};
+
+/**
+ * PUT /students/:id/refund
+ * Body: { paymentId, source } where source is 'payment' or 'upgrade'
+ * Marks the record as refunded and recalculates isPaid on the User.
+ */
+const refundStudentPayment = async (req, res) => {
+    try {
+        const { id } = req.params; // StudentProfile _id
+        const { paymentId, source } = req.body;
+
+        if (!paymentId || !source) {
+            return res.status(400).json({ message: 'paymentId and source are required' });
+        }
+
+        const StudentProfile = require('../models/StudentProfile');
+        const User = require('../models/User');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+
+        const userId = profile.userId;
+
+        if (source === 'payment') {
+            const payment = await Payment.findOne({ _id: paymentId, userId });
+            if (!payment) return res.status(404).json({ message: 'Payment not found' });
+            if (payment.status === 'refunded') {
+                return res.status(400).json({ message: 'Payment is already refunded' });
+            }
+            payment.status = 'refunded';
+            await payment.save();
+        } else if (source === 'upgrade') {
+            const upgrade = await PlanUpgrade.findOne({ _id: paymentId, userId });
+            if (!upgrade) return res.status(404).json({ message: 'Plan upgrade not found' });
+            // Mark upgrade as refunded by adding a refunded flag
+            upgrade.status = 'refunded';
+            await upgrade.save();
+        } else {
+            return res.status(400).json({ message: 'Invalid source. Must be payment or upgrade' });
+        }
+
+        // Recalculate isPaid: any remaining captured payments or non-refunded upgrades?
+        const capturedPayments = await Payment.find({ userId, status: 'captured' });
+        const capturedPaymentIds = capturedPayments.map(p => p.razorpayPaymentId);
+        const activeUpgrades = await PlanUpgrade.find({
+            userId,
+            status: { $ne: 'refunded' },
+            razorpayPaymentId: { $nin: capturedPaymentIds }
+        });
+
+        const stillPaid = capturedPayments.length > 0 || activeUpgrades.length > 0;
+        await User.findByIdAndUpdate(userId, { isPaid: stillPaid });
+
+        // Log it
+        const user = await User.findById(userId);
+        const performedBy = req.performedBy || req.query.performedBy || 'Super Admin';
+        const performedByImg = req.performedByImg || req.query.performedByImg || '';
+        await ActivityLog.create({
+            entityType: 'Student',
+            action: 'Refunded',
+            targetName: user ? user.firstName : 'Unknown Student',
+            performedBy,
+            performedByImg
+        });
+
+        res.status(200).json({ message: 'Payment marked as refunded', isPaid: stillPaid });
+    } catch (err) {
+        console.error('Refund Student Payment Error:', err);
+        res.status(500).json({ message: err.message || 'Failed to process refund' });
+    }
+};
+
 
 const getDeletedStudents = async (req, res) => {
     try {
@@ -1807,6 +1939,8 @@ module.exports = {
     deleteStudent,
     restoreStudent,
     getDeletedStudents,
+    getStudentPayments,
+    refundStudentPayment,
     // Admins
     getAdmins,
     createAdmin,

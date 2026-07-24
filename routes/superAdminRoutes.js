@@ -18,6 +18,8 @@ router.get('/students', ctrl.getStudents);
 router.post('/students', ctrl.createStudent);
 router.put('/students/:id', ctrl.updateStudent);
 router.put('/students/:id/restore', ctrl.restoreStudent);
+router.get('/students/:id/payments', ctrl.getStudentPayments);
+router.put('/students/:id/refund', ctrl.refundStudentPayment);
 router.delete('/students/:id', ctrl.deleteStudent);
 
 // Admins

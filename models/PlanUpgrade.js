@@ -41,6 +41,11 @@ const PlanUpgradeSchema = new mongoose.Schema({
         enum: ['razorpay', 'apple'],
         required: true
     },
+    status: {
+        type: String,
+        enum: ['active', 'refunded'],
+        default: 'active'
+    },
     redeemCode: {
         type: String
     },
