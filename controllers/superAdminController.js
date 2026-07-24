@@ -1312,7 +1312,7 @@ const getSuperAdminDashboard = async (req, res) => {
         }
 
         const StudentProfile = require('../models/StudentProfile');
-        const [totalStandards, totalProducts, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades, totalStudents] =
+        const [totalStandards, totalProducts, totalChapters, totalPayments, totalProductPurchases, totalPlanUpgrades, totalStudents, paidStudentIds] =
             await Promise.all([
                 Standard.countDocuments(),
                 ExploreProduct.countDocuments(),
@@ -1320,8 +1320,10 @@ const getSuperAdminDashboard = async (req, res) => {
                 Payment.countDocuments(),
                 ProductPurchase.countDocuments(),
                 PlanUpgrade.countDocuments(),
-                StudentProfile.countDocuments()
+                StudentProfile.countDocuments(),
+                Payment.distinct('userId')
             ]);
+        const totalPaidStudents = paidStudentIds.length;
 
         // A plan purchase writes BOTH a Payment and a PlanUpgrade for the same
         // razorpayPaymentId, so summing both collections double-counts revenue.
@@ -1460,6 +1462,7 @@ const getSuperAdminDashboard = async (req, res) => {
             totalUpgradeAmount,
             totalRevenue,
             totalStudents,
+            totalPaidStudents,
             revenueByMonth,
             studentsByStd: studentsByStd.map(s => ({ label: s._id || 'Unknown', value: s.count })),
             chaptersBySubj: chaptersBySubj.map(c => ({ label: c._id || 'Unknown', value: c.count })),
