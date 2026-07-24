@@ -1257,9 +1257,9 @@ const getPlanUpgrades = async (req, res) => {
         // 1. Get all Product Payment IDs to exclude them from general payments
         const productPaymentIds = await ProductPurchase.distinct('razorpayPaymentId');
 
-        // 2. Fetch Initial Payments (representing first-time plan buys)
+        // 2. Fetch Initial Payments (representing first-time plan buys) — exclude refunded
         const initialPayments = await Payment.aggregate([
-            { $match: { razorpayPaymentId: { $nin: productPaymentIds } } },
+            { $match: { razorpayPaymentId: { $nin: productPaymentIds }, status: { $ne: 'refunded' } } },
             {
                 $lookup: {
                     from: 'users',
@@ -1296,8 +1296,9 @@ const getPlanUpgrades = async (req, res) => {
             }
         ]);
 
-        // 3. Fetch Upgrades
+        // 3. Fetch Upgrades — exclude refunded
         const upgrades = await PlanUpgrade.aggregate([
+            { $match: { status: { $ne: 'refunded' } } },
             {
                 $lookup: {
                     from: 'users',
@@ -1466,15 +1467,16 @@ const getSuperAdminDashboard = async (req, res) => {
             razorpayPaymentId: { $nin: paymentIdsFromPayments }
         };
 
-        // Sum amounts
+        // Sum amounts — exclude refunded payments and upgrades
         const paymentSum = await Payment.aggregate([
+            { $match: { status: { $ne: 'refunded' } } },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
         const purchaseSum = await ProductPurchase.aggregate([
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
         const upgradeSum = await PlanUpgrade.aggregate([
-            { $match: nonDuplicateUpgradeMatch },
+            { $match: { ...nonDuplicateUpgradeMatch, status: { $ne: 'refunded' } } },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
@@ -1496,9 +1498,10 @@ const getSuperAdminDashboard = async (req, res) => {
         };
 
         const [paymentRev, upgradeRev] = await Promise.all([
-            revenueAggregation(Payment),
-            // Same de-duplication: skip upgrades already counted as a Payment.
-            revenueAggregation(PlanUpgrade, nonDuplicateUpgradeMatch)
+            // Exclude refunded payments from the revenue chart
+            revenueAggregation(Payment, { status: { $ne: 'refunded' } }),
+            // Same de-duplication + exclude refunded upgrades.
+            revenueAggregation(PlanUpgrade, { ...nonDuplicateUpgradeMatch, status: { $ne: 'refunded' } })
         ]);
 
         // Merge revenue by month
