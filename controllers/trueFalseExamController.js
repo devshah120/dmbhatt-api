@@ -8,6 +8,29 @@ const { PDFParse } = require('pdf-parse');
 const { shuffleQuestions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        std: query.std,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await TrueFalseExam.findOne(filter);
+};
+
 // Helper to parse the specialized format for True/False Exam
 const parseTrueFalseExamFormat = (text) => {
     let overview = "";
@@ -136,8 +159,31 @@ const createExam = async (req, res) => {
     try {
         console.log('[BACKEND][trueFalseExamController][createExam] Received Payload:', JSON.stringify(req.body, null, 2));
         const { title, std, medium, stream, board, subject, unit, overview, questions, totalMarks, orderIndex } = req.body;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ error: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another true/false exam in this subject.` });
+        }
+
         const newExam = new TrueFalseExam({
-            title, std, medium, stream, board, subject, unit, overview: overview || " ", questions, totalMarks: totalMarks || 20,
+            title,
+            std,
+            medium,
+            stream: normalizeStream(stream),
+            board,
+            subject,
+            unit,
+            overview: overview || " ",
+            questions,
+            totalMarks: totalMarks || 20,
             orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
@@ -192,19 +238,38 @@ const updateExam = async (req, res) => {
     const { id } = req.params;
     try {
         console.log(`[BACKEND][trueFalseExamController][updateExam] ID: ${id}, Received Payload:`, JSON.stringify(req.body, null, 2));
+        const existingExam = await TrueFalseExam.findById(id);
+        if (!existingExam) {
+            return res.status(404).json({ message: 'Exam not found' });
+        }
+
         const { title, std, medium, stream, board, subject, unit, overview, questions, totalMarks, orderIndex } = req.body;
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingExam.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std: std || existingExam.std,
+            subject: subject || existingExam.subject,
+            medium: medium || existingExam.medium,
+            board: board || existingExam.board || 'GSEB',
+            stream: normalizeStream(stream || existingExam.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another true/false exam in this subject.` });
+        }
+
         const exam = await TrueFalseExam.findByIdAndUpdate(
              id, 
              { 
-                title, std, medium, stream, board, subject, unit, overview: overview || " ", questions, 
+                title, std, medium, 
+                stream: normalizeStream(stream), 
+                board, subject, unit, overview: overview || " ", questions, 
                 totalMarks: totalMarks || 20, 
-                orderIndex: orderIndex || 1 
+                orderIndex: newOrderIndex 
              }, 
              { new: true }
         );
-        if (!exam) {
-            return res.status(404).json({ message: 'Exam not found' });
-        }
 
         await ActivityLog.create({
             entityType: 'Exam',

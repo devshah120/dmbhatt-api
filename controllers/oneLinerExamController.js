@@ -4,9 +4,50 @@ const StudentProfile = require('../models/StudentProfile');
 const { shuffleQuestions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        std: query.std,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await OneLinerExam.findOne(filter);
+};
+
 const createExam = async (req, res) => {
     try {
-        const exam = new OneLinerExam(req.body);
+        const { std, subject, medium, board, stream, orderIndex } = req.body;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ success: false, message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another one-liner exam in this subject.` });
+        }
+
+        const exam = new OneLinerExam({
+            ...req.body,
+            stream: normalizeStream(req.body.stream)
+        });
         await exam.save();
         res.status(201).json({ success: true, exam });
     } catch (err) {
@@ -87,7 +128,32 @@ const deleteExam = async (req, res) => {
 
 const updateExam = async (req, res) => {
     try {
-        const exam = await OneLinerExam.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { id } = req.params;
+        const existingExam = await OneLinerExam.findById(id);
+        if (!existingExam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        const { std, subject, medium, board, stream, orderIndex } = req.body;
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingExam.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std: std || existingExam.std,
+            subject: subject || existingExam.subject,
+            medium: medium || existingExam.medium,
+            board: board || existingExam.board || 'GSEB',
+            stream: normalizeStream(stream || existingExam.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ success: false, message: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another one-liner exam in this subject.` });
+        }
+
+        const exam = await OneLinerExam.findByIdAndUpdate(id, {
+            ...req.body,
+            stream: normalizeStream(req.body.stream)
+        }, { new: true });
         res.status(200).json({ success: true, exam });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

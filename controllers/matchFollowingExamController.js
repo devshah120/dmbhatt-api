@@ -5,12 +5,51 @@ const ActivityLog = require('../models/ActivityLog');
 const { shuffleQuestions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        std: query.std,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await MatchFollowingExam.findOne(filter);
+};
+
 // Create Exam
 const createExam = async (req, res) => {
     try {
         const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks, orderIndex } = req.body;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ error: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another match following exam in this subject.` });
+        }
+
         const newExam = new MatchFollowingExam({
-            title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks: totalMarks || pairs.length,
+            title, std, medium, 
+            stream: normalizeStream(stream), 
+            board, subject, unit, overview, pairs, totalMarks: totalMarks || pairs.length,
             orderIndex: orderIndex || 1
         });
         const savedExam = await newExam.save();
@@ -112,12 +151,35 @@ const getExamById = async (req, res) => {
 
 const updateExam = async (req, res) => {
     try {
+        const { id } = req.params;
+        const existingExam = await MatchFollowingExam.findById(id);
+        if (!existingExam) {
+            return res.status(404).json({ error: 'Exam not found' });
+        }
+
         const { title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks, orderIndex } = req.body;
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingExam.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std: std || existingExam.std,
+            subject: subject || existingExam.subject,
+            medium: medium || existingExam.medium,
+            board: board || existingExam.board || 'GSEB',
+            stream: normalizeStream(stream || existingExam.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ error: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another match following exam in this subject.` });
+        }
+
         const updatedExam = await MatchFollowingExam.findByIdAndUpdate(
-            req.params.id,
+            id,
             { 
-                title, std, medium, stream, board, subject, unit, overview, pairs, totalMarks,
-                orderIndex: orderIndex || 1
+                title, std, medium, 
+                stream: normalizeStream(stream), 
+                board, subject, unit, overview, pairs, totalMarks,
+                orderIndex: newOrderIndex
             },
             { new: true }
         );

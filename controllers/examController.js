@@ -2,6 +2,29 @@ const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const ExamResult = require('../models/ExamResult');
 const ActivityLog = require('../models/ActivityLog');
+
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        std: query.std,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await Exam.findOne(filter);
+};
 const { shuffleQuestions, shuffleMcqOptions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 const pdfImgConvert = require('pdf-img-convert');
@@ -239,9 +262,6 @@ const parseQuestionsErrors = (text) => {
     return questions;
 };
 
-/**
- * Save Exam
- */
 const saveExam = async (req, res) => {
     const { title, subject, std, medium, board, stream, unit, totalMarks, questions, orderIndex } = req.body;
 
@@ -249,6 +269,18 @@ const saveExam = async (req, res) => {
     console.log('[DEBUG] Name Required:', Exam.schema.path('name')?.options?.required);
 
     try {
+        const duplicate = await checkDuplicateOrderIndex({
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another exam in this subject.` });
+        }
         // 1. Create Question Docs
         const questionIds = [];
 
@@ -261,7 +293,7 @@ const saveExam = async (req, res) => {
             std,
             medium,
             board: board || 'GSEB',
-            stream: stream || 'None',
+            stream: normalizeStream(stream),
             unit,
             totalMarks,
             orderIndex: orderIndex || 1,
@@ -412,6 +444,25 @@ const updateExam = async (req, res) => {
     const { title, subject, std, medium, board, stream, unit, totalMarks, questions, orderIndex } = req.body;
 
     try {
+        const existingExam = await Exam.findById(id);
+        if (!existingExam) {
+            return res.status(404).json({ message: 'Exam not found' });
+        }
+
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingExam.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std: std || existingExam.std,
+            subject: subject || existingExam.subject,
+            medium: medium || existingExam.medium,
+            board: board || existingExam.board || 'GSEB',
+            stream: normalizeStream(stream || existingExam.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another exam in this subject.` });
+        }
         // 1. Update Exam Metadata
         const exam = await Exam.findByIdAndUpdate(
             id,
@@ -422,7 +473,7 @@ const updateExam = async (req, res) => {
                 std,
                 medium,
                 board: board || 'GSEB',
-                stream: stream || 'None',
+                stream: normalizeStream(stream),
                 unit,
                 totalMarks,
                 orderIndex: orderIndex || 1,

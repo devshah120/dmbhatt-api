@@ -7,6 +7,29 @@ const { PDFParse } = require('pdf-parse'); // Check if this is the correct impor
 const { shuffleQuestions, shuffleFlatOptions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        std: query.std,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await FiveMinTest.findOne(filter);
+};
+
 // Helper to parse the specialized 5 Min Test format
 const parseFiveMinTestFormat = (text) => {
     let overview = "";
@@ -152,7 +175,25 @@ const uploadFiveMinTestPdf = async (req, res) => {
 // Create Test
 const createTest = async (req, res) => {
     try {
-        const test = new FiveMinTest(req.body);
+        const { std, subject, medium, board, stream, orderIndex } = req.body;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another quiz in this subject.` });
+        }
+
+        const test = new FiveMinTest({
+            ...req.body,
+            stream: normalizeStream(req.body.stream)
+        });
         await test.save();
         res.status(201).json(test);
     } catch (err) {
@@ -213,10 +254,31 @@ const getAllTests = async (req, res) => {
 const updateTest = async (req, res) => {
     const { id } = req.params;
     try {
-        const test = await FiveMinTest.findByIdAndUpdate(id, req.body, { new: true });
-        if (!test) {
+        const existingTest = await FiveMinTest.findById(id);
+        if (!existingTest) {
             return res.status(404).json({ message: 'Test not found' });
         }
+
+        const { std, subject, medium, board, stream, orderIndex } = req.body;
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingTest.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            std: std || existingTest.std,
+            subject: subject || existingTest.subject,
+            medium: medium || existingTest.medium,
+            board: board || existingTest.board || 'GSEB',
+            stream: normalizeStream(stream || existingTest.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another quiz in this subject.` });
+        }
+
+        const test = await FiveMinTest.findByIdAndUpdate(id, {
+            ...req.body,
+            stream: normalizeStream(req.body.stream)
+        }, { new: true });
         res.status(200).json(test);
     } catch (err) {
         console.error('Update 5 Min Test Error:', err);

@@ -1,9 +1,47 @@
 const Material = require('../models/Material');
 const ActivityLog = require('../models/ActivityLog');
 
+const normalizeStream = (stream) => {
+    if (!stream || stream === 'None' || stream === '-') {
+        return 'None';
+    }
+    return stream;
+};
+
+const checkDuplicateOrderIndex = async (query, excludeId = null) => {
+    const filter = {
+        isDeleted: { $ne: true },
+        type: query.type,
+        standard: query.standard,
+        subject: query.subject,
+        medium: query.medium,
+        board: query.board || 'GSEB',
+        stream: normalizeStream(query.stream),
+        orderIndex: parseInt(query.orderIndex) || 1
+    };
+    if (excludeId) {
+        filter._id = { $ne: excludeId };
+    }
+    return await Material.findOne(filter);
+};
+
 exports.uploadBoardPaper = async (req, res) => {
     try {
         const { title, medium, standard, stream, year, subject, orderIndex } = req.body;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            type: 'BoardPaper',
+            standard,
+            subject,
+            medium,
+            board: req.body.board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another board paper for this subject.` });
+        }
 
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
@@ -17,7 +55,7 @@ exports.uploadBoardPaper = async (req, res) => {
             medium,
             standard,
             board: req.body.board || 'GSEB',
-            stream: stream || 'None',
+            stream: normalizeStream(stream),
             year,
             subject,
             file: fileUrl,
@@ -46,6 +84,20 @@ exports.uploadSchoolPaper = async (req, res) => {
     try {
         const { title, subject, medium, standard, year, schoolName, orderIndex } = req.body;
 
+        const duplicate = await checkDuplicateOrderIndex({
+            type: 'SchoolPaper',
+            standard,
+            subject,
+            medium,
+            board: req.body.board || 'GSEB',
+            stream: normalizeStream(req.body.stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another school paper for this subject.` });
+        }
+
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
         }
@@ -59,7 +111,7 @@ exports.uploadSchoolPaper = async (req, res) => {
             medium,
             standard,
             board: req.body.board || 'GSEB',
-            stream: req.body.stream || 'None',
+            stream: normalizeStream(req.body.stream),
             year,
             schoolName,
             file: fileUrl,
@@ -88,6 +140,20 @@ exports.uploadNotes = async (req, res) => {
     try {
         const { title, board, standard, medium, stream, subject, year, orderIndex } = req.body;
 
+        const duplicate = await checkDuplicateOrderIndex({
+            type: 'Notes',
+            standard,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another notes document for this subject.` });
+        }
+
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
         }
@@ -100,7 +166,7 @@ exports.uploadNotes = async (req, res) => {
             board: board || 'GSEB',
             standard,
             medium,
-            stream: stream || 'None',
+            stream: normalizeStream(stream),
             subject,
             year,
             file: fileUrl,
@@ -129,6 +195,20 @@ exports.uploadImageMaterial = async (req, res) => {
     try {
         const { title, subject, unit, medium, standard, year, schoolName, orderIndex } = req.body;
 
+        const duplicate = await checkDuplicateOrderIndex({
+            type: 'ImageMaterial',
+            standard,
+            subject,
+            medium,
+            board: req.body.board || 'GSEB',
+            stream: normalizeStream(req.body.stream),
+            orderIndex
+        });
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another image material for this subject.` });
+        }
+
         if (!req.files || !req.files['file']) {
             return res.status(400).json({ message: 'File is required' });
         }
@@ -143,7 +223,7 @@ exports.uploadImageMaterial = async (req, res) => {
             medium,
             standard,
             board: req.body.board || 'GSEB',
-            stream: req.body.stream || 'None',
+            stream: normalizeStream(req.body.stream),
             year,
             schoolName,
             file: fileUrl,
@@ -247,13 +327,34 @@ exports.updateMaterial = async (req, res) => {
         const { id } = req.params;
         const { title, subject, medium, standard, board, stream, year, schoolName, unit, type, orderIndex } = req.body;
 
+        const existingMaterial = await Material.findById(id);
+        if (!existingMaterial) {
+            return res.status(404).json({ message: 'Material not found' });
+        }
+
+        const newOrderIndex = orderIndex !== undefined ? orderIndex : existingMaterial.orderIndex;
+
+        const duplicate = await checkDuplicateOrderIndex({
+            type: type || existingMaterial.type,
+            standard: standard || existingMaterial.standard,
+            subject: subject || existingMaterial.subject,
+            medium: medium || existingMaterial.medium,
+            board: board || existingMaterial.board || 'GSEB',
+            stream: normalizeStream(stream || existingMaterial.stream),
+            orderIndex: newOrderIndex
+        }, id);
+
+        if (duplicate) {
+            return res.status(400).json({ message: `Display Order / Chapter No. ${newOrderIndex} is already assigned to another material in this subject.` });
+        }
+
         let updateData = {
             title,
             subject,
             medium,
             standard,
             board: board || 'GSEB',
-            stream: stream || 'None',
+            stream: normalizeStream(stream),
             year,
             schoolName,
             unit,
