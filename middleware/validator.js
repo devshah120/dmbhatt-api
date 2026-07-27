@@ -15,6 +15,7 @@ const registrationValidation = [
     // Phone number is optional. Only validate the format when a value is
     // actually supplied — an empty string is treated as "not provided".
     body('phoneNum')
+        .trim()
         .optional({ checkFalsy: true })
         .isMobilePhone('any').withMessage('Invalid phone number'),
 

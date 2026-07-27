@@ -110,7 +110,8 @@ const register = async (req, res) => {
 
 /**
  * Admin Registration
- * Required: name, email, phoneNum, loginCode
+ * Required: name, email, loginCode
+ * Optional: phoneNum
  */
 const registerAdmin = async (req, session) => {
     const { name, email, loginCode } = req.body;
@@ -172,7 +173,8 @@ const registerAdmin = async (req, session) => {
 
 /**
  * Student Registration
- * Required: firstName, middleName, phoneNum, std, medium, school, photo, loginCode
+ * Required: firstName, middleName, std, medium, school, photo, loginCode
+ * Optional: phoneNum
  */
 const registerStudent = async (req, session) => {
     let appliedRedeemCode = null;
@@ -632,7 +634,8 @@ const registerStudent = async (req, session) => {
 
 /**
  * Guest Registration
- * Required: firstName, middleName, phoneNum, photo, loginCode
+ * Required: firstName, middleName, photo, loginCode
+ * Optional: phoneNum
  */
 const registerGuest = async (req, session) => {
     let appliedRedeemCode = null;
