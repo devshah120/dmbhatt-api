@@ -40,6 +40,19 @@ const getUserDisplayName = (user) => {
 };
 
 /**
+ * Normalize an optional phone number.
+ *
+ * phoneNum carries a sparse unique index, which only ignores documents where
+ * the field is ABSENT. Storing '' would make a second phone-less user collide
+ * with a duplicate key error, so blank input must become undefined.
+ */
+const normalizePhone = (phoneNum) => {
+    if (phoneNum === null || phoneNum === undefined) return undefined;
+    const trimmed = String(phoneNum).trim();
+    return trimmed === '' ? undefined : trimmed;
+};
+
+/**
  * Parse address string into components
  * Format: "Street, City, State, Pincode"
  */
@@ -60,5 +73,6 @@ module.exports = {
     hashLoginCode,
     compareLoginCode,
     parseAddress,
-    getUserDisplayName
+    getUserDisplayName,
+    normalizePhone
 };

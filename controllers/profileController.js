@@ -8,6 +8,7 @@ const FiveMinTestResult = require('../models/FiveMinTestResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
 const TrueFalseExamResult = require('../models/TrueFalseExamResult');
 const Session = require('../models/Session');
+const { normalizePhone } = require('../utils/helpers');
 
 /**
  * Get User Profile
@@ -68,7 +69,28 @@ const updateProfile = async (req, res) => {
         const { firstName, phoneNum, email, school, city, state, std, stream, medium, board, schoolName, parentPhone, dob } = req.body;
 
         if (firstName) user.firstName = firstName;
-        if (phoneNum) user.phoneNum = phoneNum;
+
+        // Phone is optional. Setting it must reject a number already taken by
+        // someone else, and clearing it must unset the field rather than store
+        // '' (which would break the sparse unique index for other users).
+        if (phoneNum !== undefined) {
+            const newPhone = normalizePhone(phoneNum);
+            if (newPhone && newPhone !== user.phoneNum) {
+                const phoneTaken = await User.findOne({
+                    phoneNum: newPhone,
+                    _id: { $ne: user._id }
+                });
+                if (phoneTaken) {
+                    return res.status(400).json({ message: 'This phone number is already in use' });
+                }
+            }
+            if (newPhone) {
+                user.phoneNum = newPhone;
+            } else {
+                user.phoneNum = undefined;
+            }
+        }
+
         if (email) user.email = email;
         if (dob) user.dob = dob;
 

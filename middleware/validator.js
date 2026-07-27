@@ -12,9 +12,11 @@ const registrationValidation = [
         .notEmpty().withMessage('Login code is required')
         .isLength({ min: 4 }).withMessage('Login code must be at least 4 characters'),
 
+    // Phone number is optional. Only validate the format when a value is
+    // actually supplied — an empty string is treated as "not provided".
     body('phoneNum')
-        .notEmpty().withMessage('Phone number is required')
-        .isMobilePhone().withMessage('Invalid phone number'),
+        .optional({ checkFalsy: true })
+        .isMobilePhone('any').withMessage('Invalid phone number'),
 
     body('dob')
         .optional()

@@ -14,9 +14,9 @@ const userSchema = new mongoose.Schema({
     },
     phoneNum: {
         type: String,
-        required: true,
         unique: true,
-        trim: true
+        trim: true,
+        sparse: true // Optional field: allows many users with no phone number
     },
     email: {
         type: String,

@@ -3,7 +3,7 @@ const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
 const StudentProfile = require('../models/StudentProfile');
 const Session = require('../models/Session');
-const { hashLoginCode, compareLoginCode, generateToken, parseAddress } = require('../utils/helpers');
+const { hashLoginCode, compareLoginCode, generateToken, parseAddress, normalizePhone } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const RedeemCode = require('../models/RedeemCode');
@@ -45,7 +45,7 @@ const getReferralConfig = () => {
  */
 const register = async (req, res) => {
     const { role, phoneNum, firstName } = req.body;
-    console.log(`[DEBUG] Incoming Registration Request. Role: '${role}', Phone: '${phoneNum}', Name: '${firstName}'`);
+    console.log(`[DEBUG] Incoming Registration Request. Role: '${role}', Phone: '${phoneNum || 'not provided'}', Name: '${firstName}'`);
 
     if (!role) {
         return res.status(400).json({ message: 'Role is required' });
@@ -113,12 +113,20 @@ const register = async (req, res) => {
  * Required: name, email, phoneNum, loginCode
  */
 const registerAdmin = async (req, session) => {
-    const { name, email, phoneNum, loginCode } = req.body;
+    const { name, email, loginCode } = req.body;
+    // Phone is optional — blank input becomes undefined so it is never stored as ''
+    const phoneNum = normalizePhone(req.body.phoneNum);
 
-    // Check if user exists
-    const existingUser = await User.findOne({
-        $or: [{ email }, { phoneNum }]
-    }).session(session);
+    // Check if user exists. Only match on supplied identifiers so a phone-less
+    // admin is not reported as a duplicate of another phone-less user.
+    const duplicateChecks = [
+        ...(email ? [{ email }] : []),
+        ...(phoneNum ? [{ phoneNum }] : [])
+    ];
+
+    const existingUser = duplicateChecks.length
+        ? await User.findOne({ $or: duplicateChecks }).session(session)
+        : null;
 
     if (existingUser) {
         throw new Error('User with this email or phone number already exists');
@@ -168,8 +176,10 @@ const registerAdmin = async (req, session) => {
  */
 const registerStudent = async (req, session) => {
     let appliedRedeemCode = null;
-    const { firstName, phoneNum, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state, dob } = req.body;
-    console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum}), City: ${city}, State: ${state}, DOB: ${dob}`);
+    const { firstName, email, std, medium, board, stream, school, loginCode, rollNo, referralCode, parentPhone, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, city, state, dob } = req.body;
+    // Phone is optional — blank input becomes undefined so it is never stored as ''
+    const phoneNum = normalizePhone(req.body.phoneNum);
+    console.log(`[DEBUG] Registering student: ${firstName} (${phoneNum || 'no phone'}), City: ${city}, State: ${state}, DOB: ${dob}`);
 
     // Verify Payment unless skipped (for testing or specific cases)
     if (razorpay_payment_id && razorpay_order_id && razorpay_signature) {
@@ -218,19 +228,20 @@ const registerStudent = async (req, session) => {
         console.log('[DEBUG] Registration proceeding without payment details');
     }
 
-    // Check if user exists
-    console.log(`[DEBUG] Registering student. Phone: '${phoneNum}', Type: ${typeof phoneNum}`);
+    // Check if user exists.
+    // Both phone and email are optional, so only match on the ones actually
+    // supplied — querying { phoneNum: undefined } would match every phone-less
+    // user and falsely report a duplicate.
+    console.log(`[DEBUG] Registering student. Phone: '${phoneNum || ''}', Type: ${typeof phoneNum}`);
 
-    if (!phoneNum) {
-        throw new Error('Phone number is missing or undefined');
-    }
+    const duplicateChecks = [
+        ...(phoneNum ? [{ phoneNum }] : []),
+        ...(email ? [{ email }] : [])
+    ];
 
-    const existingUser = await User.findOne({
-        $or: [
-            { phoneNum },
-            ...(email ? [{ email }] : [])
-        ]
-    }).session(session);
+    const existingUser = duplicateChecks.length
+        ? await User.findOne({ $or: duplicateChecks }).session(session)
+        : null;
 
     let savedUser;
     let isNewUser = false; // Track if this is a new user for welcome email
@@ -241,13 +252,19 @@ const registerStudent = async (req, session) => {
             throw new Error('This account was previously deleted. Registration is not allowed with this phone number.');
         }
 
+        // Work out WHICH identifier matched. Phone is optional, so a plain
+        // `existingUser.phoneNum === phoneNum` comparison would be true for
+        // undefined === undefined and misclassify an email-only match.
+        const phoneMatched = !!phoneNum && existingUser.phoneNum === phoneNum;
+        const emailMatched = !!email && existingUser.email === email;
+
         // 1. Check if email is already taken by ANOTHER user
-        if (email && existingUser.email === email && existingUser.phoneNum !== phoneNum) {
+        if (emailMatched && !phoneMatched) {
             throw new Error('User with this email already exists');
         }
 
         // 2. Handle phone match
-        if (existingUser.phoneNum === phoneNum) {
+        if (phoneMatched) {
             if (existingUser.role === 'student') {
                 console.log(`[DEBUG] Existing student found: ${existingUser.phoneNum}. blocking re-registration.`);
                 // Strictly block re-registration if they are already a student (even if unpaid)
@@ -619,20 +636,26 @@ const registerStudent = async (req, session) => {
  */
 const registerGuest = async (req, session) => {
     let appliedRedeemCode = null;
-    const { firstName, phoneNum, email, loginCode, board, stream, schoolName, referralCode, city, state } = req.body;
+    const { firstName, email, loginCode, board, stream, schoolName, referralCode, city, state } = req.body;
+    // Phone is optional — blank input becomes undefined so it is never stored as ''
+    const phoneNum = normalizePhone(req.body.phoneNum);
 
     // Check if photo was uploaded
     const photoFile = req.files?.photo?.[0];
     // Photo is NOT required for guest registration
 
 
-    // Check if user exists (by phone or email)
-    const existingUser = await User.findOne({
-        $or: [
-            { phoneNum },
-            ...(email ? [{ email }] : [])
-        ]
-    }).session(session);
+    // Check if user exists (by phone or email). Only match on identifiers that
+    // were actually supplied — { phoneNum: undefined } would match every
+    // phone-less user and falsely report a duplicate.
+    const duplicateChecks = [
+        ...(phoneNum ? [{ phoneNum }] : []),
+        ...(email ? [{ email }] : [])
+    ];
+
+    const existingUser = duplicateChecks.length
+        ? await User.findOne({ $or: duplicateChecks }).session(session)
+        : null;
 
     if (existingUser) {
         if (email && existingUser.email === email) {
