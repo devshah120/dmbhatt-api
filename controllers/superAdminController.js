@@ -570,15 +570,22 @@ const revokeStudentSessions = async (req, res) => {
 
         const result = await Session.updateMany(filter, { $set: { isActive: false } });
 
-        const user = await User.findById(profile.userId);
-        const ActivityLog = require('../models/ActivityLog');
-        await ActivityLog.create({
-            entityType: 'Student',
-            action: sessionId ? 'Device Logged Out' : 'All Devices Logged Out',
-            targetName: user ? user.firstName : 'Unknown',
-            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
-            performedByImg: req.performedByImg || req.query.performedByImg || ''
-        });
+        // Audit logging is best-effort: the sessions are already revoked above,
+        // so a failure here must not report the logout as failed and send the
+        // admin back to retry an action that actually succeeded.
+        try {
+            const user = await User.findById(profile.userId);
+            const ActivityLog = require('../models/ActivityLog');
+            await ActivityLog.create({
+                entityType: 'Student',
+                action: 'Logged Out',
+                targetName: user ? user.firstName : 'Unknown',
+                performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+                performedByImg: req.performedByImg || req.query.performedByImg || ''
+            });
+        } catch (logErr) {
+            console.error('Failed to write logout activity log:', logErr.message);
+        }
 
         res.status(200).json({
             message: sessionId
