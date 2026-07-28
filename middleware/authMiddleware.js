@@ -41,7 +41,22 @@ const protect = async (req, res, next) => {
             const session = await Session.findOne({ token, isActive: true });
 
             if (!session) {
-                return res.status(401).json({ message: 'Session expired or logged out' });
+                // Distinguished from a plain 401 so the app can tell the student
+                // they were signed out by a login elsewhere / by an admin,
+                // rather than silently bouncing them to the login screen.
+                return res.status(401).json({
+                    code: 'SESSION_REVOKED',
+                    message: 'Session expired or logged out'
+                });
+            }
+
+            // Track recency so the device limit evicts sensibly and the admin
+            // panel can show when each device was last used. Throttled to once a
+            // minute — this runs on every authenticated request.
+            const lastActive = session.lastActive ? session.lastActive.getTime() : 0;
+            if (Date.now() - lastActive > 60 * 1000) {
+                Session.updateOne({ _id: session._id }, { $set: { lastActive: new Date() } })
+                    .catch((err) => console.error('Failed to update session lastActive:', err));
             }
 
             // Get user from the token

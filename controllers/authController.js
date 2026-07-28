@@ -758,11 +758,34 @@ const registerGuest = async (req, session) => {
 };
 
 /**
+ * Maximum number of devices a student may be logged in on at once.
+ * Configured by the super admin at Configuration → App Version.
+ */
+const DEFAULT_MAX_DEVICES = 1;
+
+const getMaxDevices = () => {
+    try {
+        const configPath = path.join(__dirname, '../config/app.json');
+        if (fs.existsSync(configPath)) {
+            const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            const limit = Number(data.maxDevices);
+            // 0 / negative / NaN are treated as "not configured" rather than
+            // "nobody may log in" — a bad config value must never lock out every
+            // student.
+            if (Number.isFinite(limit) && limit > 0) return limit;
+        }
+    } catch (err) {
+        console.error('Error reading device limit config:', err);
+    }
+    return DEFAULT_MAX_DEVICES;
+};
+
+/**
  * Universal Login Handler
  * Handles login for all roles: admin, assistant, student, guest
  */
 const login = async (req, res) => {
-    const { role, loginCode, phoneNum, email, identifier } = req.body;
+    const { role, loginCode, phoneNum, email, identifier, deviceId, deviceName, platform } = req.body;
 
     try {
         let user;
@@ -776,6 +799,60 @@ const login = async (req, res) => {
         // Find user by phone number or email (ignores role sent by client for lookup)
         user = await loginUserByIdentifier(role, loginIdentifier, loginCode);
 
+        // ---- Device limit enforcement (students only) ----
+        // Admins manage the app from multiple machines, so the limit is not
+        // applied to them.
+        const resolvedDeviceId = (deviceId || '').trim() || 'unknown';
+
+        if (user.role === 'student') {
+            const maxDevices = getMaxDevices();
+
+            // Drop sessions whose expiry has passed. The TTL monitor only runs
+            // once a minute, so without this an expired session could still be
+            // counted against the limit.
+            await Session.updateMany(
+                { userId: user._id, isActive: true, expiresAt: { $lte: new Date() } },
+                { $set: { isActive: false } }
+            );
+
+            // Logging in again from a device that already holds a session
+            // replaces that session instead of consuming another slot —
+            // otherwise a student would exhaust their own limit just by logging
+            // out and back in, or by reinstalling the app.
+            const existingForDevice = resolvedDeviceId !== 'unknown'
+                ? await Session.findOne({ userId: user._id, deviceId: resolvedDeviceId, isActive: true })
+                : null;
+
+            if (existingForDevice) {
+                await Session.updateMany(
+                    { userId: user._id, deviceId: resolvedDeviceId, isActive: true },
+                    { $set: { isActive: false } }
+                );
+            } else {
+                const activeCount = await Session.countDocuments({ userId: user._id, isActive: true });
+
+                if (activeCount >= maxDevices) {
+                    const otherDevices = await Session.find({ userId: user._id, isActive: true })
+                        .sort({ lastActive: -1 })
+                        .select('deviceName platform lastActive')
+                        .lean();
+
+                    return res.status(403).json({
+                        code: 'DEVICE_LIMIT_REACHED',
+                        maxDevices,
+                        activeDevices: otherDevices.map((s) => ({
+                            deviceName: s.deviceName || 'Unknown device',
+                            platform: s.platform || '',
+                            lastActive: s.lastActive
+                        })),
+                        message: maxDevices === 1
+                            ? 'This account is already logged in on another device. Please logout from that device first.'
+                            : `This account is already logged in on ${maxDevices} devices. Please logout from one of them first.`
+                    });
+                }
+            }
+        }
+
         // Generate JWT token
         const token = generateToken(user._id, user.role);
 
@@ -786,7 +863,9 @@ const login = async (req, res) => {
         const session = new Session({
             userId: user._id,
             token,
-            deviceId: req.body.deviceId || 'unknown',
+            deviceId: resolvedDeviceId,
+            deviceName: deviceName || '',
+            platform: platform || '',
             expiresAt
         });
         await session.save();

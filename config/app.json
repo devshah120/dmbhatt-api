@@ -1,0 +1,12 @@
+{
+  "studentMinAndroidVersion": "1",
+  "studentMinIosVersion": "1",
+  "studentPlayStoreUrl": "https://play.store.url",
+  "studentAppStoreUrl": "https://app.store.url",
+  "adminMinAndroidVersion": "1",
+  "adminMinIosVersion": "1",
+  "adminPlayStoreUrl": "https://play.store.url",
+  "adminAppStoreUrl": "https://app.store.url",
+  "forceUpdateMessage": "A new version of the app is available. Please update to continue using the app.",
+  "maxDevices": 1
+}

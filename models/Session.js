@@ -15,6 +15,16 @@ const sessionSchema = new mongoose.Schema({
         type: String,
         default: 'unknown'
     },
+    // Human-readable label shown to the student and in the admin panel
+    // (e.g. "Samsung SM-G991B" / "iPhone 14 Pro").
+    deviceName: {
+        type: String,
+        default: ''
+    },
+    platform: {
+        type: String,
+        default: ''
+    },
     isActive: {
         type: Boolean,
         default: true
@@ -34,5 +44,10 @@ const sessionSchema = new mongoose.Schema({
 // Index for performance and TTL
 sessionSchema.index({ userId: 1 });
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired sessions
+
+// Device-limit counting reads active sessions per user, and login looks up the
+// current device's session to reuse its slot.
+sessionSchema.index({ userId: 1, isActive: 1 });
+sessionSchema.index({ userId: 1, deviceId: 1, isActive: 1 });
 
 module.exports = mongoose.model('Session', sessionSchema);

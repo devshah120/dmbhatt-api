@@ -514,6 +514,85 @@ const restoreStudent = async (req, res) => {
 };
 
 /**
+ * GET /students/:id/sessions
+ * Lists the devices a student is currently logged in on.
+ */
+const getStudentSessions = async (req, res) => {
+    try {
+        const { id } = req.params; // StudentProfile _id
+        const StudentProfile = require('../models/StudentProfile');
+        const Session = require('../models/Session');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+
+        const sessions = await Session.find({
+            userId: profile.userId,
+            isActive: true,
+            expiresAt: { $gt: new Date() }
+        }).sort({ lastActive: -1 }).lean();
+
+        res.status(200).json({
+            sessions: sessions.map(s => ({
+                _id: s._id,
+                deviceId: s.deviceId,
+                deviceName: s.deviceName || 'Unknown device',
+                platform: s.platform || '',
+                lastActive: s.lastActive,
+                loggedInAt: s.createdAt
+            }))
+        });
+    } catch (err) {
+        console.error('Get Student Sessions Error:', err);
+        res.status(500).json({ message: 'Failed to fetch student sessions' });
+    }
+};
+
+/**
+ * DELETE /students/:id/sessions
+ * Force-logs-out a student from all devices (or one device via ?sessionId=).
+ * Lets an admin rescue a student who is locked out — e.g. after losing a phone
+ * or reinstalling the app — without waiting for the session to expire.
+ */
+const revokeStudentSessions = async (req, res) => {
+    try {
+        const { id } = req.params; // StudentProfile _id
+        const { sessionId } = req.query;
+        const StudentProfile = require('../models/StudentProfile');
+        const User = require('../models/User');
+        const Session = require('../models/Session');
+
+        const profile = await StudentProfile.findById(id);
+        if (!profile) return res.status(404).json({ message: 'Student not found' });
+
+        const filter = { userId: profile.userId, isActive: true };
+        if (sessionId) filter._id = sessionId;
+
+        const result = await Session.updateMany(filter, { $set: { isActive: false } });
+
+        const user = await User.findById(profile.userId);
+        const ActivityLog = require('../models/ActivityLog');
+        await ActivityLog.create({
+            entityType: 'Student',
+            action: sessionId ? 'Device Logged Out' : 'All Devices Logged Out',
+            targetName: user ? user.firstName : 'Unknown',
+            performedBy: req.performedBy || req.query.performedBy || 'Super Admin',
+            performedByImg: req.performedByImg || req.query.performedByImg || ''
+        });
+
+        res.status(200).json({
+            message: sessionId
+                ? 'Device logged out successfully'
+                : 'Student logged out from all devices',
+            revokedCount: result.modifiedCount ?? result.nModified ?? 0
+        });
+    } catch (err) {
+        console.error('Revoke Student Sessions Error:', err);
+        res.status(500).json({ message: 'Failed to log out student devices' });
+    }
+};
+
+/**
  * GET /students/:id/payments
  * Returns all captured payments (Payment + PlanUpgrade) for a student.
  */
@@ -1949,6 +2028,9 @@ module.exports = {
     createAdmin,
     updateAdmin,
     deleteAdmin,
+    // Sessions / devices
+    getStudentSessions,
+    revokeStudentSessions,
     // Config
     getConfig,
     saveConfig,

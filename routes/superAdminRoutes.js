@@ -20,6 +20,10 @@ router.put('/students/:id', ctrl.updateStudent);
 router.put('/students/:id/restore', ctrl.restoreStudent);
 router.get('/students/:id/payments', ctrl.getStudentPayments);
 router.put('/students/:id/refund', ctrl.refundStudentPayment);
+// Logged-in devices. Registered before DELETE /students/:id so the more
+// specific path is not shadowed by the delete-student route.
+router.get('/students/:id/sessions', ctrl.getStudentSessions);
+router.delete('/students/:id/sessions', ctrl.revokeStudentSessions);
 router.delete('/students/:id', ctrl.deleteStudent);
 
 // Admins
