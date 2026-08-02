@@ -42,9 +42,9 @@ const getUserDisplayName = (user) => {
 /**
  * Normalize an optional phone number.
  *
- * phoneNum carries a sparse unique index, which only ignores documents where
- * the field is ABSENT. Storing '' would make a second phone-less user collide
- * with a duplicate key error, so blank input must become undefined.
+ * phoneNum carries a partial unique index covering non-empty strings only.
+ * Blank input must become undefined so the key is omitted entirely rather than
+ * stored as '' — keeping phone-less users out of the unique index.
  */
 const normalizePhone = (phoneNum) => {
     if (phoneNum === null || phoneNum === undefined) return undefined;
@@ -68,11 +68,43 @@ const parseAddress = (addressString) => {
     };
 };
 
+// Human-readable message per uniquely-indexed field.
+const DUPLICATE_FIELD_MESSAGES = {
+    phoneNum: 'This mobile number is already registered. Please log in instead.',
+    email: 'This email address is already registered. Please log in instead.',
+    referralCode: 'This referral code is already in use.',
+    rollNo: 'This roll number is already assigned to another student.'
+};
+
+/**
+ * Convert a MongoDB duplicate-key error (E11000) into a message safe to show a
+ * user. The driver's raw text leaks the database name, collection and index
+ * ("E11000 duplicate key error collection: test.users index: phoneNum_1 ..."),
+ * which is both confusing and an information disclosure.
+ *
+ * Returns null when `err` is not a duplicate-key error, so callers can fall
+ * through to their normal error handling.
+ */
+const getDuplicateKeyMessage = (err) => {
+    if (!err || err.code !== 11000) return null;
+
+    // keyPattern is the reliable source; fall back to parsing the message for
+    // errors that crossed a serialization boundary and lost their properties.
+    let field = Object.keys(err.keyPattern || err.keyValue || {})[0];
+    if (!field && typeof err.message === 'string') {
+        const match = err.message.match(/index:\s*([A-Za-z0-9_]+?)_\d+/);
+        field = match && match[1];
+    }
+
+    return DUPLICATE_FIELD_MESSAGES[field] || 'This account already exists.';
+};
+
 module.exports = {
     generateToken,
     hashLoginCode,
     compareLoginCode,
     parseAddress,
     getUserDisplayName,
-    normalizePhone
+    normalizePhone,
+    getDuplicateKeyMessage
 };

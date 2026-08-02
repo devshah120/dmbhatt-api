@@ -1,0 +1,112 @@
+[
+  {
+    "_id": "69d2975bb7764164add9ec89",
+    "role": "admin",
+    "firstName": "Ankit Sir",
+    "phoneNum": "9033239340",
+    "email": "",
+    "createdAt": "2026-04-05T17:09:47.390Z"
+  },
+  {
+    "_id": "69d29791b7764164add9ec8f",
+    "role": "admin",
+    "firstName": "Deep",
+    "phoneNum": "9898280947",
+    "email": "",
+    "createdAt": "2026-04-05T17:10:41.302Z"
+  },
+  {
+    "_id": "69d2b90b150236d219d26e66",
+    "role": "admin",
+    "firstName": "Hetvi",
+    "phoneNum": "9016350231",
+    "email": "",
+    "createdAt": "2026-04-05T19:33:31.417Z"
+  },
+  {
+    "_id": "69d2bb09150236d219d26ea0",
+    "role": "admin",
+    "firstName": "Hardik Sir",
+    "phoneNum": "9898968729",
+    "email": "",
+    "createdAt": "2026-04-05T19:42:01.466Z"
+  },
+  {
+    "_id": "69e909d65084de08b63c25de",
+    "role": "super admin",
+    "firstName": "Super Admin",
+    "phoneNum": "9825189540",
+    "createdAt": "2026-04-22T17:48:06.267Z"
+  },
+  {
+    "_id": "69f0bba3b03f36951d075caf",
+    "role": "admin",
+    "firstName": "Tanvi",
+    "phoneNum": "7802838845",
+    "email": "",
+    "createdAt": "2026-04-28T13:52:35.863Z"
+  },
+  {
+    "_id": "69f0bcd6b03f36951d075ce5",
+    "role": "admin",
+    "firstName": "Riya",
+    "phoneNum": "8799055882",
+    "email": "",
+    "createdAt": "2026-04-28T13:57:42.143Z"
+  },
+  {
+    "_id": "69f0bcf6b03f36951d075d10",
+    "role": "admin",
+    "firstName": "DMEM",
+    "phoneNum": "7434035707",
+    "email": "",
+    "createdAt": "2026-04-28T13:58:14.936Z"
+  },
+  {
+    "_id": "6a25194ab62113eaa90f3736",
+    "role": "admin",
+    "firstName": "Rudri",
+    "phoneNum": "9173781224",
+    "email": "",
+    "createdAt": "2026-06-07T07:10:02.453Z"
+  },
+  {
+    "_id": "6a25705ab62113eaa90f589d",
+    "role": "admin",
+    "firstName": "Vedanti",
+    "phoneNum": "7096876163",
+    "email": "",
+    "createdAt": "2026-06-07T13:21:30.418Z"
+  },
+  {
+    "_id": "6a2edae81da7231035a1a058",
+    "role": "admin",
+    "firstName": "Namrata",
+    "phoneNum": "9510884435",
+    "email": "",
+    "createdAt": "2026-06-14T16:46:32.516Z"
+  },
+  {
+    "_id": "6a427a28a3db468d6453556f",
+    "role": "admin",
+    "firstName": "Astha",
+    "phoneNum": "9727114471",
+    "email": "",
+    "createdAt": "2026-06-29T13:59:04.245Z"
+  },
+  {
+    "_id": "6a5c661e57a9e5dc3c994bbb",
+    "role": "admin",
+    "firstName": "Narendra",
+    "phoneNum": "9662078152",
+    "email": "",
+    "createdAt": "2026-07-19T05:52:30.180Z"
+  },
+  {
+    "_id": "6a6a348121b9b74d40d5189c",
+    "role": "student",
+    "firstName": "Allen",
+    "email": "allen.7p2tggm.paid@icloud.com",
+    "createdAt": "2026-07-29T17:12:33.068Z"
+  }
+]

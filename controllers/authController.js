@@ -3,7 +3,7 @@ const User = require('../models/User');
 const AdminProfile = require('../models/AdminProfile');
 const StudentProfile = require('../models/StudentProfile');
 const Session = require('../models/Session');
-const { hashLoginCode, compareLoginCode, generateToken, parseAddress, normalizePhone } = require('../utils/helpers');
+const { hashLoginCode, compareLoginCode, generateToken, parseAddress, normalizePhone, getDuplicateKeyMessage } = require('../utils/helpers');
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const RedeemCode = require('../models/RedeemCode');
@@ -90,6 +90,27 @@ const register = async (req, res) => {
         if (!committed) {
             await session.abortTransaction();
             console.error('Registration Error:', err);
+
+            // A duplicate-key error means the identifier is taken. Surface a
+            // readable message instead of the driver's raw E11000 text, which
+            // leaks the database, collection and index names to the client.
+            const duplicateMessage = getDuplicateKeyMessage(err);
+            if (duplicateMessage) {
+                return res.status(409).json({
+                    message: duplicateMessage,
+                    error: duplicateMessage
+                });
+            }
+
+            // Deliberate validation throws ("This mobile number is already
+            // registered") are the caller's fault, not a server fault.
+            if (/already registered|already exists|already in use|previously deleted/i.test(err.message || '')) {
+                return res.status(409).json({
+                    message: err.message,
+                    error: err.message
+                });
+            }
+
             return res.status(500).json({
                 message: 'Registration failed',
                 error: err.message
@@ -130,7 +151,7 @@ const registerAdmin = async (req, session) => {
         : null;
 
     if (existingUser) {
-        throw new Error('User with this email or phone number already exists');
+        throw new Error('This email address or mobile number is already registered. Please log in instead.');
     }
 
     // Hash login code
@@ -251,7 +272,7 @@ const registerStudent = async (req, session) => {
     if (existingUser) {
         // Check if account was previously deleted
         if (existingUser.deletedAt) {
-            throw new Error('This account was previously deleted. Registration is not allowed with this phone number.');
+            throw new Error('This account was previously deleted and cannot be registered again. Please contact support.');
         }
 
         // Work out WHICH identifier matched. Phone is optional, so a plain
@@ -262,7 +283,7 @@ const registerStudent = async (req, session) => {
 
         // 1. Check if email is already taken by ANOTHER user
         if (emailMatched && !phoneMatched) {
-            throw new Error('User with this email already exists');
+            throw new Error('This email address is already registered. Please log in instead.');
         }
 
         // 2. Handle phone match
@@ -272,13 +293,13 @@ const registerStudent = async (req, session) => {
                 // Strictly block re-registration if they are already a student (even if unpaid)
                 // Unless they are providing a NEW payment (upgrade or renewal)
                 if (!razorpay_payment_id) {
-                    throw new Error('User with this phone number already exists');
+                    throw new Error('This mobile number is already registered. Please log in instead.');
                 }
                 // Allow update ONLY if payment is provided
                 savedUser = existingUser;
             } else if (existingUser.role !== 'guest') {
                 console.log(`[DEBUG] User found: ${existingUser.phoneNum}, ID: ${existingUser._id}, Role: ${existingUser.role}`);
-                throw new Error('User with this phone number already exists');
+                throw new Error('This mobile number is already registered. Please log in instead.');
             } else {
                 console.log(`[DEBUG] Upgrading guest user to student: ${existingUser.phoneNum}`);
                 savedUser = existingUser;
@@ -662,9 +683,9 @@ const registerGuest = async (req, session) => {
 
     if (existingUser) {
         if (email && existingUser.email === email) {
-            throw new Error('User with this email already exists');
+            throw new Error('This email address is already registered. Please log in instead.');
         }
-        throw new Error('User with this phone number already exists');
+        throw new Error('This mobile number is already registered. Please log in instead.');
     }
 
     // Hash login code
