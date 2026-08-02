@@ -130,6 +130,32 @@ const getStudents = async (req, res) => {
                 }
             },
             {
+                // Devices the student is currently logged in on. Mirrors the filter
+                // used by getStudentSessions so the count matches the device list.
+                $lookup: {
+                    from: 'sessions',
+                    let: { studentUserId: '$userId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$userId', '$$studentUserId'] },
+                                        { $eq: ['$isActive', true] },
+                                        { $gt: ['$expiresAt', new Date()] }
+                                    ]
+                                }
+                            }
+                        },
+                        // One student can hold several sessions on the same handset
+                        // (re-login issues a new token), so count distinct devices.
+                        { $group: { _id: '$deviceId' } },
+                        { $count: 'count' }
+                    ],
+                    as: 'activeSessions'
+                }
+            },
+            {
                 $addFields: {
                     // A plan purchase writes BOTH a Payment and a PlanUpgrade for the
                     // same razorpayPaymentId. Summing both collections double-counts it
@@ -194,6 +220,7 @@ const getStudents = async (req, res) => {
                     medium: 1,
                     stream: 1,
                     totalRewardPoints: 1,
+                    deviceCount: { $ifNull: [{ $arrayElemAt: ['$activeSessions.count', 0] }, 0] },
                     createdAt: 1,
                     referrerName: { $arrayElemAt: ['$referrer.firstName', 0] },
                     referrerCode: { $arrayElemAt: ['$referrer.referralCode', 0] },
