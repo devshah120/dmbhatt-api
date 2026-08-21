@@ -823,12 +823,33 @@ exports.verifyUpgradePayment = async (req, res) => {
 // Apple In-App Purchase Verification
 // ============================================================
 
+const APPLE_VERIFY_RECEIPT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_VERIFY_RECEIPT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_APP_SHARED_SECRET = process.env.APPLE_APP_SHARED_SECRET || '';
 const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.bondbyte.studentsapp';
 
 /**
- * Verify Apple receipt with Apple servers (Sandbox only)
+ * POST a receipt to one of Apple's verifyReceipt endpoints
+ */
+const postAppleReceipt = async (url, payload) => {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`Apple API returned HTTP ${response.status}`);
+    }
+
+    return response.json();
+};
+
+/**
+ * Verify Apple receipt with Apple servers.
+ * Always hits production first; on status 21007 the receipt came from the test
+ * environment, so it is retried against sandbox (Apple's documented flow, which
+ * keeps TestFlight and sandbox testers working against the live endpoint).
  */
 const verifyAppleReceipt = async (receiptData) => {
     const payload = {
@@ -840,17 +861,14 @@ const verifyAppleReceipt = async (receiptData) => {
     }
 
     try {
-        const response = await fetch(APPLE_VERIFY_RECEIPT_SANDBOX, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const result = await postAppleReceipt(APPLE_VERIFY_RECEIPT_PRODUCTION, payload);
 
-        if (!response.ok) {
-            throw new Error(`Apple API returned HTTP ${response.status}`);
+        if (result.status === 21007) {
+            console.log('Apple receipt is from sandbox, retrying against sandbox endpoint');
+            return postAppleReceipt(APPLE_VERIFY_RECEIPT_SANDBOX, payload);
         }
 
-        return response.json();
+        return result;
     } catch (error) {
         console.error('Apple receipt verification error:', error.message);
         throw error;
@@ -895,7 +913,7 @@ exports.verifyAppleMembership = async (req, res) => {
         logEntry.steps.push({ step: 'Validate required fields', success: true });
 
         // Verify with Apple
-        logEntry.steps.push({ step: 'Calling Apple API', success: true, appleUrl: 'https://sandbox.itunes.apple.com/verifyReceipt' });
+        logEntry.steps.push({ step: 'Calling Apple API', success: true, appleUrl: APPLE_VERIFY_RECEIPT_PRODUCTION });
         const appleResult = await verifyAppleReceipt(receipt);
 
         logEntry.steps.push({
@@ -912,8 +930,8 @@ exports.verifyAppleMembership = async (req, res) => {
                 21003: 'Receipt cannot be authenticated',
                 21004: 'Shared secret does not match',
                 21005: 'Receipt server unavailable',
-                21007: 'Receipt from test environment (should auto-retry with sandbox)',
-                21008: 'Receipt from production environment'
+                21007: 'Receipt from test environment (sandbox retry failed)',
+                21008: 'Receipt from production environment (sent to production endpoint)'
             };
             const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
             logEntry.steps.push({
@@ -1164,8 +1182,8 @@ exports.verifyAppleUpgrade = async (req, res) => {
                 21003: 'Receipt cannot be authenticated',
                 21004: 'Shared secret does not match',
                 21005: 'Receipt server unavailable',
-                21007: 'Receipt from test environment (should auto-retry with sandbox)',
-                21008: 'Receipt from production environment'
+                21007: 'Receipt from test environment (sandbox retry failed)',
+                21008: 'Receipt from production environment (sent to production endpoint)'
             };
             const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
             logEntry.steps.push({
@@ -1423,8 +1441,8 @@ exports.verifyAppleProductPurchase = async (req, res) => {
                 21003: 'Receipt cannot be authenticated',
                 21004: 'Shared secret does not match',
                 21005: 'Receipt server unavailable',
-                21007: 'Receipt from test environment (should auto-retry with sandbox)',
-                21008: 'Receipt from production environment'
+                21007: 'Receipt from test environment (sandbox retry failed)',
+                21008: 'Receipt from production environment (sent to production endpoint)'
             };
             const message = statusMessages[appleResult.status] || `Apple verification failed with status ${appleResult.status}`;
             logEntry.steps.push({
