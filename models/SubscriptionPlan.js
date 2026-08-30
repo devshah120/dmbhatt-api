@@ -12,6 +12,12 @@ const SubscriptionPlanSchema = new mongoose.Schema({
         required: true,
         min: 0
     },
+    // Optional iOS-specific price. When null/undefined the iOS app falls back to `amount`.
+    iosAmount: {
+        type: Number,
+        default: null,
+        min: 0
+    },
     description: {
         type: String,
         default: ''

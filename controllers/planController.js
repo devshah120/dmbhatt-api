@@ -1,5 +1,14 @@
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 
+// Normalizes an incoming iOS amount. Returns `null` when the admin left it blank
+// (meaning "use the Android/base amount"), or a validated non-negative number.
+const parseIosAmount = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num < 0) return undefined; // undefined signals invalid
+    return num;
+};
+
 // Get all subscription plans
 exports.getAllPlans = async (req, res) => {
     try {
@@ -48,6 +57,11 @@ exports.createOrUpdatePlan = async (req, res) => {
             return res.status(400).json({ message: 'Standard and amount are required' });
         }
 
+        const iosAmount = parseIosAmount(req.body.iosAmount);
+        if (iosAmount === undefined) {
+            return res.status(400).json({ message: 'iOS amount must be a non-negative number' });
+        }
+
         if (!['6', '7', '8', '9', '10', '11', '12'].includes(standard)) {
             return res.status(400).json({ message: 'Invalid standard' });
         }
@@ -63,7 +77,7 @@ exports.createOrUpdatePlan = async (req, res) => {
             // Update existing plan
             plan = await SubscriptionPlan.findByIdAndUpdate(
                 existingPlan._id,
-                { amount, description, isActive },
+                { amount, iosAmount, description, isActive },
                 { new: true, runValidators: true }
             );
         } else {
@@ -71,6 +85,7 @@ exports.createOrUpdatePlan = async (req, res) => {
             plan = new SubscriptionPlan({
                 standard,
                 amount,
+                iosAmount,
                 description,
                 isActive: isActive !== false
             });
@@ -110,9 +125,16 @@ exports.bulkUpdatePlans = async (req, res) => {
                 });
             }
 
+            const iosAmount = parseIosAmount(planData.iosAmount);
+            if (iosAmount === undefined) {
+                return res.status(400).json({
+                    message: `iOS amount must be a non-negative number for standard ${standard}`
+                });
+            }
+
             const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
                 { standard },
-                { amount, description, isActive },
+                { amount, iosAmount, description, isActive },
                 { new: true, upsert: true, runValidators: true }
             );
 
