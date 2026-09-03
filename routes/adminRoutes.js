@@ -39,6 +39,7 @@ router.post('/generate-redeem-code', adminController.generateRedeemCode);
 router.get('/redeem-codes', adminController.getRedeemCodes);
 router.delete('/delete-redeem-code/:id', adminController.deleteRedeemCode);
 router.put('/revoke-redeem-code/:id', adminController.revokeRedeemCode);
+router.put('/edit-redeem-code/:id', adminController.editRedeemCode);
 
 // Leaderboard
 router.get('/leaderboard', adminController.getAdminLeaderboard);

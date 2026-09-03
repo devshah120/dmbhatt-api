@@ -889,13 +889,14 @@ exports.verifyAppleMembership = async (req, res) => {
             standard: req.body?.standard,
             medium: req.body?.medium,
             stream: req.body?.stream,
+            amount: req.body?.amount,
             receipt: req.body?.receipt ? `[RECEIPT_${req.body.receipt.substring(0, 20)}...]` : null
         },
         steps: []
     };
 
     try {
-        const { receipt, productId, apple_transaction_id, standard, medium, stream } = req.body;
+        const { receipt, productId, apple_transaction_id, standard, medium, stream, amount } = req.body;
 
         logEntry.steps.push({ step: 'Parse request body', success: true });
 
@@ -1031,7 +1032,7 @@ exports.verifyAppleMembership = async (req, res) => {
                 razorpayOrderId: appleOrderId,
                 razorpayPaymentId: apple_transaction_id,
                 razorpaySignature: 'apple_iap',
-                amount: 0, // Apple handles pricing
+                amount: amount || 0,
                 status: 'captured',
                 appleReceiptData: {
                     bundleId,

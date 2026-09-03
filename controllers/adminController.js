@@ -1228,6 +1228,62 @@ const revokeRedeemCode = async (req, res) => {
 };
 
 /**
+ * Edit Redeem Code (Admin)
+ * Allows updating discount/discountType and un-revoking a previously revoked code.
+ */
+const editRedeemCode = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { discount, discountType, revoked, maxUses, expiresAt } = req.body;
+        const RedeemCode = require('../models/RedeemCode');
+        const code = await RedeemCode.findById(id);
+
+        if (!code) return res.status(404).json({ message: 'Code not found' });
+
+        if (discountType !== undefined) {
+            code.discountType = discountType === 'flat' ? 'flat' : 'percentage';
+        }
+        if (discount !== undefined) {
+            code.discount = discount;
+        }
+        if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
+            const parsed = Number(maxUses);
+            code.maxUses = Number.isFinite(parsed) ? parsed : code.maxUses;
+        }
+        if (expiresAt !== undefined) {
+            if (!expiresAt) {
+                code.expiresAt = null;
+            } else {
+                const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(expiresAt);
+                const parsedDate = isDateOnly
+                    ? new Date(`${expiresAt}T23:59:59.999`)
+                    : new Date(expiresAt);
+                if (isNaN(parsedDate.getTime())) {
+                    return res.status(400).json({ message: 'Invalid expiry date' });
+                }
+                code.expiresAt = parsedDate;
+            }
+        }
+        if (revoked !== undefined) {
+            code.revoked = !!revoked;
+            if (!code.revoked) {
+                code.revokedAt = null;
+                code.revokedBy = null;
+            } else {
+                code.revokedAt = new Date();
+                code.revokedBy = req.query.performedBy || req.body?.revokedBy || 'Admin';
+            }
+        }
+
+        await code.save();
+        res.status(200).json(code);
+    } catch (err) {
+        console.error('Edit Redeem Code Error:', err);
+        res.status(400).json({ message: err.message || 'Failed to edit redeem code' });
+    }
+};
+
+/**
  * Get Admin Leaderboard (Top 5)
  */
 const getAdminLeaderboard = async (req, res) => {
@@ -1311,6 +1367,7 @@ module.exports = {
     getRedeemCodes,
     deleteRedeemCode,
     revokeRedeemCode,
+    editRedeemCode,
     getAdminLeaderboard,
     toggleStudentGiftStatus
 };
