@@ -3,14 +3,22 @@ const nodemailer = require('nodemailer');
 /**
  * Configure Nodemailer transporter
  */
+// Local Postfix listens on loopback with a self-signed cert and offers no AUTH,
+// so skip cert verification and omit credentials when talking to it. Remote
+// relays still get full verification and authentication.
+const isLocalSmtp = ['localhost', '127.0.0.1'].includes(process.env.SMTP_HOST);
+
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
     secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
+    ...(process.env.SMTP_USER ? {
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+        },
+    } : {}),
+    ...(isLocalSmtp ? { tls: { rejectUnauthorized: false } } : {}),
 });
 
 /**

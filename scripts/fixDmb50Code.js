@@ -1,18 +1,23 @@
 /**
  * One-time fix for the DMB50 redeem code:
  *   - un-revoke it (so it can be redeemed again)
- *   - switch it from 50% off to a flat Rs.100 off
+ *   - switch it from 50% off to a flat discount (amount below)
  *
  * Usage:
  *   node scripts/fixDmb50Code.js            # dry run - reports only, changes nothing
  *   node scripts/fixDmb50Code.js --apply    # actually apply the change
  */
 require('dotenv').config();
+const dns = require('dns');
+// Some Windows/VPN setups leave Node's resolver unable to answer SRV queries
+// even though the OS resolver can; point Node at a public resolver for this script.
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const mongoose = require('mongoose');
 const RedeemCode = require('../models/RedeemCode');
 
 const APPLY = process.argv.includes('--apply');
 const TARGET_CODE = process.argv.find((a) => !a.startsWith('--') && a !== process.argv[0] && a !== process.argv[1]) || 'DMB50';
+const FLAT_DISCOUNT = 50;
 
 const run = async () => {
     if (!process.env.MONGODB_URI) {
@@ -42,12 +47,12 @@ const run = async () => {
     });
 
     if (!APPLY) {
-        console.log('\nWould set: discount=100, discountType=flat, revoked=false, revokedAt=null, revokedBy=null');
+        console.log(`\nWould set: discount=${FLAT_DISCOUNT}, discountType=flat, revoked=false, revokedAt=null, revokedBy=null`);
         await mongoose.connection.close();
         return;
     }
 
-    code.discount = 100;
+    code.discount = FLAT_DISCOUNT;
     code.discountType = 'flat';
     code.revoked = false;
     code.revokedAt = null;
