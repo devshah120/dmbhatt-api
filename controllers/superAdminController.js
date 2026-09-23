@@ -405,8 +405,8 @@ const getStudentsExport = async (req, res) => {
 const updateStudent = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, email, phoneNum, std, medium, stream, totalRewardPoints } = req.body;
-        
+        const { firstName, email, phoneNum, std, medium, stream, totalRewardPoints, password } = req.body;
+
         const StudentProfile = require('../models/StudentProfile');
         const User = require('../models/User');
 
@@ -418,6 +418,11 @@ const updateStudent = async (req, res) => {
         if (firstName !== undefined) userUpdates.firstName = firstName.trim();
         if (email !== undefined) userUpdates.email = email.trim();
         if (phoneNum !== undefined) userUpdates.phoneNum = phoneNum.trim();
+        // Blank password means keep the current one
+        if (password && password.trim() !== '') {
+            const bcrypt = require('bcryptjs');
+            userUpdates.loginCodeHash = await bcrypt.hash(password.trim(), 10);
+        }
         if (Object.keys(userUpdates).length > 0) {
             await User.findByIdAndUpdate(profile.userId, { $set: userUpdates });
         }
