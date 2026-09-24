@@ -17,7 +17,7 @@ const examViolationSchema = new mongoose.Schema({
     examType: {
         type: String,
         required: true,
-        enum: ['REGULAR', 'ONELINER', 'FIVEMIN']
+        enum: ['REGULAR', 'ONELINER', 'FIVEMIN', 'BOARD_CRACKER']
     }
 }, {
     timestamps: true

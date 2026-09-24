@@ -22,7 +22,7 @@ const examAttemptSchema = new mongoose.Schema({
     examType: {
         type: String,
         required: true,
-        enum: ['REGULAR', 'ONELINER', 'TRUE_FALSE', 'MATCH_FOLLOWING', 'FIVE_MIN']
+        enum: ['REGULAR', 'ONELINER', 'TRUE_FALSE', 'MATCH_FOLLOWING', 'FIVE_MIN', 'BOARD_CRACKER']
     },
     title: {
         type: String,

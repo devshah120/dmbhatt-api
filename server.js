@@ -65,6 +65,8 @@ const trueFalseExamRoutes = require('./routes/trueFalseExamRoutes');
 app.use('/api/truefalseexam', trueFalseExamRoutes);
 const matchFollowingExamRoutes = require('./routes/matchFollowingExamRoutes');
 app.use('/api/matchfollowingexam', matchFollowingExamRoutes);
+const boardCrackerRoutes = require('./routes/boardCrackerRoutes');
+app.use('/api/boardcracker', boardCrackerRoutes);
 const superAdminRoutes = require('./routes/superAdminRoutes');
 app.use('/api/superadmin', superAdminRoutes);
 const redeemRoutes = require('./routes/redeemRoutes');

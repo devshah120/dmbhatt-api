@@ -7,6 +7,7 @@ const ExamResult = require('../models/ExamResult');
 const FiveMinTestResult = require('../models/FiveMinTestResult');
 const OneLinerExamResult = require('../models/OneLinerExamResult');
 const TrueFalseExamResult = require('../models/TrueFalseExamResult');
+const BoardCrackerResult = require('../models/BoardCrackerResult');
 const Session = require('../models/Session');
 const { normalizePhone } = require('../utils/helpers');
 
@@ -33,6 +34,7 @@ const getProfile = async (req, res) => {
             fiveMinTest: await FiveMinTestResult.countDocuments({ studentId: user._id }),
             oneLinerExam: await OneLinerExamResult.countDocuments({ studentId: user._id }),
             trueFalseExam: await TrueFalseExamResult.countDocuments({ studentId: user._id }),
+            boardCracker: await BoardCrackerResult.countDocuments({ studentId: user._id }),
         };
 
         res.status(200).json({
