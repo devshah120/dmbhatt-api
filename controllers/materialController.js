@@ -185,12 +185,14 @@ exports.uploadSchoolPaper = async (req, res) => {
     }
 };
 
-exports.uploadNotes = async (req, res) => {
+// Notes, IMP Notes and Phantom Papers share the same fields and upload flow;
+// only the stored type and the user-facing label differ.
+const createNotesUploader = (type, label) => async (req, res) => {
     try {
         const { title, board, standard, medium, stream, subject, year, orderIndex } = req.body;
 
         const duplicate = await checkDuplicateOrderIndex({
-            type: 'Notes',
+            type,
             standard,
             subject,
             medium,
@@ -200,7 +202,7 @@ exports.uploadNotes = async (req, res) => {
         });
 
         if (duplicate) {
-            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another notes document for this subject.` });
+            return res.status(400).json({ message: `Display Order / Chapter No. ${orderIndex || 1} is already assigned to another ${label} document for this subject.` });
         }
 
         if (!req.files || !req.files['file']) {
@@ -210,7 +212,7 @@ exports.uploadNotes = async (req, res) => {
         const fileUrl = req.files['file'][0].path.replace(/\\/g, '/');
 
         const newMaterial = new Material({
-            type: 'Notes',
+            type,
             title,
             board: board || 'GSEB',
             standard,
@@ -233,12 +235,16 @@ exports.uploadNotes = async (req, res) => {
             performedByImg: req.performedByImg || req.query.performedByImg || req.body.performedByImg || ''
         });
 
-        res.status(201).json({ message: 'Notes uploaded successfully', material: newMaterial });
+        res.status(201).json({ message: `${label} uploaded successfully`, material: newMaterial });
     } catch (error) {
-        console.error('Error uploading notes:', error);
+        console.error(`Error uploading ${label}:`, error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+exports.uploadNotes = createNotesUploader('Notes', 'Notes');
+exports.uploadImpNotes = createNotesUploader('ImpNotes', 'IMP Notes');
+exports.uploadPhantomPaper = createNotesUploader('PhantomPaper', 'Phantom Paper');
 
 exports.uploadImageMaterial = async (req, res) => {
     try {

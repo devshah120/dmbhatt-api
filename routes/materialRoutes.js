@@ -16,6 +16,8 @@ router.post('/upload-board-paper', optionalProtect, uploadMaterial, materialCont
 router.post('/upload-school-paper', optionalProtect, uploadMaterial, materialController.uploadSchoolPaper);
 router.post('/upload-image-material', optionalProtect, uploadMaterial, materialController.uploadImageMaterial);
 router.post('/upload-notes', optionalProtect, uploadMaterial, materialController.uploadNotes);
+router.post('/upload-imp-notes', optionalProtect, uploadMaterial, materialController.uploadImpNotes);
+router.post('/upload-phantom-paper', optionalProtect, uploadMaterial, materialController.uploadPhantomPaper);
 router.get('/all', materialController.getAllMaterials);
 router.get('/next-order-index', materialController.getNextOrderIndex);
 router.delete('/delete/:id', protect, materialController.deleteMaterial);

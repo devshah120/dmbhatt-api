@@ -4,7 +4,7 @@ const MaterialSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes']
+        enum: ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes', 'ImpNotes', 'PhantomPaper']
     },
     title: {
         type: String,
@@ -17,11 +17,11 @@ const MaterialSchema = new mongoose.Schema({
     },
     medium: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes', 'ImpNotes', 'PhantomPaper'].includes(this.type); }
     },
     standard: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes', 'ImpNotes', 'PhantomPaper'].includes(this.type); }
     },
     board: {
         type: String,
@@ -34,7 +34,7 @@ const MaterialSchema = new mongoose.Schema({
     },
     year: {
         type: String,
-        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes'].includes(this.type); }
+        required: function () { return ['BoardPaper', 'SchoolPaper', 'ImageMaterial', 'Notes', 'ImpNotes', 'PhantomPaper'].includes(this.type); }
     },
     schoolName: {
         type: String,
