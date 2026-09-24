@@ -25,6 +25,39 @@ const checkDuplicateOrderIndex = async (query, excludeId = null) => {
     return await Material.findOne(filter);
 };
 
+/**
+ * Suggests the next free Display Order / Chapter No. for a given
+ * type + standard + subject + medium + board + stream group, so the
+ * Add form can pre-fill it instead of always defaulting to 1.
+ */
+exports.getNextOrderIndex = async (req, res) => {
+    try {
+        const { type, standard, subject, medium, board, stream } = req.query;
+
+        if (!type || !standard || !subject || !medium) {
+            return res.status(200).json({ nextOrderIndex: 1 });
+        }
+
+        const filter = {
+            isDeleted: { $ne: true },
+            type,
+            standard,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream)
+        };
+
+        const top = await Material.findOne(filter).sort({ orderIndex: -1 });
+        const nextOrderIndex = top && top.orderIndex ? top.orderIndex + 1 : 1;
+
+        res.status(200).json({ nextOrderIndex });
+    } catch (error) {
+        console.error('Error computing next order index:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 exports.uploadBoardPaper = async (req, res) => {
     try {
         const { title, medium, standard, stream, year, subject, orderIndex } = req.body;
