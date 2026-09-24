@@ -75,6 +75,8 @@ const supportRoutes = require('./routes/supportRoutes');
 app.use('/api/support', supportRoutes);
 const planRoutes = require('./routes/planRoutes');
 app.use('/api/plans', planRoutes);
+const bannerRoutes = require('./routes/bannerRoutes');
+app.use('/api/banner', bannerRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
