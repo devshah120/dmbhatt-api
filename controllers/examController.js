@@ -25,6 +25,38 @@ const checkDuplicateOrderIndex = async (query, excludeId = null) => {
     }
     return await Exam.findOne(filter);
 };
+
+/**
+ * Suggests the next free Display Order / Chapter No. for a given
+ * std + subject + medium + board + stream group, so the Add form can
+ * pre-fill it instead of always defaulting to 1.
+ */
+const getNextOrderIndex = async (req, res) => {
+    try {
+        const { std, subject, medium, board, stream } = req.query;
+
+        if (!std || !subject || !medium) {
+            return res.status(200).json({ nextOrderIndex: 1 });
+        }
+
+        const filter = {
+            isDeleted: { $ne: true },
+            std,
+            subject,
+            medium,
+            board: board || 'GSEB',
+            stream: normalizeStream(stream)
+        };
+
+        const top = await Exam.findOne(filter).sort({ orderIndex: -1 });
+        const nextOrderIndex = top && top.orderIndex ? top.orderIndex + 1 : 1;
+
+        res.status(200).json({ nextOrderIndex });
+    } catch (error) {
+        console.error('Error computing next order index:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
 const { shuffleQuestions, shuffleMcqOptions } = require('../utils/examShuffleService');
 const { recordAttempt, getNextAttemptNumber, shouldShuffleFor } = require('../utils/examAttemptService');
 const pdfImgConvert = require('pdf-img-convert');
@@ -699,5 +731,6 @@ module.exports = {
     getExamById,
     updateExam,
     submitExam,
-    updateViolation
+    updateViolation,
+    getNextOrderIndex
 };

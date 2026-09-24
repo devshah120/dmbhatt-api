@@ -6,6 +6,7 @@ const { protect, optionalProtect } = require('../middleware/authMiddleware');
 
 router.post('/add', oneLinerExamController.createExam);
 router.get('/all', oneLinerExamController.getAllExams);
+router.get('/next-order-index', oneLinerExamController.getNextOrderIndex);
 router.post('/submit', protect, oneLinerExamController.submitResult);
 router.get('/:id', optionalProtect, oneLinerExamController.getExamById);
 router.delete('/:id', oneLinerExamController.deleteExam);

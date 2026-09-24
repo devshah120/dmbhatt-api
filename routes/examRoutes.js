@@ -24,6 +24,8 @@ router.get('/all', examController.getAllExams);
 // Must stay above '/:id' so 'attempts' is not read as an exam id.
 router.get('/attempts', protect, examController.getMyAttempts);
 router.get('/attempts/:examId', protect, examController.getMyAttempts);
+// Must stay above '/:id' so 'next-order-index' is not read as an exam id.
+router.get('/next-order-index', examController.getNextOrderIndex);
 // optionalProtect: identifies the student so retakes can be reshuffled,
 // while keeping the route open for the admin app / guests.
 router.get('/:id', optionalProtect, examController.getExamById);
