@@ -93,6 +93,10 @@ const processScheduledNotifications = async () => {
                         }
                     },
                     data: {
+                        // FCM data values must be strings.
+                        ...Object.fromEntries(
+                            Object.entries(notification.data || {}).map(([k, v]) => [k, String(v)])
+                        ),
                         title: notification.title,
                         body: notification.body
                     }

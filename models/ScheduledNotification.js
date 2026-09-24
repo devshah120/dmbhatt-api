@@ -22,6 +22,11 @@ const scheduledNotificationSchema = new mongoose.Schema({
         enum: ['pending', 'sent', 'failed'],
         default: 'pending'
     },
+    // Optional extra FCM data (string values), e.g. a Live Exam deep link.
+    data: {
+        type: mongoose.Schema.Types.Mixed,
+        default: undefined
+    },
     sentAt: Date,
     errorMessage: String,
     fcmMessageId: String,

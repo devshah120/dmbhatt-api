@@ -1,3 +1,4 @@
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -75,6 +76,8 @@ const supportRoutes = require('./routes/supportRoutes');
 app.use('/api/support', supportRoutes);
 const planRoutes = require('./routes/planRoutes');
 app.use('/api/plans', planRoutes);
+const liveExamRoutes = require('./routes/liveExamRoutes');
+app.use('/api/liveexam', liveExamRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
@@ -111,7 +114,10 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, () => {
+    // Explicit HTTP server so Socket.IO (Live Arena realtime) shares the port.
+    const server = http.createServer(app);
+    require('./realtime/liveExamSocket').init(server);
+    server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
 }
