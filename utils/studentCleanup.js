@@ -21,7 +21,8 @@ const STUDENT_OWNED_COLLECTIONS = [
     { model: 'FiveMinTestResult', field: 'studentId' },
     { model: 'OneLinerExamResult', field: 'studentId' },
     { model: 'TrueFalseExamResult', field: 'studentId' },
-    { model: 'BoardCrackerResult', field: 'studentId' },
+    { model: 'ObjectivesTestSeriesResult', field: 'studentId' },
+    { model: 'ObjectivesTestSeriesAttemptStart', field: 'studentId' },
     { model: 'RewardHistory', field: 'studentId' }
 ];
 

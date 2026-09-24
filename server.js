@@ -65,8 +65,11 @@ const trueFalseExamRoutes = require('./routes/trueFalseExamRoutes');
 app.use('/api/truefalseexam', trueFalseExamRoutes);
 const matchFollowingExamRoutes = require('./routes/matchFollowingExamRoutes');
 app.use('/api/matchfollowingexam', matchFollowingExamRoutes);
-const boardCrackerRoutes = require('./routes/boardCrackerRoutes');
-app.use('/api/boardcracker', boardCrackerRoutes);
+const objectivesTestSeriesRoutes = require('./routes/objectivesTestSeriesRoutes');
+app.use('/api/objectivestestseries', objectivesTestSeriesRoutes);
+// Legacy path from when the feature was called Board Crackers; app builds
+// already installed on phones still call it.
+app.use('/api/boardcracker', objectivesTestSeriesRoutes);
 const superAdminRoutes = require('./routes/superAdminRoutes');
 app.use('/api/superadmin', superAdminRoutes);
 const redeemRoutes = require('./routes/redeemRoutes');

@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 
 /**
- * Board Crackers: a full-length MCQ paper (up to 100 questions) built around
+ * Objectives Test Series: a full-length MCQ paper (up to 100 questions) built around
  * the board exam pattern for one subject. Unlike the chapter-wise exam types
  * there is no unit - a paper covers the whole syllabus.
  */
 const MAX_QUESTIONS = 100;
 
-const boardCrackerSchema = new mongoose.Schema({
+const objectivesTestSeriesSchema = new mongoose.Schema({
     title: {
         type: String,
         required: true
@@ -43,6 +43,18 @@ const boardCrackerSchema = new mongoose.Schema({
         type: Number,
         default: 60
     },
+    // Students cannot open the paper before this moment. null = available immediately.
+    startAt: {
+        type: Date,
+        default: null
+    },
+    // The ranked window closes here. A student's first attempt between startAt
+    // and endAt counts on the leaderboard; everything after is practice.
+    // null = the ranked window never closes.
+    endAt: {
+        type: Date,
+        default: null
+    },
     questions: {
         type: [{
             question: String,
@@ -61,7 +73,7 @@ const boardCrackerSchema = new mongoose.Schema({
         }],
         validate: {
             validator: (qs) => qs.length <= MAX_QUESTIONS,
-            message: `A Board Cracker paper can have at most ${MAX_QUESTIONS} questions.`
+            message: `An Objectives Test Series paper can have at most ${MAX_QUESTIONS} questions.`
         }
     },
     createdAt: {
@@ -70,6 +82,8 @@ const boardCrackerSchema = new mongoose.Schema({
     }
 });
 
-boardCrackerSchema.statics.MAX_QUESTIONS = MAX_QUESTIONS;
+objectivesTestSeriesSchema.statics.MAX_QUESTIONS = MAX_QUESTIONS;
 
-module.exports = mongoose.model('BoardCracker', boardCrackerSchema);
+// Collection keeps its original name so documents saved while this model
+// was called "BoardCracker" are still found.
+module.exports = mongoose.model('ObjectivesTestSeries', objectivesTestSeriesSchema, 'boardcrackers');

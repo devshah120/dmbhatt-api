@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const boardCrackerResultSchema = new mongoose.Schema({
+const objectivesTestSeriesResultSchema = new mongoose.Schema({
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -8,12 +8,12 @@ const boardCrackerResultSchema = new mongoose.Schema({
     },
     examId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'BoardCracker',
+        ref: 'ObjectivesTestSeries',
         required: true
     },
     title: {
         type: String,
-        default: 'Board Cracker'
+        default: 'Objectives Test Series'
     },
     subject: String,
     obtainedMarks: {
@@ -55,6 +55,12 @@ const boardCrackerResultSchema = new mongoose.Schema({
         enum: ['MANUAL', 'TIME_UP', 'VIOLATIONS'],
         default: 'MANUAL'
     },
+    // true only for the student's first attempt inside the paper's ranked
+    // window; retakes and attempts after endAt are practice.
+    isRanked: {
+        type: Boolean,
+        default: false
+    },
     answers: [{
         questionId: mongoose.Schema.Types.ObjectId,
         selectedAnswer: String,
@@ -69,4 +75,14 @@ const boardCrackerResultSchema = new mongoose.Schema({
     timestamps: true
 });
 
-module.exports = mongoose.model('BoardCrackerResult', boardCrackerResultSchema);
+// At most one ranked result per student per paper, even if two submits race.
+objectivesTestSeriesResultSchema.index(
+    { examId: 1, studentId: 1 },
+    { unique: true, partialFilterExpression: { isRanked: true } }
+);
+// Leaderboard order: marks, then fastest, then earliest.
+objectivesTestSeriesResultSchema.index({ examId: 1, isRanked: 1, obtainedMarks: -1, timeTakenSeconds: 1, submittedAt: 1 });
+
+// Collection keeps its original name so documents saved while this model
+// was called "BoardCrackerResult" are still found.
+module.exports = mongoose.model('ObjectivesTestSeriesResult', objectivesTestSeriesResultSchema, 'boardcrackerresults');

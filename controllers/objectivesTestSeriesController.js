@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
-const BoardCracker = require('../models/BoardCracker');
-const BoardCrackerResult = require('../models/BoardCrackerResult');
+const ObjectivesTestSeries = require('../models/ObjectivesTestSeries');
+const ObjectivesTestSeriesResult = require('../models/ObjectivesTestSeriesResult');
+const ObjectivesTestSeriesAttemptStart = require('../models/ObjectivesTestSeriesAttemptStart');
 const ActivityLog = require('../models/ActivityLog');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
@@ -20,6 +21,95 @@ const normalizeStream = (stream) => {
 
 const isAdminUser = (user) => !!user && (user.role === 'admin' || user.role === 'super admin');
 
+/** Accepts an ISO string / timestamp; empty or invalid means "no schedule". */
+const parseScheduleDate = (value) => {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+};
+
+const isNotStarted = (exam, now = new Date()) => !!exam.startAt && new Date(exam.startAt) > now;
+
+const notStartedResponse = (res, exam) => res.status(403).json({
+    code: 'NOT_STARTED',
+    message: 'This paper has not started yet.',
+    startAt: exam.startAt,
+    secondsUntilStart: Math.ceil((new Date(exam.startAt) - new Date()) / 1000)
+});
+
+const hasEnded = (exam, now = new Date()) => !!exam.endAt && new Date(exam.endAt) < now;
+
+/** UPCOMING (locked) -> LIVE (ranked window) -> ENDED (practice only). */
+const getScheduleStatus = (exam, now = new Date()) => {
+    if (isNotStarted(exam, now)) return 'UPCOMING';
+    if (hasEnded(exam, now)) return 'ENDED';
+    return 'LIVE';
+};
+
+const validateSchedule = (startAt, endAt) => {
+    if (startAt && endAt && endAt <= startAt) return 'End date & time must be after the start date & time.';
+    return null;
+};
+
+// Slack for network latency between the app's timer running out and the
+// submit reaching the server.
+const RANKED_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * Latest moment a ranked attempt that began at startedAt can be submitted
+ * and still count. Timed papers get their full time limit even if the
+ * window closes mid-attempt; untimed papers must finish by endAt.
+ */
+const rankedDeadline = (exam, startedAt) => {
+    if (exam.duration > 0) {
+        return new Date(new Date(startedAt).getTime() + exam.duration * 60 * 1000 + RANKED_GRACE_MS);
+    }
+    return exam.endAt ? new Date(new Date(exam.endAt).getTime() + RANKED_GRACE_MS) : null;
+};
+
+/**
+ * Whether this student's attempt at this paper counts on the leaderboard.
+ * Only the first attempt can be ranked, and only if it was opened inside the
+ * ranked window. Returns { ranked, startedAt?, reason? } where reason explains
+ * a practice attempt: GUEST | ALREADY_ATTEMPTED | RANKED_TIME_EXPIRED | ENDED.
+ */
+const getRankedState = async (exam, studentId, now = new Date()) => {
+    if (!studentId || String(studentId) === GUEST_ID) return { ranked: false, reason: 'GUEST' };
+
+    const alreadySubmitted = await ObjectivesTestSeriesResult.exists({ studentId, examId: exam._id });
+    if (alreadySubmitted) return { ranked: false, reason: 'ALREADY_ATTEMPTED' };
+
+    const start = await ObjectivesTestSeriesAttemptStart.findOne({ studentId, examId: exam._id });
+    if (start) {
+        const deadline = rankedDeadline(exam, start.startedAt);
+        if (!deadline || now <= deadline) return { ranked: true, startedAt: start.startedAt };
+        // Opened the ranked attempt but never submitted it in time.
+        return { ranked: false, reason: 'RANKED_TIME_EXPIRED' };
+    }
+
+    if (hasEnded(exam, now)) return { ranked: false, reason: 'ENDED' };
+    return { ranked: true, startedAt: null };
+};
+
+/**
+ * Position of a ranked result: better marks first, then less time, then the
+ * earlier submission.
+ */
+const getRankOf = async (examId, result) => 1 + await ObjectivesTestSeriesResult.countDocuments({
+    examId,
+    isRanked: true,
+    $or: [
+        { obtainedMarks: { $gt: result.obtainedMarks } },
+        { obtainedMarks: result.obtainedMarks, timeTakenSeconds: { $lt: result.timeTakenSeconds } },
+        {
+            obtainedMarks: result.obtainedMarks,
+            timeTakenSeconds: result.timeTakenSeconds,
+            submittedAt: { $lt: result.submittedAt }
+        }
+    ]
+});
+
 const checkDuplicateOrderIndex = async (query, excludeId = null) => {
     const filter = {
         std: query.std,
@@ -32,7 +122,7 @@ const checkDuplicateOrderIndex = async (query, excludeId = null) => {
     if (excludeId) {
         filter._id = { $ne: excludeId };
     }
-    return await BoardCracker.findOne(filter);
+    return await ObjectivesTestSeries.findOne(filter);
 };
 
 /**
@@ -72,8 +162,8 @@ const sanitizeQuestions = (questions) => {
 
 const validateQuestions = (questions) => {
     if (questions.length === 0) return 'Please add at least one question.';
-    if (questions.length > BoardCracker.MAX_QUESTIONS) {
-        return `A Board Cracker paper can have at most ${BoardCracker.MAX_QUESTIONS} questions.`;
+    if (questions.length > ObjectivesTestSeries.MAX_QUESTIONS) {
+        return `An Objectives Test Series paper can have at most ${ObjectivesTestSeries.MAX_QUESTIONS} questions.`;
     }
     for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
@@ -102,7 +192,7 @@ const getNextOrderIndex = async (req, res) => {
             return res.status(200).json({ nextOrderIndex: 1 });
         }
 
-        const top = await BoardCracker.findOne({
+        const top = await ObjectivesTestSeries.findOne({
             std,
             subject,
             medium,
@@ -127,7 +217,7 @@ const getNextOrderIndex = async (req, res) => {
  *   - "Explanation:" lines
  * Anything before the first question becomes the paper description.
  */
-const parseBoardCrackerFormat = (text) => {
+const parseObjectivesTestSeriesFormat = (text) => {
     const questions = [];
     const answerKey = {};
     let description = '';
@@ -235,12 +325,12 @@ const parseBoardCrackerFormat = (text) => {
 
     return {
         description: description.trim().slice(0, 1000),
-        questions: questions.slice(0, BoardCracker.MAX_QUESTIONS),
+        questions: questions.slice(0, ObjectivesTestSeries.MAX_QUESTIONS),
         totalFound: questions.length
     };
 };
 
-const uploadBoardCrackerPdf = async (req, res) => {
+const uploadObjectivesTestSeriesPdf = async (req, res) => {
     if (!req.file || !req.file.buffer) {
         return res.status(400).json({ message: 'No PDF file uploaded' });
     }
@@ -260,7 +350,7 @@ const uploadBoardCrackerPdf = async (req, res) => {
 
         // Scanned PDFs have no text layer - fall back to OCR.
         if (extractedText.length < 50) {
-            console.log('Starting OCR for Board Cracker PDF...');
+            console.log('Starting OCR for Objectives Test Series PDF...');
             const outputImages = await pdfImgConvert.convert(pdfBuffer);
             for (let i = 0; i < outputImages.length; i++) {
                 const result = await Tesseract.recognize(outputImages[i], 'eng');
@@ -268,7 +358,7 @@ const uploadBoardCrackerPdf = async (req, res) => {
             }
         }
 
-        const parsed = parseBoardCrackerFormat(extractedText);
+        const parsed = parseObjectivesTestSeriesFormat(extractedText);
 
         res.status(200).json({
             message: 'PDF processed successfully',
@@ -278,7 +368,7 @@ const uploadBoardCrackerPdf = async (req, res) => {
             rawText: extractedText
         });
     } catch (err) {
-        console.error('Board Cracker PDF processing error:', err);
+        console.error('Objectives Test Series PDF processing error:', err);
         res.status(500).json({ message: 'Failed to process PDF', error: err.message });
     }
 };
@@ -287,19 +377,23 @@ const createExam = async (req, res) => {
     try {
         const { title, description, std, medium, stream, board, subject, duration, orderIndex } = req.body;
         const questions = sanitizeQuestions(req.body.questions);
+        const startAt = parseScheduleDate(req.body.startAt) ?? null;
+        const endAt = parseScheduleDate(req.body.endAt) ?? null;
 
         if (!title || !std || !medium || !subject) {
             return res.status(400).json({ message: 'Title, standard, medium and subject are required.' });
         }
         const questionError = validateQuestions(questions);
         if (questionError) return res.status(400).json({ message: questionError });
+        const scheduleError = validateSchedule(startAt, endAt);
+        if (scheduleError) return res.status(400).json({ message: scheduleError });
 
         const duplicate = await checkDuplicateOrderIndex({ std, subject, medium, board, stream, orderIndex });
         if (duplicate) {
-            return res.status(400).json({ message: `Display Order ${orderIndex || 1} is already assigned to another Board Cracker paper in this subject.` });
+            return res.status(400).json({ message: `Display Order ${orderIndex || 1} is already assigned to another Objectives Test Series paper in this subject.` });
         }
 
-        const saved = await BoardCracker.create({
+        const saved = await ObjectivesTestSeries.create({
             title,
             description: description || '',
             std,
@@ -308,6 +402,8 @@ const createExam = async (req, res) => {
             board: board || 'GSEB',
             subject,
             duration: duration !== undefined ? Number(duration) || 0 : 60,
+            startAt,
+            endAt,
             orderIndex: parseInt(orderIndex) || 1,
             questions
         });
@@ -322,8 +418,8 @@ const createExam = async (req, res) => {
 
         res.status(201).json(saved);
     } catch (error) {
-        console.error('Error creating board cracker:', error);
-        res.status(500).json({ message: 'Failed to create Board Cracker paper', error: error.message });
+        console.error('Error creating objectives test series:', error);
+        res.status(500).json({ message: 'Failed to create Objectives Test Series paper', error: error.message });
     }
 };
 
@@ -341,24 +437,62 @@ const getAllExams = async (req, res) => {
         if (stream) match.stream = stream;
         if (subject) match.subject = subject;
 
-        const exams = await BoardCracker.aggregate([
+        const exams = await ObjectivesTestSeries.aggregate([
             { $match: match },
             { $sort: { orderIndex: 1, createdAt: -1 } },
             { $addFields: { questionCount: { $size: { $ifNull: ['$questions', []] } } } },
             { $project: { questions: 0 } }
         ]);
 
+        // Lock state comes from the server clock so a student can't unlock a
+        // paper early by changing their phone's time. secondsUntilStart lets
+        // the app run an accurate countdown without trusting the device clock.
+        const now = new Date();
+        exams.forEach((exam) => {
+            exam.status = getScheduleStatus(exam, now);
+            exam.isLocked = exam.status === 'UPCOMING';
+            exam.secondsUntilStart = exam.isLocked
+                ? Math.ceil((new Date(exam.startAt) - now) / 1000)
+                : 0;
+            exam.secondsUntilEnd = exam.status === 'LIVE' && exam.endAt
+                ? Math.ceil((new Date(exam.endAt) - now) / 1000)
+                : 0;
+        });
+
+        // For a signed-in student: whether each paper is already attempted
+        // (so retakes are practice) and their ranked score if they have one.
+        const studentId = req.user?._id;
+        if (studentId && req.user.role === 'student' && exams.length > 0) {
+            const results = await ObjectivesTestSeriesResult.find({
+                studentId,
+                examId: { $in: exams.map(e => e._id) }
+            }).select('examId isRanked obtainedMarks totalMarks').lean();
+
+            const byExam = new Map();
+            results.forEach((r) => {
+                const key = String(r.examId);
+                const entry = byExam.get(key) || { ranked: null };
+                if (r.isRanked) entry.ranked = { obtainedMarks: r.obtainedMarks, totalMarks: r.totalMarks };
+                byExam.set(key, entry);
+            });
+            exams.forEach((exam) => {
+                const entry = byExam.get(String(exam._id));
+                exam.attempted = !!entry;
+                exam.myRankedResult = entry?.ranked || null;
+            });
+        }
+
         res.status(200).json(exams);
     } catch (err) {
-        console.error('Get All Board Crackers Error:', err);
-        res.status(500).json({ message: 'Failed to fetch Board Cracker papers', error: err.message });
+        console.error('Get All Objectives Test Series Error:', err);
+        res.status(500).json({ message: 'Failed to fetch Objectives Test Series papers', error: err.message });
     }
 };
 
 const updateExam = async (req, res) => {
     const { id } = req.params;
     try {
-        const existing = await BoardCracker.findById(id);
+        const existing = await ObjectivesTestSeries.findById(id);
         if (!existing) {
             return res.status(404).json({ message: 'Paper not found' });
         }
@@ -367,6 +501,13 @@ const updateExam = async (req, res) => {
         const questions = sanitizeQuestions(req.body.questions);
         const questionError = validateQuestions(questions);
         if (questionError) return res.status(400).json({ message: questionError });
+
+        const parsedStart = parseScheduleDate(req.body.startAt);
+        const parsedEnd = parseScheduleDate(req.body.endAt);
+        const startAt = parsedStart === undefined ? existing.startAt : parsedStart;
+        const endAt = parsedEnd === undefined ? existing.endAt : parsedEnd;
+        const scheduleError = validateSchedule(startAt, endAt);
+        if (scheduleError) return res.status(400).json({ message: scheduleError });
 
         const newOrderIndex = orderIndex !== undefined ? parseInt(orderIndex) || 1 : existing.orderIndex;
         const duplicate = await checkDuplicateOrderIndex({
@@ -378,7 +519,7 @@ const updateExam = async (req, res) => {
             orderIndex: newOrderIndex
         }, id);
         if (duplicate) {
-            return res.status(400).json({ message: `Display Order ${newOrderIndex} is already assigned to another Board Cracker paper in this subject.` });
+            return res.status(400).json({ message: `Display Order ${newOrderIndex} is already assigned to another Objectives Test Series paper in this subject.` });
         }
 
         existing.set({
@@ -390,6 +531,8 @@ const updateExam = async (req, res) => {
             board: board || existing.board,
             subject: subject || existing.subject,
             duration: duration !== undefined ? Number(duration) || 0 : existing.duration,
+            startAt,
+            endAt,
             orderIndex: newOrderIndex,
             questions
         });
@@ -405,15 +548,15 @@ const updateExam = async (req, res) => {
 
         res.status(200).json(exam);
     } catch (err) {
-        console.error('Update Board Cracker Error:', err);
-        res.status(500).json({ message: 'Failed to update Board Cracker paper', error: err.message });
+        console.error('Update Objectives Test Series Error:', err);
+        res.status(500).json({ message: 'Failed to update Objectives Test Series paper', error: err.message });
     }
 };
 
 const deleteExam = async (req, res) => {
     const { id } = req.params;
     try {
-        const deleted = await BoardCracker.findByIdAndDelete(id);
+        const deleted = await ObjectivesTestSeries.findByIdAndDelete(id);
 
         if (deleted) {
             await ActivityLog.create({
@@ -427,8 +570,8 @@ const deleteExam = async (req, res) => {
 
         res.status(200).json({ message: 'Paper deleted successfully' });
     } catch (err) {
-        console.error('Delete Board Cracker Error:', err);
-        res.status(500).json({ message: 'Failed to delete Board Cracker paper', error: err.message });
+        console.error('Delete Objectives Test Series Error:', err);
+        res.status(500).json({ message: 'Failed to delete Objectives Test Series paper', error: err.message });
     }
 };
 
@@ -442,7 +585,7 @@ const getExamById = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(404).json({ message: 'Paper not found' });
         }
-        const exam = await BoardCracker.findById(id);
+        const exam = await ObjectivesTestSeries.findById(id);
         if (!exam) {
             return res.status(404).json({ message: 'Paper not found' });
         }
@@ -451,13 +594,14 @@ const getExamById = async (req, res) => {
         if (isAdminUser(req.user)) {
             return res.status(200).json(payload);
         }
+        if (isNotStarted(exam)) return notStartedResponse(res, exam);
 
         const studentId = req.user?._id;
         const attemptNumber = await getNextAttemptNumber({
             studentId,
             examId: id,
             examType: 'BOARD_CRACKER',
-            ResultModel: BoardCrackerResult,
+            ResultModel: ObjectivesTestSeriesResult,
             skipShuffle: !shouldShuffleFor(req)
         });
 
@@ -466,10 +610,31 @@ const getExamById = async (req, res) => {
         payload.attemptNumber = attemptNumber;
         payload.isShuffled = attemptNumber > 1;
 
+        // Ranked or practice? Opening a ranked attempt starts its server-side
+        // clock; reopening it resumes the same clock.
+        const now = new Date();
+        const state = await getRankedState(exam, studentId, now);
+        let rankedStartedAt = state.startedAt;
+        if (state.ranked && !rankedStartedAt) {
+            const start = await ObjectivesTestSeriesAttemptStart.findOneAndUpdate(
+                { studentId, examId: exam._id },
+                { $setOnInsert: { startedAt: now } },
+                { upsert: true, new: true }
+            );
+            rankedStartedAt = start.startedAt;
+        }
+        payload.attemptMode = state.ranked ? 'RANKED' : 'PRACTICE';
+        payload.practiceReason = state.reason || null;
+        payload.status = getScheduleStatus(exam, now);
+        // Seconds already used on a resumed ranked attempt; 0 for a fresh one.
+        payload.elapsedSeconds = state.ranked
+            ? Math.max(0, Math.floor((now - new Date(rankedStartedAt)) / 1000))
+            : 0;
+
         res.status(200).json(payload);
     } catch (err) {
-        console.error('Get Board Cracker By ID Error:', err);
-        res.status(500).json({ message: 'Failed to fetch Board Cracker paper', error: err.message });
+        console.error('Get Objectives Test Series By ID Error:', err);
+        res.status(500).json({ message: 'Failed to fetch Objectives Test Series paper', error: err.message });
     }
 };
 
@@ -489,10 +654,11 @@ const submitResult = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(examId)) {
             return res.status(400).json({ message: 'Invalid exam id' });
         }
-        const exam = await BoardCracker.findById(examId);
+        const exam = await ObjectivesTestSeries.findById(examId);
         if (!exam) {
             return res.status(404).json({ message: 'Paper not found' });
         }
+        if (isNotStarted(exam)) return notStartedResponse(res, exam);
 
         const selections = new Map();
         (req.body.answers || []).forEach((a) => {
@@ -521,9 +687,24 @@ const submitResult = async (req, res) => {
         const obtainedMarks = correctCount;
         const accuracy = totalMarks > 0 ? Math.round((correctCount / totalMarks) * 100) : 0;
 
+        // Ranked only if this attempt was opened inside the ranked window
+        // (it has a server start record) and submitted within its time.
+        const now = new Date();
+        const state = await getRankedState(exam, studentId, now);
+        let isRanked = state.ranked && !!state.startedAt;
+        let practiceReason = isRanked ? null : (state.reason || 'NOT_STARTED_IN_WINDOW');
+        // Ranked time comes from the server clock, capped at the time limit.
+        let timeTaken = Number(timeTakenSeconds) || 0;
+        if (isRanked) {
+            timeTaken = Math.max(0, Math.round((now - new Date(state.startedAt)) / 1000));
+            if (exam.duration > 0) timeTaken = Math.min(timeTaken, exam.duration * 60);
+        }
+
         let attemptInfo = null;
+        let rank = null;
+        let totalRanked = null;
         if (!isGuest) {
-            await BoardCrackerResult.create({
+            const resultData = {
                 studentId,
                 examId,
                 title: exam.title,
@@ -534,7 +715,7 @@ const submitResult = async (req, res) => {
                 wrongCount,
                 skippedCount,
                 accuracy,
-                timeTakenSeconds: Number(timeTakenSeconds) || 0,
+                timeTakenSeconds: timeTaken,
                 violationCount: Number(violationCount) || 0,
                 violations: Array.isArray(req.body.violations)
                     ? req.body.violations.slice(0, 20).map(v => String(v).slice(0, 200))
@@ -542,8 +723,26 @@ const submitResult = async (req, res) => {
                 submitReason: ['MANUAL', 'TIME_UP', 'VIOLATIONS'].includes(req.body.submitReason)
                     ? req.body.submitReason
                     : 'MANUAL',
-                answers: review.map(({ explanation, ...a }) => a)
-            });
+                answers: review.map(({ explanation, ...a }) => a),
+                isRanked,
+                submittedAt: now
+            };
+
+            let saved;
+            try {
+                saved = await ObjectivesTestSeriesResult.create(resultData);
+            } catch (err) {
+                // Lost a race with another submit of the same first attempt:
+                // that one holds the ranked slot, so this one is practice.
+                if (err.code !== 11000 || !isRanked) throw err;
+                isRanked = false;
+                practiceReason = 'ALREADY_ATTEMPTED';
+                saved = await ObjectivesTestSeriesResult.create({ ...resultData, isRanked: false });
+            }
+            if (isRanked) {
+                rank = await getRankOf(exam._id, saved);
+                totalRanked = await ObjectivesTestSeriesResult.countDocuments({ examId: exam._id, isRanked: true });
+            }
 
             attemptInfo = await recordAttempt({
                 studentId,
@@ -566,30 +765,104 @@ const submitResult = async (req, res) => {
             skippedCount,
             accuracy,
             review,
+            timeTakenSeconds: timeTaken,
+            isRanked,
+            practiceReason,
+            rank,
+            totalRanked,
             attemptNumber: attemptInfo?.attemptNumber,
             totalAttempts: attemptInfo?.totalAttempts,
             bestMarks: attemptInfo?.bestMarks
         });
     } catch (err) {
-        console.error('Submit Board Cracker Result Error:', err);
+        console.error('Submit Objectives Test Series Result Error:', err);
         res.status(500).json({ message: 'Failed to submit result', error: err.message });
+    }
+};
+
+/**
+ * Ranked results for one paper: top 100 plus the caller's own position.
+ * Only first attempts made inside the ranked window appear here.
+ */
+const getLeaderboard = async (req, res) => {
+    const { id } = req.params;
+    try {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(404).json({ message: 'Paper not found' });
+        }
+        const exam = await ObjectivesTestSeries.findById(id).select('title subject std startAt endAt questions');
+        if (!exam) {
+            return res.status(404).json({ message: 'Paper not found' });
+        }
+
+        const LIMIT = 100;
+        const [top, totalParticipants] = await Promise.all([
+            ObjectivesTestSeriesResult.find({ examId: id, isRanked: true })
+                .sort({ obtainedMarks: -1, timeTakenSeconds: 1, submittedAt: 1 })
+                .limit(LIMIT)
+                .populate('studentId', 'firstName lastName photoPath')
+                .lean(),
+            ObjectivesTestSeriesResult.countDocuments({ examId: id, isRanked: true })
+        ]);
+
+        const myId = req.user?._id ? String(req.user._id) : null;
+        const toEntry = (r, rank) => ({
+            rank,
+            studentId: r.studentId?._id || r.studentId,
+            name: [r.studentId?.firstName, r.studentId?.lastName].filter(Boolean).join(' ') || 'Student',
+            photoPath: r.studentId?.photoPath || '',
+            obtainedMarks: r.obtainedMarks,
+            totalMarks: r.totalMarks,
+            accuracy: r.accuracy,
+            timeTakenSeconds: r.timeTakenSeconds,
+            submittedAt: r.submittedAt,
+            isMe: !!myId && String(r.studentId?._id || r.studentId) === myId
+        });
+        const entries = top.map((r, i) => toEntry(r, i + 1));
+
+        let me = entries.find(e => e.isMe) || null;
+        if (!me && myId && myId !== GUEST_ID) {
+            const mine = await ObjectivesTestSeriesResult.findOne({ examId: id, studentId: myId, isRanked: true })
+                .populate('studentId', 'firstName lastName photoPath')
+                .lean();
+            if (mine) me = toEntry(mine, await getRankOf(id, mine));
+        }
+
+        res.status(200).json({
+            exam: {
+                _id: exam._id,
+                title: exam.title,
+                subject: exam.subject,
+                std: exam.std,
+                totalMarks: exam.questions.length,
+                startAt: exam.startAt,
+                endAt: exam.endAt,
+                status: getScheduleStatus(exam)
+            },
+            totalParticipants,
+            entries,
+            me
+        });
+    } catch (err) {
+        console.error('Get Objectives Test Series Leaderboard Error:', err);
+        res.status(500).json({ message: 'Failed to fetch leaderboard', error: err.message });
     }
 };
 
 const getMyResults = async (req, res) => {
     try {
-        const results = await BoardCrackerResult.find({ studentId: req.user._id })
+        const results = await ObjectivesTestSeriesResult.find({ studentId: req.user._id })
             .select('-answers')
             .sort({ createdAt: -1 });
         res.status(200).json(results);
     } catch (err) {
-        console.error('Get Board Cracker Results Error:', err);
+        console.error('Get Objectives Test Series Results Error:', err);
         res.status(500).json({ message: 'Failed to fetch results', error: err.message });
     }
 };
 
 module.exports = {
-    uploadBoardCrackerPdf,
+    uploadObjectivesTestSeriesPdf,
     createExam,
     getAllExams,
     updateExam,
@@ -597,6 +870,7 @@ module.exports = {
     getExamById,
     submitResult,
     getMyResults,
+    getLeaderboard,
     getNextOrderIndex,
-    parseBoardCrackerFormat
+    parseObjectivesTestSeriesFormat
 };
