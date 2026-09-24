@@ -3,6 +3,7 @@ const ObjectivesTestSeries = require('../models/ObjectivesTestSeries');
 const ObjectivesTestSeriesResult = require('../models/ObjectivesTestSeriesResult');
 const ObjectivesTestSeriesAttemptStart = require('../models/ObjectivesTestSeriesAttemptStart');
 const ActivityLog = require('../models/ActivityLog');
+const ScheduledNotification = require('../models/ScheduledNotification');
 const pdfImgConvert = require('pdf-img-convert');
 const Tesseract = require('tesseract.js');
 const { PDFParse } = require('pdf-parse');
@@ -50,6 +51,50 @@ const getScheduleStatus = (exam, now = new Date()) => {
 const validateSchedule = (startAt, endAt) => {
     if (startAt && endAt && endAt <= startAt) return 'End date & time must be after the start date & time.';
     return null;
+};
+
+const NOTIFICATION_SOURCE = 'ObjectivesTestSeries';
+
+/**
+ * Queues a push to the paper's standard for the moment it unlocks, replacing
+ * any not-yet-sent one so reschedules and edits stay in sync. The notification
+ * worker sends it to the std_<std> topic once startAt passes. Papers that open
+ * immediately get no push. Failures are logged, not thrown, so a notification
+ * problem never blocks saving the paper.
+ */
+const syncStartNotification = async (exam) => {
+    try {
+        await ScheduledNotification.deleteMany({
+            sourceType: NOTIFICATION_SOURCE,
+            sourceId: exam._id,
+            status: 'pending'
+        });
+
+        if (!exam.startAt || new Date(exam.startAt) <= new Date()) return;
+
+        await ScheduledNotification.create({
+            title: 'New Test Series paper is live!',
+            body: `${exam.title} (${exam.subject}) is now open. Attempt it now!`,
+            std: exam.std,
+            scheduledTime: exam.startAt,
+            sourceType: NOTIFICATION_SOURCE,
+            sourceId: exam._id
+        });
+    } catch (err) {
+        console.error(`Failed to schedule start notification for paper ${exam._id}:`, err);
+    }
+};
+
+const cancelStartNotification = async (examId) => {
+    try {
+        await ScheduledNotification.deleteMany({
+            sourceType: NOTIFICATION_SOURCE,
+            sourceId: examId,
+            status: 'pending'
+        });
+    } catch (err) {
+        console.error(`Failed to cancel start notification for paper ${examId}:`, err);
+    }
 };
 
 // Slack for network latency between the app's timer running out and the
@@ -407,6 +452,7 @@ const createExam = async (req, res) => {
             orderIndex: parseInt(orderIndex) || 1,
             questions
         });
+        await syncStartNotification(saved);
 
         await ActivityLog.create({
             entityType: 'Exam',
@@ -537,6 +583,7 @@ const updateExam = async (req, res) => {
             questions
         });
         const exam = await existing.save();
+        await syncStartNotification(exam);
 
         await ActivityLog.create({
             entityType: 'Exam',
@@ -559,6 +606,7 @@ const deleteExam = async (req, res) => {
         const deleted = await ObjectivesTestSeries.findByIdAndDelete(id);
 
         if (deleted) {
+            await cancelStartNotification(deleted._id);
             await ActivityLog.create({
                 entityType: 'Exam',
                 action: 'Deleted',

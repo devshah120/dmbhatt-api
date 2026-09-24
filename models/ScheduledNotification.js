@@ -17,6 +17,14 @@ const scheduledNotificationSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
+    // Set when the notification was queued automatically for a record (e.g. a
+    // scheduled Objectives Test Series paper), so it can be moved or removed
+    // when that record is rescheduled or deleted.
+    sourceType: String,
+    sourceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        index: true
+    },
     status: {
         type: String,
         enum: ['pending', 'sent', 'failed'],
