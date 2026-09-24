@@ -11,6 +11,12 @@
  *   - Group records by (type + subject + standard + board + medium + stream) —
  *     this must match checkDuplicateOrderIndex() in materialController.js
  *     exactly, so migrated data won't collide with the live duplicate check.
+ *   - Board Paper and School Paper are literal past-year exam papers, so for
+ *     those two types `year` is ALSO part of the group — each year gets its
+ *     own independent 1,2,3... sequence (e.g. the 2026 and 2025 Board Papers
+ *     for the same subject can both be order 1). Notes and Image Material
+ *     represent curriculum chapters/units, so they keep one shared sequence
+ *     across years, same as before.
  *   - Within each group, sort by createdAt ASC (oldest first)
  *   - Assign orderIndex 1, 2, 3... sequentially
  *
@@ -30,7 +36,10 @@ const normalizeStream = (stream) => {
   return stream;
 };
 
-const GROUP_FIELDS = ['type', 'subject', 'standard', 'board', 'medium', 'stream'];
+// Mirrors YEAR_SCOPED_TYPES in materialController.js.
+const YEAR_SCOPED_TYPES = ['BoardPaper', 'SchoolPaper'];
+
+const BASE_GROUP_FIELDS = ['type', 'subject', 'standard', 'board', 'medium', 'stream'];
 
 async function migrateMaterials() {
   console.log('─── Migrating: Material (all types) ───');
@@ -41,10 +50,13 @@ async function migrateMaterials() {
   console.log(`  Found ${records.length} records`);
   if (records.length === 0) return;
 
-  // Group by composite key
+  // Group by composite key — `year` is appended only for Board/School Paper.
   const groups = {};
   for (const rec of records) {
-    const key = GROUP_FIELDS
+    const groupFields = YEAR_SCOPED_TYPES.includes(rec.type)
+      ? [...BASE_GROUP_FIELDS, 'year']
+      : BASE_GROUP_FIELDS;
+    const key = groupFields
       .map(f => {
         const val = f === 'stream' ? normalizeStream(rec.stream) : rec[f];
         return (val || 'unknown').toString().trim().toLowerCase();

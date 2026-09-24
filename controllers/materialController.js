@@ -8,6 +8,13 @@ const normalizeStream = (stream) => {
     return stream;
 };
 
+// Board Paper and School Paper are literal past-year exam papers, so each
+// year gets its own independent 1,2,3... sequence (e.g. the 2026 Board Paper
+// and the 2025 Board Paper can both be order 1). Notes and Image Material
+// represent curriculum chapters/units, so they keep one shared sequence
+// across years.
+const YEAR_SCOPED_TYPES = ['BoardPaper', 'SchoolPaper'];
+
 const checkDuplicateOrderIndex = async (query, excludeId = null) => {
     const filter = {
         isDeleted: { $ne: true },
@@ -19,6 +26,9 @@ const checkDuplicateOrderIndex = async (query, excludeId = null) => {
         stream: normalizeStream(query.stream),
         orderIndex: parseInt(query.orderIndex) || 1
     };
+    if (YEAR_SCOPED_TYPES.includes(query.type)) {
+        filter.year = query.year;
+    }
     if (excludeId) {
         filter._id = { $ne: excludeId };
     }
@@ -27,12 +37,13 @@ const checkDuplicateOrderIndex = async (query, excludeId = null) => {
 
 /**
  * Suggests the next free Display Order / Chapter No. for a given
- * type + standard + subject + medium + board + stream group, so the
- * Add form can pre-fill it instead of always defaulting to 1.
+ * type + standard + subject + medium + board + stream (+ year, for Board/
+ * School Paper) group, so the Add form can pre-fill it instead of always
+ * defaulting to 1.
  */
 exports.getNextOrderIndex = async (req, res) => {
     try {
-        const { type, standard, subject, medium, board, stream } = req.query;
+        const { type, standard, subject, medium, board, stream, year } = req.query;
 
         if (!type || !standard || !subject || !medium) {
             return res.status(200).json({ nextOrderIndex: 1 });
@@ -47,6 +58,9 @@ exports.getNextOrderIndex = async (req, res) => {
             board: board || 'GSEB',
             stream: normalizeStream(stream)
         };
+        if (YEAR_SCOPED_TYPES.includes(type)) {
+            filter.year = year;
+        }
 
         const top = await Material.findOne(filter).sort({ orderIndex: -1 });
         const nextOrderIndex = top && top.orderIndex ? top.orderIndex + 1 : 1;
@@ -69,6 +83,7 @@ exports.uploadBoardPaper = async (req, res) => {
             medium,
             board: req.body.board || 'GSEB',
             stream: normalizeStream(stream),
+            year,
             orderIndex
         });
 
@@ -124,6 +139,7 @@ exports.uploadSchoolPaper = async (req, res) => {
             medium,
             board: req.body.board || 'GSEB',
             stream: normalizeStream(req.body.stream),
+            year,
             orderIndex
         });
 
@@ -374,6 +390,7 @@ exports.updateMaterial = async (req, res) => {
             medium: medium || existingMaterial.medium,
             board: board || existingMaterial.board || 'GSEB',
             stream: normalizeStream(stream || existingMaterial.stream),
+            year: year || existingMaterial.year,
             orderIndex: newOrderIndex
         }, id);
 
