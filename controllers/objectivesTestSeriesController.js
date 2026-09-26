@@ -897,6 +897,97 @@ const getLeaderboard = async (req, res) => {
     }
 };
 
+/**
+ * Combined standings across every currently-open Objectives Test Series
+ * paper for a std/medium/board/stream: each student's total ranked marks
+ * added up over those papers, not one leaderboard per paper.
+ *
+ * Only ranked results count (first attempt, made inside that paper's ranked
+ * window) - same rule as the per-paper leaderboard. A student who has not
+ * taken every paper is still included, ranked on the marks they do have.
+ */
+const getCombinedLeaderboard = async (req, res) => {
+    try {
+        const { std, medium, board, stream } = req.query;
+        const match = {};
+        if (std) match.std = std;
+        if (medium) match.medium = medium;
+        if (board) match.board = board;
+        if (stream) match.stream = stream;
+
+        const now = new Date();
+        const papers = await ObjectivesTestSeries.find(match)
+            .select('title std startAt endAt questions')
+            .lean();
+        const openPapers = papers.filter((p) => getScheduleStatus(p, now) !== 'UPCOMING');
+        if (openPapers.length === 0) {
+            return res.status(200).json({ papers: [], totalParticipants: 0, entries: [], me: null });
+        }
+        const paperIds = openPapers.map((p) => p._id);
+        const totalMarksByPaper = new Map(openPapers.map((p) => [String(p._id), p.questions.length]));
+        const grandTotalMarks = openPapers.reduce((sum, p) => sum + p.questions.length, 0);
+
+        const LIMIT = 100;
+        const rows = await ObjectivesTestSeriesResult.aggregate([
+            { $match: { examId: { $in: paperIds }, isRanked: true } },
+            {
+                $group: {
+                    _id: '$studentId',
+                    obtainedMarks: { $sum: '$obtainedMarks' },
+                    timeTakenSeconds: { $sum: '$timeTakenSeconds' },
+                    papersAttempted: { $sum: 1 },
+                    lastSubmittedAt: { $max: '$submittedAt' }
+                }
+            },
+            { $sort: { obtainedMarks: -1, timeTakenSeconds: 1, lastSubmittedAt: 1 } }
+        ]);
+
+        const myId = req.user?._id ? String(req.user._id) : null;
+        const populated = await ObjectivesTestSeriesResult.populate(
+            rows.map((r) => ({ studentId: r._id })),
+            { path: 'studentId', select: 'firstName lastName photoPath' }
+        );
+        const toEntry = (r, student, rank) => ({
+            rank,
+            studentId: student?._id || r._id,
+            name: [student?.firstName, student?.lastName].filter(Boolean).join(' ') || 'Student',
+            photoPath: student?.photoPath || '',
+            obtainedMarks: r.obtainedMarks,
+            totalMarks: grandTotalMarks,
+            papersAttempted: r.papersAttempted,
+            papersTotal: openPapers.length,
+            timeTakenSeconds: r.timeTakenSeconds,
+            submittedAt: r.lastSubmittedAt,
+            isMe: !!myId && String(r._id) === myId
+        });
+
+        const top = rows.slice(0, LIMIT);
+        const entries = top.map((r, i) => toEntry(r, populated[i].studentId, i + 1));
+
+        let me = entries.find((e) => e.isMe) || null;
+        if (!me && myId && myId !== GUEST_ID) {
+            const myIndex = rows.findIndex((r) => String(r._id) === myId);
+            if (myIndex !== -1) {
+                me = toEntry(rows[myIndex], populated[myIndex].studentId, myIndex + 1);
+            }
+        }
+
+        res.status(200).json({
+            papers: openPapers.map((p) => ({
+                _id: p._id,
+                title: p.title,
+                totalMarks: totalMarksByPaper.get(String(p._id))
+            })),
+            totalParticipants: rows.length,
+            entries,
+            me
+        });
+    } catch (err) {
+        console.error('Get Combined Objectives Test Series Leaderboard Error:', err);
+        res.status(500).json({ message: 'Failed to fetch combined leaderboard', error: err.message });
+    }
+};
+
 const getMyResults = async (req, res) => {
     try {
         const results = await ObjectivesTestSeriesResult.find({ studentId: req.user._id })
@@ -947,6 +1038,7 @@ module.exports = {
     getMyResults,
     getMyResultDetail,
     getLeaderboard,
+    getCombinedLeaderboard,
     getNextOrderIndex,
     parseObjectivesTestSeriesFormat
 };
