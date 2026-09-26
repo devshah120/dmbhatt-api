@@ -12,6 +12,7 @@ router.post('/create', objectivesTestSeriesController.createExam);
 router.get('/all', objectivesTestSeriesController.getAllExams);
 router.get('/next-order-index', objectivesTestSeriesController.getNextOrderIndex);
 router.get('/my-results', protect, objectivesTestSeriesController.getMyResults);
+router.get('/my-results/:resultId', protect, objectivesTestSeriesController.getMyResultDetail);
 router.post('/submit', protect, objectivesTestSeriesController.submitResult);
 router.get('/:id/leaderboard', protect, objectivesTestSeriesController.getLeaderboard);
 router.get('/:id', optionalProtect, objectivesTestSeriesController.getExamById);

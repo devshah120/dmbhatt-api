@@ -909,6 +909,33 @@ const getMyResults = async (req, res) => {
     }
 };
 
+/**
+ * One of the caller's own results with the paper it was taken on, answers
+ * included - the student has already submitted it, so the key is safe to
+ * show. Powers the history screen's question-paper PDF.
+ */
+const getMyResultDetail = async (req, res) => {
+    const { resultId } = req.params;
+    try {
+        if (!mongoose.Types.ObjectId.isValid(resultId)) {
+            return res.status(404).json({ message: 'Result not found' });
+        }
+        const result = await ObjectivesTestSeriesResult.findOne({ _id: resultId, studentId: req.user._id }).lean();
+        if (!result) {
+            return res.status(404).json({ message: 'Result not found' });
+        }
+
+        const exam = await ObjectivesTestSeries.findById(result.examId)
+            .select('title subject std medium duration questions')
+            .lean();
+
+        res.status(200).json({ result, exam });
+    } catch (err) {
+        console.error('Get Objectives Test Series Result Detail Error:', err);
+        res.status(500).json({ message: 'Failed to fetch result', error: err.message });
+    }
+};
+
 module.exports = {
     uploadObjectivesTestSeriesPdf,
     createExam,
@@ -918,6 +945,7 @@ module.exports = {
     getExamById,
     submitResult,
     getMyResults,
+    getMyResultDetail,
     getLeaderboard,
     getNextOrderIndex,
     parseObjectivesTestSeriesFormat
